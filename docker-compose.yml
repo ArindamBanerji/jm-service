@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  jm-api:
+    build: .
+    ports:
+      - "8100:8100"
+    volumes:
+      - jm-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  jm-data:
