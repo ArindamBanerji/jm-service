@@ -1,13 +1,45 @@
-version: "3.9"
-
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: jm_labeling
+      POSTGRES_USER: jm
+      POSTGRES_PASSWORD: jm_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jm -d jm_labeling"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   jm-api:
     build: .
     ports:
-      - "8100:8100"
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://jm:jm_dev@postgres:5432/jm_labeling
+      JM_DB_PATH: /data/jm_tenants.db
+      LS_CONFIG_PATH: /data/ls_config.json
+      ADMIN_API_KEY: test-admin-key-for-smoke
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - jm-data:/app/data
+      - jm-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"
+      interval: 30s
+      timeout: 3s
+      retries: 3
     restart: unless-stopped
 
 volumes:
+  pgdata:
   jm-data:

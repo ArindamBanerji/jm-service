@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import math
 import uuid
+from math import isfinite
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -208,6 +209,8 @@ class JudgmentMemoryEngine:
         self.variance_trackers: dict[str, WelfordState] = {
             f: WelfordState() for f in config.factors
         }
+        self.correct_trackers: dict[str, WelfordState] = {f: WelfordState() for f in config.factors}
+        self.incorrect_trackers: dict[str, WelfordState] = {f: WelfordState() for f in config.factors}
 
         # Conservation gate
         self.conservation = ConservationState()
@@ -286,11 +289,40 @@ class JudgmentMemoryEngine:
             factors=factors,
         )
 
+    def score_readonly(self, factors: dict[str, float], category: str) -> dict[str, float]:
+        """Return action softmax scores without changing engine state."""
+        if category not in self.config.categories:
+            raise ValueError(f"Unknown category: {category}")
+        for name, value in factors.items():
+            if not isfinite(value):
+                raise ValueError(f"Non-finite factor value: {name}={value}")
+        factor_vec = [factors.get(f, 0.5) for f in self.config.factors]
+        distances: dict[str, float] = {}
+        for action in self.config.actions:
+            centroid = self.centroids.get(f"{category}|{action}")
+            distances[action] = self._l2_distance(factor_vec, centroid) if centroid is not None else 999.0
+        return self._softmax_scores(distances)
+
+    def score_readonly_batch(self, items: list[dict]) -> list[dict[str, float]]:
+        """Validate the whole batch, then return scores in input order."""
+        for item in items:
+            category = item.get("category", "")
+            if category not in self.config.categories:
+                raise ValueError(f"Unknown category: {category}")
+            for name, value in item.get("factors", {}).items():
+                if not isfinite(value):
+                    raise ValueError(f"Non-finite factor value: {name}={value}")
+        return [self.score_readonly(item["factors"], item["category"]) for item in items]
+
     def learn(
         self,
         decision_id: str,
         actual_action: str,
         confirmed: bool = True,
+        *,
+        eta: float | None = None,
+        outcome_correct: bool | None = None,
+        track_outcome: bool = True,
     ) -> LearnResult:
         """
         Learn from a verified outcome.
@@ -300,6 +332,8 @@ class JudgmentMemoryEngine:
         confirmed: True = human confirms recommendation was right,
                    False = human overrides
         """
+        if eta is not None and not (0 < eta <= 1):
+            raise ValueError(f"eta must be in (0, 1], got {eta}")
         log_entry = self.decision_log.get(decision_id)
         if log_entry is None:
             raise ValueError(f"Unknown decision_id: {decision_id}")
@@ -309,7 +343,7 @@ class JudgmentMemoryEngine:
         recommended = log_entry["recommended_action"]
 
         # Determine learning rate
-        eta = self.eta_confirm if confirmed else self.eta_override
+        effective_eta = eta if eta is not None else (self.eta_confirm if confirmed else self.eta_override)
 
         # The centroid to update is (category, actual_action)
         key = f"{category}|{actual_action}"
@@ -320,7 +354,7 @@ class JudgmentMemoryEngine:
 
         # Update: μ ← μ + η·(f − μ)
         new_centroid = [
-            c + eta * (f - c)
+            c + effective_eta * (f - c)
             for c, f in zip(centroid, factor_vec)
         ]
         self.centroids[key] = new_centroid
@@ -330,6 +364,11 @@ class JudgmentMemoryEngine:
         # Update variance trackers
         for i, factor_name in enumerate(self.config.factors):
             self.variance_trackers[factor_name].update(factor_vec[i])
+        if track_outcome:
+            outcome_is_correct = outcome_correct if outcome_correct is not None else confirmed
+            trackers = self.correct_trackers if outcome_is_correct else self.incorrect_trackers
+            for i, factor_name in enumerate(self.config.factors):
+                trackers[factor_name].update(factor_vec[i])
 
         # Update conservation state
         was_correct = (recommended == actual_action)
@@ -344,9 +383,54 @@ class JudgmentMemoryEngine:
             centroid_moved=True,
             old_distance=old_dist,
             new_distance=new_dist,
-            learning_rate_used=eta,
+            learning_rate_used=effective_eta,
             gate_status="clear" if gate_pass else f"PAUSED: {gate_reason}",
         )
+
+    def signal_confidence_inversion(self) -> dict | None:
+        """Report a mismatch between stable input and outcome separation."""
+        if self.conservation.total_verified < 50:
+            return None
+        input_vars = {f: w.variance for f, w in self.variance_trackers.items() if w.count >= 20}
+        if len(input_vars) < 2:
+            return None
+        most_trusted = min(input_vars, key=input_vars.get)  # type: ignore[arg-type]
+        gaps = {
+            f: abs(self.correct_trackers[f].mean - self.incorrect_trackers[f].mean)
+            for f in self.config.factors
+            if self.correct_trackers[f].count >= 10 and self.incorrect_trackers[f].count >= 10
+        }
+        if len(gaps) < 2:
+            return None
+        most_predictive = max(gaps, key=gaps.get)  # type: ignore[arg-type]
+        if most_trusted == most_predictive:
+            return None
+        return {
+            "trusted_factor": most_trusted,
+            "trusted_factor_variance": round(input_vars[most_trusted], 6),
+            "actual_signal_factor": most_predictive,
+            "actual_signal_gap": round(gaps[most_predictive], 4),
+            "interpretation": (
+                f"Annotators treat '{most_trusted}' as the most stable signal "
+                f"(variance={input_vars[most_trusted]:.4f}), but '{most_predictive}' "
+                f"is the strongest predictor of correct outcomes "
+                f"(|mean_correct - mean_incorrect| = {gaps[most_predictive]:.4f})"
+            ),
+        }
+
+    def centroid_disagreement(
+        self, other_engines: list["JudgmentMemoryEngine"], category: str, action: str
+    ) -> float | None:
+        """Distance from this centroid to the mean available peer centroid."""
+        key = f"{category}|{action}"
+        mine = self.centroids.get(key)
+        if mine is None:
+            return None
+        peers = [engine.centroids[key] for engine in other_engines if key in engine.centroids]
+        if not peers:
+            return None
+        mean_peer = [sum(peer[i] for peer in peers) / len(peers) for i in range(len(mine))]
+        return self._l2_distance(mine, mean_peer)
 
     def diagnostics(self) -> dict:
         """Return the full diagnostic state — noise fingerprint, conservation, centroids."""
@@ -394,6 +478,14 @@ class JudgmentMemoryEngine:
                 f: {"count": w.count, "mean": w.mean, "m2": w.m2}
                 for f, w in self.variance_trackers.items()
             },
+            "correct_trackers": {
+                f: {"count": w.count, "mean": w.mean, "m2": w.m2}
+                for f, w in self.correct_trackers.items()
+            },
+            "incorrect_trackers": {
+                f: {"count": w.count, "mean": w.mean, "m2": w.m2}
+                for f, w in self.incorrect_trackers.items()
+            },
             "conservation": {
                 "category_coverage": self.conservation.category_coverage,
                 "total_verified": self.conservation.total_verified,
@@ -426,6 +518,15 @@ class JudgmentMemoryEngine:
                 engine.variance_trackers[f].count = vt["count"]
                 engine.variance_trackers[f].mean = vt["mean"]
                 engine.variance_trackers[f].m2 = vt["m2"]
+
+        for tracker_key in ("correct_trackers", "incorrect_trackers"):
+            trackers: dict[str, WelfordState] = getattr(engine, tracker_key)
+            saved = state.get(tracker_key, {})
+            for factor in engine.config.factors:
+                if factor in saved:
+                    trackers[factor].count = saved[factor]["count"]
+                    trackers[factor].mean = saved[factor]["mean"]
+                    trackers[factor].m2 = saved[factor]["m2"]
 
         # Restore conservation state
         cs = state.get("conservation", {})

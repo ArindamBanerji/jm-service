@@ -18,16 +18,28 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import sqlite3
 import time
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager, contextmanager
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from db.connection import engine as labeling_engine
 from pydantic import BaseModel, Field, field_validator
+from dashboard_router import router as dashboard_router
+from auth import router as admin_router
+from label_studio import router as label_studio_router
+from label_health.api import router as label_health_router
+from labeling_router import router as labeling_router
+from labeling_router import autonomy_router
 
 
 # ─── Database (SQLite — swap for Postgres in R2) ─────────────────
@@ -213,6 +225,10 @@ class ErrorResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
+    application.state.engine_hash_verified = (
+        hashlib.sha256(Path(__file__).with_name("jm_core.py").read_bytes()).hexdigest()
+        == "1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09"
+    )
     yield
 
 
@@ -226,13 +242,19 @@ app = FastAPI(
         "**Conservation gate**: Three-layer safety mechanism prevents drift. "
         "Monitors aggregate accuracy, per-factor delta, and rate-of-change."
     ),
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
     responses={401: {"model": ErrorResponse, "description": "Invalid API key"}},
 )
+app.include_router(label_health_router)
+app.include_router(labeling_router)
+app.include_router(autonomy_router)
+app.include_router(dashboard_router)
+app.include_router(label_studio_router)
+app.include_router(admin_router)
 
-app.add_middleware(
-    CORSMiddleware,
+app.add_middleware(  # type: ignore[call-arg]
+    CORSMiddleware,  # type: ignore[arg-type]
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
@@ -337,14 +359,33 @@ def validate_learn_input(req: LearnRequest, engine, domain_id: str, tenant: str)
 # ─── Endpoints ───────────────────────────────────────────────────
 
 @app.get("/v1/health", tags=["System"])
-def health():
-    """Service health check."""
-    return {"status": "ok", "service": "judgment-memory", "version": "0.1.0"}
+async def health():
+    """Check both stores and the frozen engine before reporting readiness."""
+    checks = {"labeling_db": "connected", "legacy_db": "connected",
+              "engine_hash": "verified" if getattr(app.state, "engine_hash_verified", False) else "mismatch"}
+    try:
+        async with labeling_engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except Exception as exc:
+        checks["labeling_db"] = f"error: {type(exc).__name__}"
+    try:
+        legacy_connection = sqlite3.connect(DB_PATH)
+        try:
+            legacy_connection.execute("SELECT 1")
+        finally:
+            legacy_connection.close()
+    except Exception as exc:
+        checks["legacy_db"] = f"error: {type(exc).__name__}"
+    status = ("unhealthy" if checks["labeling_db"] != "connected" or checks["engine_hash"] != "verified"
+              else "degraded" if checks["legacy_db"] != "connected" else "healthy")
+    payload = {"status": status, "version": "0.2.0", "checks": checks}
+    return JSONResponse(payload, status_code=503 if status == "unhealthy" else 200)
 
 
 @app.post("/v1/register", tags=["Tenants"])
-def register_tenant(req: RegisterRequest = RegisterRequest()):
+def register_tenant(req: RegisterRequest | None = None):
     """Register a new tenant. Returns an API key for all subsequent requests."""
+    req = req or RegisterRequest(name="default")
     api_key = f"jm_{uuid.uuid4().hex[:24]}"
     with get_db() as db:
         db.execute(
@@ -372,7 +413,7 @@ def create_domain(req: CreateDomainRequest, tenant: str = Depends(get_tenant)):
         factors=req.factors,
         categories=req.categories,
         actions=req.actions,
-        factor_ranges={k: tuple(v) for k, v in req.factor_ranges.items()},
+        factor_ranges={k: (v[0], v[1]) for k, v in req.factor_ranges.items()},
     )
 
     engine = JudgmentMemoryEngine(config)
@@ -549,6 +590,13 @@ def export_state(domain_id: str, tenant: str = Depends(get_tenant)):
     """
     engine = load_engine(domain_id, tenant)
     return engine.export_state()
+
+
+# Serve the built review UI after every API route. HashRouter keeps deep links
+# on the client so StaticFiles can serve a single index.html at the root.
+frontend_dist = Path(__file__).resolve().parent / "frontend" / "dist"
+if frontend_dist.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 
 # ─── Run ─────────────────────────────────────────────────────────
