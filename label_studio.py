@@ -264,13 +264,17 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     row.source_task_id = label_id
     if row.category != category or row.factors_json != factors:
         raise HTTPException(409, detail="Task changed after scoring")
+    reviewer = (str(annotation["completed_by"])
+                if annotation.get("completed_by") is not None else row.annotator_id)
     ground_truth = _field(task["data"], config.ground_truth_field) if config.ground_truth_field else None
     if ground_truth is None:
         return {"status": "pending_ground_truth"}
+    if row.verified_at is None and reviewer is not None:
+        row.annotator_id = reviewer
     correct = ground_truth == actual if isinstance(ground_truth, str) else ground_truth
     if not isinstance(correct, bool):
         raise HTTPException(422, detail="Ground truth must be an action or boolean")
-    if row.verified_at is not None and (row.actual_action, row.verified_outcome) == (actual, correct):
+    if row.verified_at is not None and (row.actual_action, row.verified_outcome, row.annotator_id) == (actual, correct, reviewer):
         return {"status": "processed"}
     if row.verified_at is not None and payload["action"] != "ANNOTATION_UPDATED":
         raise HTTPException(409, detail="Verification already exists")
@@ -279,13 +283,10 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     if actual not in domain.config_json["actions"]:
         raise HTTPException(422, detail="Unknown annotation action")
     if row.verified_at is None:
-        engine = await repository.load_engine(session, config.domain_id, row.annotator_id)
-        if engine is None:
-            raise HTTPException(404, detail="Project engine not found")
+        engine = await repository.load_or_create_engine(session, config.domain_id, row.annotator_id)
         await repository.verify_and_learn(session, engine, config.domain_id, row.label_id, actual, correct)
         return {"status": "processed"}
-    await repository.verify_and_relearn(session, config.domain_id, row, actual, correct,
-                                        str(annotation["completed_by"]) if annotation.get("completed_by") is not None else row.annotator_id)
+    await repository.verify_and_relearn(session, config.domain_id, row, actual, correct, reviewer)
     return {"status": "processed"}
 
 

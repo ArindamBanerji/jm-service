@@ -69,6 +69,7 @@ class VerifyRequest(BaseModel):
     label_id: str = Field(min_length=1)
     actual_action: str = Field(min_length=1)
     verified_outcome: bool
+    annotator_id: str | None = None
 
 
 class VerifyResponse(BaseModel):
@@ -193,9 +194,13 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
         raise HTTPException(status_code=404, detail="Label not found")
     if row.verified_at is not None:
         raise HTTPException(status_code=409, detail="Label already verified")
+    if request.annotator_id is not None:
+        if not request.annotator_id.strip():
+            raise HTTPException(status_code=422, detail="annotator_id must be nonempty")
+        row.annotator_id = request.annotator_id
     engine = await repository.load_engine(session, domain_id, row.annotator_id)
     if engine is None:
-        raise HTTPException(status_code=404, detail="Engine not found")
+        engine = await repository.load_or_create_engine(session, domain_id, row.annotator_id)
     if request.actual_action not in engine.config.actions:
         raise HTTPException(status_code=422, detail="Unknown actual_action")
     try:

@@ -379,3 +379,29 @@ Line-by-line analysis:
   label_health/api.py: 10 MiB byte check, two-worker executor and semaphore, 60-second acquisition and processing limits, 504 on timeout and 422 on CSV validation. A timed-out worker retains its slot until it finishes.
   label_studio.py: default config path is /data/ls_config.json; compose and image set the same path.
 Notes: Docker/Podman and live Railway PostgreSQL remain unavailable locally. A Railway /data volume and managed database TLS handshake require staging verification. The smoke gate from LBL-DEPLOY-1 remains open. Existing report requests use 10 MiB application limit after multipart parsing; ingress controls may also be needed for hostile uploads.
+
+## LBL-SWEEP-5 — Final Pre-Ship Cleanliness Sweep
+Status: COMPLETE
+Date: 2026-11-21
+Files created: docs/astra_sweep_5_final_findings.md
+Tests: 166 passed, 0 failed, 332 warnings in the requested workspace run. Requirements-only run: 151 passed, 15 skipped, 0 failed. LF export of the committed suites: 38 passed and 1 failed. Local HTTP smoke: 9/9.
+mypy: clean, 0 errors across 15 files
+Verdict: BLOCKED
+Notes: Production Starlette advisories, lost Label Studio reviewer identity, and unreproducible release tests block launch. The frozen Git blob and working copy match the expected hash.
+
+## LBL-DEPLOY-3 — Final Ship Fixes
+Status: COMPLETE — code and reproducible release revision committed; container/PostgreSQL smoke remains a separate deployment gate
+Date: 2026-11-21
+Files modified: requirements.txt, label_studio.py, labeling_router.py, test_jm_service.py, test_label_studio.py, test_labeling_router.py, docs/session_state.md
+Files added to release candidate: .gitattributes, pyproject.toml, test_labeling_factors.py, test_label_health.py, test_db.py, test_labeling_router.py, test_policy_engine.py, test_dashboard.py, test_label_studio.py, test_smoke.py
+Findings addressed: patched FastAPI/Starlette pins; reviewer attribution on first verification and reviewer change; previously missing tests/config; current legacy health contract and lifespan fixture; LF checkout rules for frozen engine and shell entrypoint.
+Tests: 195 passed, 0 failed, 1 Starlette TestClient deprecation warning in a requirements-only isolated environment. The same 195 tests passed from a fresh export of the staged Git tree. `pip check` passed.
+mypy: clean on label_studio.py and labeling_router.py in the project environment (0 errors). The isolated environment without optional third-party typing packages reports missing-import errors in dependency modules; no source error was reported in the project environment.
+Frozen SHA-256: 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09, including the exported candidate.
+Missing files for commit: none of the requested release files; all are committed. Unrelated experiments remain untracked.
+Line-by-line analysis:
+  requirements.txt: FastAPI 0.163.1 and explicit Starlette 1.10.0 replace the vulnerable resolution; pytest-asyncio 0.23.8 is declared; matplotlib is omitted from hosted-service dependencies because only experiments import it. The isolated resolver installed the pins without conflict.
+  label_studio.py: verified create binds a previously anonymous prediction to completed_by before learning; update includes reviewer identity in idempotency and appends a scoped revision when reviewer changes; both flows have database assertions. Events without ground truth remain pending.
+  labeling_router.py: VerifyRequest accepts optional annotator_id, rejects blank values, binds the row before learning, and loads or creates that reviewer's engine; omitted annotator_id retains the scored scope.
+  test_jm_service.py: health expects status/version/checks from the current endpoint and enters the app lifespan with an isolated SQLite labeling database.
+Notes: The committed candidate was tested as an exported Git tree. Managed PostgreSQL, Docker image startup, and native Linux PDF rendering still require the separately documented deployment smoke gate.

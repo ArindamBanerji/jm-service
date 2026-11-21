@@ -9,11 +9,13 @@ Run: pytest test_jm_service.py -v
 """
 
 import json
+import asyncio
 import os
 import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import create_async_engine
 
 
 # ─── Fixtures ────────────────────────────────────────────────────
@@ -40,8 +42,16 @@ def clean_db(tmp_path):
 
 @pytest.fixture
 def client(clean_db):
-    from jm_service import app
-    return TestClient(app)
+    import jm_service
+    from pathlib import Path
+
+    labeling_engine = create_async_engine(
+        f"sqlite+aiosqlite:///{(Path(clean_db).with_name('labeling.db')).as_posix()}"
+    )
+    jm_service.labeling_engine = labeling_engine
+    with TestClient(jm_service.app) as test_client:
+        yield test_client
+    asyncio.run(labeling_engine.dispose())
 
 
 @pytest.fixture
@@ -467,5 +477,8 @@ class TestHealth:
     def test_health(self, client):
         resp = client.get("/v1/health")
         assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
-        assert resp.json()["version"] == "0.1.0"
+        assert resp.json()["status"] == "healthy"
+        assert resp.json()["version"] == "0.2.0"
+        assert resp.json()["checks"] == {
+            "labeling_db": "connected", "legacy_db": "connected", "engine_hash": "verified"
+        }
