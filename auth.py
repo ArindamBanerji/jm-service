@@ -6,13 +6,14 @@ import os
 import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.connection import get_db
 from db.models import ApiKey
+from rate_limit import limiter
 
 Session = Annotated[AsyncSession, Depends(get_db)]
 router = APIRouter(prefix="/v1/admin", tags=["Admin"])
@@ -55,12 +56,13 @@ class CreateKey(BaseModel):
 
 
 @router.post("/api-keys")
-async def create_key(request: CreateKey, session: Session,
+@limiter.limit("10/minute")
+async def create_key(request: Request, payload: CreateKey, session: Session,
                      x_admin_key: Annotated[str | None, Header(alias="X-Admin-Key")] = None) -> dict[str, str]:
     expected = os.getenv("ADMIN_API_KEY")
     if not expected or not x_admin_key or not secrets.compare_digest(x_admin_key, expected):
         raise HTTPException(status_code=401, detail="Invalid admin key")
-    plain, record = generate_api_key(request.tenant_id, request.tenant_name)
+    plain, record = generate_api_key(payload.tenant_id, payload.tenant_name)
     session.add(record)
     await session.flush()
-    return {"api_key": plain, "tenant_id": request.tenant_id}
+    return {"api_key": plain, "tenant_id": payload.tenant_id}

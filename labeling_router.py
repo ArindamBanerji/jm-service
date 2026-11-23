@@ -5,7 +5,7 @@ from dataclasses import asdict
 from math import isfinite
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +18,7 @@ from db import repository
 from auth import Tenant, scoped_domain_id
 from jm_core import ConservationState, DomainConfig, JudgmentMemoryEngine
 from policy_engine import AutonomyTier, evaluate_domain
+from rate_limit import limiter
 
 router = APIRouter(prefix="/v1/labels", tags=["Labeling"])
 autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
@@ -229,7 +230,8 @@ async def ingest_batch(request: IngestBatchRequest, session: Session, tenant: Te
 
 
 @router.get("/{domain_id}/pending")
-async def pending(domain_id: str, session: Session, tenant: Tenant, category: str | None = None,
+@limiter.limit("60/minute")
+async def pending(request: Request, domain_id: str, session: Session, tenant: Tenant, category: str | None = None,
                   limit: int = Query(default=50, ge=1, le=200)) -> list[dict]:
     domain_id = scoped_domain_id(tenant, domain_id)
     if await repository.get_domain(session, domain_id) is None:
@@ -247,7 +249,8 @@ async def pending(domain_id: str, session: Session, tenant: Tenant, category: st
 
 
 @autonomy_router.get("/{domain_id}/autonomy")
-async def domain_autonomy(domain_id: str, session: Session, tenant: Tenant) -> dict:
+@limiter.limit("60/minute")
+async def domain_autonomy(request: Request, domain_id: str, session: Session, tenant: Tenant) -> dict:
     public_domain_id = domain_id
     domain_id = scoped_domain_id(tenant, domain_id)
     domain = await repository.get_domain(session, domain_id)

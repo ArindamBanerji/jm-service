@@ -27,7 +27,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager, contextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -40,6 +40,9 @@ from label_studio import router as label_studio_router
 from label_health.api import router as label_health_router
 from labeling_router import router as labeling_router
 from labeling_router import autonomy_router
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from rate_limit import limiter
 
 
 # ─── Database (SQLite — swap for Postgres in R2) ─────────────────
@@ -246,6 +249,8 @@ app = FastAPI(
     lifespan=lifespan,
     responses={401: {"model": ErrorResponse, "description": "Invalid API key"}},
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.include_router(label_health_router)
 app.include_router(labeling_router)
 app.include_router(autonomy_router)
@@ -383,7 +388,8 @@ async def health():
 
 
 @app.post("/v1/register", tags=["Tenants"])
-def register_tenant(req: RegisterRequest | None = None):
+@limiter.limit("10/minute")
+def register_tenant(request: Request, req: RegisterRequest | None = None):
     """Register a new tenant. Returns an API key for all subsequent requests."""
     req = req or RegisterRequest(name="default")
     api_key = f"jm_{uuid.uuid4().hex[:24]}"
@@ -438,7 +444,8 @@ def create_domain(req: CreateDomainRequest, tenant: str = Depends(get_tenant)):
 
 
 @app.get("/v1/domains", response_model=DomainListResponse, tags=["Domains"])
-def list_domains(tenant: str = Depends(get_tenant)):
+@limiter.limit("60/minute")
+def list_domains(request: Request, tenant: str = Depends(get_tenant)):
     """List all domains for this tenant."""
     with get_db() as db:
         rows = db.execute(
@@ -468,7 +475,9 @@ def list_domains(tenant: str = Depends(get_tenant)):
         422: {"model": ErrorResponse, "description": "Invalid factors or category"},
     },
 )
-def score_decision(domain_id: str, req: ScoreRequest, tenant: str = Depends(get_tenant)):
+@limiter.limit("30/minute")
+def score_decision(request: Request, domain_id: str, req: ScoreRequest,
+                   tenant: str = Depends(get_tenant)):
     """Score an input against the centroid geometry.
 
     Returns the recommended action and confidence. The decision_id in the
@@ -564,7 +573,9 @@ def learn_outcome(domain_id: str, req: LearnRequest, tenant: str = Depends(get_t
     tags=["Diagnostics"],
     responses={404: {"model": ErrorResponse}},
 )
-def get_diagnostics(domain_id: str, tenant: str = Depends(get_tenant)):
+@limiter.limit("60/minute")
+def get_diagnostics(request: Request, domain_id: str,
+                    tenant: str = Depends(get_tenant)):
     """Get noise fingerprint, conservation gate status, accuracy metrics, and state size.
 
     The noise fingerprint shows per-factor Welford variance (σ), which reveals
@@ -582,7 +593,9 @@ def get_diagnostics(domain_id: str, tenant: str = Depends(get_tenant)):
     tags=["Diagnostics"],
     responses={404: {"model": ErrorResponse}},
 )
-def export_state(domain_id: str, tenant: str = Depends(get_tenant)):
+@limiter.limit("60/minute")
+def export_state(request: Request, domain_id: str,
+                 tenant: str = Depends(get_tenant)):
     """Export full engine state as JSON for backup or migration.
 
     The state includes all centroids, variance trackers, conservation gate state,

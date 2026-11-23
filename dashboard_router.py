@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from itertools import groupby
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import Float, and_, case, cast, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,7 @@ from db.models import Domain, LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
 from labeling_router import _category_stats
 from policy_engine import TierStatus, evaluate_domain
+from rate_limit import limiter
 
 router = APIRouter(prefix="/v1/dashboard", tags=["Dashboard"])
 Session = Annotated[AsyncSession, Depends(get_db)]
@@ -155,7 +156,8 @@ async def _curve(session: AsyncSession, domain_id: str, window: int,
 
 
 @router.get("/{domain_id}/overview")
-async def overview(domain: DashboardDomain, session: Session) -> Overview:
+@limiter.limit("60/minute")
+async def overview(request: Request, domain: DashboardDomain, session: Session) -> Overview:
     config = DomainConfig.from_dict(domain.config_json)
     engine = await repository.load_engine(session, domain.domain_id)
     if engine is None:
@@ -176,7 +178,8 @@ async def overview(domain: DashboardDomain, session: Session) -> Overview:
 
 
 @router.get("/{domain_id}/corrections")
-async def corrections(domain: DashboardDomain, session: Session) -> Corrections:
+@limiter.limit("60/minute")
+async def corrections(request: Request, domain: DashboardDomain, session: Session) -> Corrections:
     count = func.count()
     groups = (LabelLog.category, LabelLog.recommended_action, LabelLog.actual_action)
     query = (select(*groups, count).where(LabelLog.domain_id == domain.domain_id, LabelLog.tenant_id == session.info.get("tenant_id", ""), verified)
@@ -199,7 +202,8 @@ async def corrections(domain: DashboardDomain, session: Session) -> Corrections:
 
 
 @router.get("/{domain_id}/annotators")
-async def annotators(domain: DashboardDomain, session: Session,
+@limiter.limit("60/minute")
+async def annotators(request: Request, domain: DashboardDomain, session: Session,
                      limit: int = Query(50, ge=1, le=100)) -> Annotators:
     annotator = LabelLog.annotator_id
     total = func.count().label("total")
@@ -236,7 +240,8 @@ async def annotators(domain: DashboardDomain, session: Session,
 
 
 @router.get("/{domain_id}/factors")
-async def factors(domain: DashboardDomain, session: Session) -> Factors:
+@limiter.limit("60/minute")
+async def factors(request: Request, domain: DashboardDomain, session: Session) -> Factors:
     names = DomainConfig.from_dict(domain.config_json).factors
     engine = await repository.load_engine(session, domain.domain_id)
     # Expand JSON objects as key/value rows; custom factor names are literal keys.
@@ -259,7 +264,8 @@ async def factors(domain: DashboardDomain, session: Session) -> Factors:
 
 
 @router.get("/{domain_id}/compounding")
-async def compounding(domain: DashboardDomain, session: Session, window: int = Query(10, ge=1, le=2**31-1),
+@limiter.limit("60/minute")
+async def compounding(request: Request, domain: DashboardDomain, session: Session, window: int = Query(10, ge=1, le=2**31-1),
                       category: str | None = None) -> Compounding:
     curve = await _curve(session, domain.domain_id, window, category)
     baseline = curve[0].accuracy if curve and curve[0].verified_count >= window else None

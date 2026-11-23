@@ -26,11 +26,10 @@ def clean_db(tmp_path):
     db_path = str(tmp_path / "test.db")
     os.environ["JM_DB_PATH"] = db_path
 
-    # Force reimport to pick up new DB_PATH
-    import importlib
+    # Point the shared app at this test's database and clear its in-memory quotas.
     import jm_service
-    importlib.reload(jm_service)
     jm_service.DB_PATH = db_path
+    jm_service.limiter.reset()
     jm_service.init_db()
 
     yield db_path
@@ -99,6 +98,29 @@ class TestRegistration:
         r1 = client.post("/v1/register", json={"name": "a"})
         r2 = client.post("/v1/register", json={"name": "b"})
         assert r1.json()["api_key"] != r2.json()["api_key"]
+
+
+class TestRateLimits:
+    def test_registration_limit_and_health_exemption(self, client):
+        for _ in range(10):
+            assert client.post("/v1/register").status_code == 200
+        assert client.post("/v1/register").status_code == 429
+        assert client.get("/v1/health").status_code == 200
+
+    def test_score_limit(self, client, api_key, domain_id):
+        url = f"/v1/domains/{domain_id}/score"
+        payload = {"factors": {"spend": 0.5, "risk": 0.5, "urgency": 0.5},
+                   "category": "invoice"}
+        headers = {"x-api-key": api_key}
+        for _ in range(30):
+            assert client.post(url, json=payload, headers=headers).status_code == 200
+        assert client.post(url, json=payload, headers=headers).status_code == 429
+
+    def test_read_limit(self, client, api_key):
+        headers = {"x-api-key": api_key}
+        for _ in range(60):
+            assert client.get("/v1/domains", headers=headers).status_code == 200
+        assert client.get("/v1/domains", headers=headers).status_code == 429
 
 
 # ─── Auth Tests ──────────────────────────────────────────────────
@@ -312,9 +334,11 @@ class TestLearn:
 # ─── Compounding Test ────────────────────────────────────────────
 
 class TestCompounding:
-    def test_accuracy_improves_with_training(self, client, api_key, domain_id):
+    def test_accuracy_improves_with_training(self, client, api_key, domain_id, monkeypatch):
         """The core JM claim: score/learn loop produces compounding accuracy."""
+        import jm_service
         import random
+        monkeypatch.setattr(jm_service.limiter, "enabled", False)
         random.seed(42)
 
         headers = {"x-api-key": api_key}

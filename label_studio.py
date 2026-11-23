@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ from db.models import LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
 from labeling_router import IngestItem, _category_stats, _ingest
 from policy_engine import AutonomyTier, evaluate_domain
+from rate_limit import limiter
 
 router = APIRouter(prefix="/v1/label-studio", tags=["Label Studio"])
 Session = Annotated[AsyncSession, Depends(get_db)]
@@ -291,5 +292,6 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
 
 
 @router.get("/health")
-async def health() -> dict[str, str]:
+@limiter.limit("60/minute")
+async def health(request: Request) -> dict[str, str]:
     return {"status": "UP", "model_version": "jm-v1"}
