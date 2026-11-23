@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.db
+*.sqlite3
+.env
+.venv/
+experiment_results.json
+e_jm_*.png
+e_jm_param_sweep_heatmap.png
+experiments/*/results/*.json
+experiments/*/results/*.png
+experiments/*/results/*.pdf
