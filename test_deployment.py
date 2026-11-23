@@ -99,6 +99,29 @@ def test_url_normalization_sslmode_stripped():
     assert args == {"ssl": True}
 
 
+def test_url_normalization_railway_internal_no_ssl():
+    """Railway internal networking: SSL disabled (private network, self-signed cert)."""
+    url, args = normalize_database_url(
+        "postgresql://user:pass@postgres.railway.internal:5432/railway")
+    assert url == "postgresql+asyncpg://user:pass@postgres.railway.internal:5432/railway"
+    assert args == {"ssl": False}
+
+
+def test_url_normalization_railway_internal_explicit_sslmode_wins():
+    """Explicit sslmode in URL overrides Railway internal detection."""
+    url, args = normalize_database_url(
+        "postgresql://user:pass@postgres.railway.internal:5432/railway?sslmode=require")
+    assert args == {"ssl": True}
+
+
+def test_url_normalization_railway_external_ssl(monkeypatch):
+    """Railway external proxy: SSL enabled."""
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
+    url, args = normalize_database_url(
+        "postgresql://user:pass@external-host.proxy.rlwy.net:5432/railway")
+    assert args == {"ssl": True}
+
+
 def test_url_normalization_sqlite_unchanged():
     original = "sqlite+aiosqlite:///test.db"
     assert normalize_database_url(original) == (original, {})

@@ -23,6 +23,10 @@ def normalize_database_url(url: str) -> tuple[str, dict[str, bool]]:
         if ssl_modes[-1] not in {"require", "disable"}:
             raise ValueError(f"Unsupported sslmode: {ssl_modes[-1]}")
         return clean_url, {"ssl": ssl_modes[-1] == "require"}
+    # Railway private network: no SSL needed (self-signed cert, traffic already isolated)
+    hostname = parsed.hostname or ""
+    if hostname.endswith(".railway.internal"):
+        return clean_url, {"ssl": False}
     if os.getenv("RAILWAY_ENVIRONMENT"):
         return clean_url, {"ssl": True}
     return clean_url, {}
