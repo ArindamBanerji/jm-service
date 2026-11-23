@@ -20,7 +20,6 @@ COPY docker-entrypoint.sh ./
 RUN mkdir -p /data && chmod +x docker-entrypoint.sh
 
 # SQLite data will be stored in a volume
-VOLUME /data
 ENV JM_DB_PATH=/data/jm_tenants.db
 ENV LS_CONFIG_PATH=/data/ls_config.json
 
