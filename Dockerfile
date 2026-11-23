@@ -29,3 +29,4 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.getenv('PORT', '8000') + '/v1/health')" || exit 1
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
+# cache-bust
