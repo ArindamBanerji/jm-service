@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
 import { createTextTask, hasApiKey, ingestBatch, seedSample, uploadForAnalysis, type HealthReport } from '../api'
@@ -21,6 +21,15 @@ export default function Upload() {
   const [taskId, setTaskId] = useState('')
   const [taskText, setTaskText] = useState('')
   const [taskCategory, setTaskCategory] = useState('')
+  const importController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    const accountChanging = () => importController.current?.abort()
+    window.addEventListener('dlj-account-changing', accountChanging)
+    return () => {
+      window.removeEventListener('dlj-account-changing', accountChanging)
+      importController.current?.abort()
+    }
+  }, [])
   const createTask = async () => {
     if (!domainId || !taskId.trim() || !taskText) { setError('Enter a domain, label ID and source text.'); return }
     setBusy(true); setError(null)
@@ -62,15 +71,40 @@ export default function Upload() {
   }
   const startScoring = async () => {
     if (!file || !domainId) { setError('Enter an active domain ID in the sidebar.'); return }
+    const capturedKey = localStorage.getItem('rgi-api-key')
+    if (!capturedKey) { setError('Enter an API key before importing labels.'); return }
+    const controller = new AbortController()
+    importController.current = controller
+    sessionStorage.setItem('dlj-import-active', '1')
+    let committed = 0
+    let total = 0
     setBusy(true); setError(null)
     try {
       const rows = await parseIngestCsv(file)
+      total = rows.length
       for (let start = 0; start < rows.length; start += 100) {
-        await ingestBatch({ domain_id: domainId, items: rows.slice(start, start + 100) })
-        setProgress(Math.min(start + 100, rows.length))
+        if (controller.signal.aborted || localStorage.getItem('rgi-api-key') !== capturedKey) {
+          setError(`Import stopped: account changed during upload. ${committed} of ${rows.length} rows were committed to the original account.`)
+          return
+        }
+        await ingestBatch({ domain_id: domainId, items: rows.slice(start, start + 100) }, capturedKey, controller.signal)
+        committed = Math.min(start + 100, rows.length)
+        setProgress(committed)
+      }
+      if (controller.signal.aborted || localStorage.getItem('rgi-api-key') !== capturedKey) {
+        setError(`Import stopped: account changed during upload. ${committed} of ${rows.length} rows were committed to the original account.`)
+        return
       }
       navigate('/queue')
-    } catch (cause) { setError(`${String(cause)}${progress ? ` (${progress} rows already ingested)` : ''}`) } finally { setBusy(false) }
+    } catch (cause) {
+      if (localStorage.getItem('rgi-api-key') !== capturedKey)
+        setError(`Import stopped: account changed during upload. ${committed} of ${total} rows were committed to the original account.`)
+      else if (!controller.signal.aborted) setError(`${String(cause)}${committed ? ` (${committed} rows already ingested)` : ''}`)
+    } finally {
+      if (importController.current === controller) importController.current = null
+      sessionStorage.removeItem('dlj-import-active')
+      setBusy(false)
+    }
   }
   return <div className="page"><div className="eyebrow">01 / Onboarding</div><h1>Start with your labels.</h1><p className="subtitle">Upload an existing CSV. See its health first, then score labels into a review queue.</p><SignupBanner />
     <div className="card card-pad"><CsvDropzone onFile={next => { void analyze(next) }} busy={busy} /><p className="muted">CSV requires at least 200 rows, label_id, category, verified outcome, and two numeric factor columns. The health report is free and does not save your data.</p>

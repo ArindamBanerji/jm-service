@@ -217,6 +217,7 @@ test.describe('Track 2 signup banner', () => {
     await page.addInitScript(() => localStorage.removeItem('rgi-api-key'));
     await page.goto('/#/upload');
     const link = page.locator('.notice').getByRole('link', { name: /Start your free trial/i });
-    await expect(link).toHaveAttribute('href', '/#/signup');
+    await link.click();
+    await expect(page).toHaveURL(/#\/signup$/);
   });
 });

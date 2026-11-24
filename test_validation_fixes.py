@@ -75,8 +75,9 @@ def test_verified_relabel_rejected(client):
 
 def test_incorrect_verification_can_be_corrected(client):
     assert ingest(client).status_code == 200
+    assert ingest(client, label_id="L2", category="B").status_code == 200
     assert verify(client, False).status_code == 200
-    response = relabel(client, revision(client))
+    response = relabel(client, revision(client), category="B")
     assert response.status_code == 200, response.text
     assert client.get("/v1/labels/medical/items/L1").json()["verified_at"] is None
 

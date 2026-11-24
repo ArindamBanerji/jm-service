@@ -4,6 +4,7 @@ __pycache__
 *.db
 .git
 frontend/node_modules
+frontend/dist
 .mypy_cache
 node_modules
 *.egg-info

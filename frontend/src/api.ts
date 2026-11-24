@@ -160,9 +160,10 @@ function explain(detail: unknown): string {
   return 'Request failed'
 }
 
-async function request<T>(path: string, init?: RequestInit, onResponse?: (response: Response) => void): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, onResponse?: (response: Response) => void,
+  credential?: string, expectedFormat: 'json' | 'html' | 'pdf' = 'json'): Promise<T> {
   const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register'
-  const apiKey = localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : '')
+  const apiKey = credential ?? (localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : ''))
   const headers = new Headers(init?.headers)
   if (authenticated && apiKey) headers.set('X-Api-Key', apiKey)
   const response = await fetch(`${BASE}${path}`, { ...init, headers })
@@ -178,8 +179,11 @@ async function request<T>(path: string, init?: RequestInit, onResponse?: (respon
     throw new ApiError(explain(detail), response.status)
   }
   onResponse?.(response)
-  if (response.headers.get('content-type')?.includes('application/pdf')) return await response.blob() as T
-  if (response.headers.get('content-type')?.includes('text/html')) return await response.text() as T
+  const contentType = response.headers.get('content-type') ?? ''
+  if (expectedFormat === 'pdf' && contentType.includes('application/pdf')) return await response.blob() as T
+  if (expectedFormat === 'html' && contentType.includes('text/html')) return await response.text() as T
+  if (expectedFormat !== 'json' || !contentType.includes('application/json'))
+    throw new ApiError('Unexpected response format', 502)
   return await response.json() as T
 }
 function json(body: unknown): RequestInit { return { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } }
@@ -192,10 +196,11 @@ function params(values: Record<string, string | number | undefined>): string {
 const id = (value: string) => encodeURIComponent(value)
 
 export const uploadForAnalysis = (file: File) => request<HealthReport>('/label-health/analyze', upload(file))
-export const uploadForReport = (file: File) => request<string>('/label-health/report', upload(file))
-export const downloadReportPdf = (file: File) => request<Blob>('/label-health/report/pdf', upload(file))
+export const uploadForReport = (file: File) => request<string>('/label-health/report', upload(file), undefined, undefined, 'html')
+export const downloadReportPdf = (file: File) => request<Blob>('/label-health/report/pdf', upload(file), undefined, undefined, 'pdf')
 export const ingestLabel = (body: IngestRequest) => request<IngestResponse>('/labels/ingest', json(body))
-export const ingestBatch = (body: IngestBatchRequest) => request<IngestBatchResponse>('/labels/ingest/batch', json(body))
+export const ingestBatch = (body: IngestBatchRequest, credential?: string, signal?: AbortSignal) =>
+  request<IngestBatchResponse>('/labels/ingest/batch', { ...json(body), signal }, undefined, credential)
 export const seedSample = (domainId: string) => request<SampleSeedResponse>(`/labels/${id(domainId)}/sample`, { method: 'POST' })
 export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (import.meta.env.DEV && import.meta.env.VITE_API_KEY))
 export interface RegistrationResponse { api_key: string; tenant_id: string; tier: 'trial'; message: string }

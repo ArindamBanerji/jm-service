@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import tempfile
+import logging
 from datetime import datetime, timezone
 from hmac import compare_digest
 from pathlib import Path
@@ -25,6 +27,7 @@ from policy_engine import AutonomyTier, evaluate_domain
 from rate_limit import limiter
 
 router = APIRouter(prefix="/v1/label-studio", tags=["Label Studio"])
+logger = logging.getLogger(__name__)
 Session = Annotated[AsyncSession, Depends(get_db)]
 _config_lock = Lock()
 _default_map = {"model_confidence": "data.ml_confidence",
@@ -123,7 +126,7 @@ def _task_values(task: Any, config: ConnectorConfig, index: int | None = None) -
             raise HTTPException(422, detail=f"Invalid factor {name}")
         try:
             factors[name] = float(value)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OverflowError) as exc:
             raise HTTPException(422, detail=f"Invalid factor {name}") from exc
     category = _field(data, config.category_field) or "default"
     return str(task["id"]), str(category), factors
@@ -144,8 +147,15 @@ async def _ensure_domain(session: AsyncSession, config: ConnectorConfig) -> None
 def _action(annotation: dict[str, Any]) -> str:
     if isinstance(annotation.get("actual_action"), str):
         return annotation["actual_action"]
-    for result in annotation.get("result", []):
+    results = annotation.get("result", [])
+    if not isinstance(results, list):
+        raise TypeError("annotation result must be a list")
+    for result in results:
+        if not isinstance(result, dict):
+            raise TypeError("annotation result entry must be an object")
         value = result.get("value", {})
+        if not isinstance(value, dict):
+            raise TypeError("annotation value must be an object")
         for key in ("choices", "labels", "rectanglelabels"):
             if isinstance(value.get(key), list) and value[key]:
                 return str(value[key][0])
@@ -161,9 +171,17 @@ async def configure(config: ConnectorConfig, _: Authorized, tenant: Tenant) -> C
         saved = _saved_configs()
         saved[f"{tenant}\0{config.project_id}"] = config.model_dump()
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(json.dumps(saved), encoding="utf-8")
-        temporary.replace(path)
+        temporary_name = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                             prefix=path.name + ".", suffix=".tmp",
+                                             delete=False) as temporary:
+                temporary_name = temporary.name
+                json.dump(saved, temporary)
+            os.replace(temporary_name, path)
+        finally:
+            if temporary_name is not None and os.path.exists(temporary_name):
+                os.unlink(temporary_name)
     return config
 
 
@@ -239,9 +257,10 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     annotation = payload.get("annotation")
     if not isinstance(annotation, dict):
         raise HTTPException(422, detail="annotation is required")
-    source_annotation_id = str(annotation.get("id", "")).strip()
-    if not source_annotation_id:
+    raw_annotation_id = annotation.get("id")
+    if raw_annotation_id is None or not str(raw_annotation_id).strip():
         raise HTTPException(422, detail="annotation id is required")
+    source_annotation_id = str(raw_annotation_id).strip()
     annotation_id = f"{config.project_id}:{source_annotation_id}"
     if len(annotation_id) > 200:
         raise HTTPException(422, detail="annotation id is too long")
@@ -249,7 +268,11 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     if not isinstance(task, dict):
         task = {"id": annotation.get("task"), "data": payload.get("data", {})}
     label_id, category, factors = _task_values(task, config)
-    actual = _action(annotation)
+    try:
+        actual = _action(annotation)
+    except (TypeError, AttributeError, KeyError):
+        logger.warning("Skipped malformed connector annotation result for project %s", config.project_id)
+        return {"status": "skipped"}
     await _ensure_domain(session, config)
     row = await session.scalar(select(LabelLog).where(
         LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
@@ -267,10 +290,14 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     if row is None:
         ingest_id = "annotation:" + hashlib.sha256(
             f"{label_id}\0{annotation_id}".encode()).hexdigest()
-        await _ingest(session, config.domain_id, IngestItem(
-            label_id=ingest_id, category=category,
-            annotator_id=str(annotation["completed_by"]) if annotation.get("completed_by") is not None else None,
-            factors=factors), config.public_domain_id)
+        try:
+            item = IngestItem(
+                label_id=ingest_id, category=category,
+                annotator_id=str(annotation["completed_by"]) if annotation.get("completed_by") is not None else None,
+                factors=factors)
+        except ValidationError as exc:
+            raise HTTPException(422, detail="Invalid task at index 0") from exc
+        await _ingest(session, config.domain_id, item, config.public_domain_id)
         row = await session.scalar(select(LabelLog).where(
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
             LabelLog.label_id == ingest_id).with_for_update())

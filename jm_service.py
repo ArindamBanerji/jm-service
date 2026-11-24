@@ -173,6 +173,13 @@ class CreateDomainRequest(BaseModel):
                 raise ValueError("Empty strings not allowed")
         return v
 
+    @field_validator("categories", "actions")
+    @classmethod
+    def no_centroid_separator(cls, values: list[str]) -> list[str]:
+        if any("|" in value for value in values):
+            raise ValueError("Category/action names must not contain '|'")
+        return values
+
 
 class ScoreRequest(BaseModel):
     factors: dict[str, float] = Field(

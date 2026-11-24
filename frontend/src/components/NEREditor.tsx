@@ -8,11 +8,12 @@ interface Props {
   entityTypes: string[]
   onSpansChange: (spans: NerSpan[]) => void
   readOnly?: boolean
+  disabled?: boolean
 }
 type Popup = { kind: 'create'; start: number; end: number; x: number; y: number } |
   { kind: 'edit'; index: number; x: number; y: number }
 
-export default function NEREditor({ text, spans, entityTypes, onSpansChange, readOnly = false }: Props) {
+export default function NEREditor({ text, spans, entityTypes, onSpansChange, readOnly = false, disabled = false }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const [popup, setPopup] = useState<Popup | null>(null)
   const [customType, setCustomType] = useState('')
@@ -36,10 +37,12 @@ export default function NEREditor({ text, spans, entityTypes, onSpansChange, rea
       aria-label={`${span.label}: ${mention}. Edit entity`}
       style={{ background: nerColor(span.label), color: '#172033', borderRadius: 4, padding: '2px 3px', boxDecorationBreak: 'clone', cursor: 'pointer' }}
       onClick={event => {
+        if (disabled) return
         if (!window.getSelection()?.isCollapsed) return
         setPopup({ kind: 'edit', index, x: event.clientX, y: event.clientY })
       }}
       onKeyDown={event => {
+        if (disabled) return
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           const rect = event.currentTarget.getBoundingClientRect()
@@ -65,6 +68,7 @@ export default function NEREditor({ text, spans, entityTypes, onSpansChange, rea
     return start + Array.from(range.toString()).length
   }
   const selectionEnded = () => {
+    if (disabled) return
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) return
     const range = selection.getRangeAt(0)
@@ -76,7 +80,7 @@ export default function NEREditor({ text, spans, entityTypes, onSpansChange, rea
     setPopup({ kind: 'create', start, end, x: rect.left, y: rect.bottom })
   }
   const update = (type: string) => {
-    if (!popup || !type.trim()) return
+    if (disabled || !popup || !type.trim()) return
     if (popup.kind === 'create') {
       onSpansChange([...spans, { start: popup.start, end: popup.end, label: type.trim(),
         text: points.slice(popup.start, popup.end).join('') }].sort((a, b) => a.start - b.start))
@@ -87,7 +91,7 @@ export default function NEREditor({ text, spans, entityTypes, onSpansChange, rea
     setPopup(null); setCustomType('')
   }
   const remove = () => {
-    if (popup?.kind !== 'edit') return
+    if (disabled || popup?.kind !== 'edit') return
     onSpansChange(spans.filter((_, index) => index !== popup.index))
     setPopup(null)
   }
@@ -96,15 +100,15 @@ export default function NEREditor({ text, spans, entityTypes, onSpansChange, rea
   return <section aria-label="Edit named entities" style={{ marginTop: 20 }}>
     <h3 className="section-title">Named entities</h3>
     <p className="muted">Drag to select text, then choose its entity type. Click a highlight to change or delete it.</p>
-    <div ref={root} className="card-pad" onMouseUp={selectionEnded}
+    <div ref={root} className="card-pad" onMouseUp={selectionEnded} aria-busy={disabled}
       style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', background: '#f7f9fc', borderRadius: 8, userSelect: 'text' }}>{parts}</div>
     {popup && <div className="ner-popup" role="dialog" aria-label={popup.kind === 'create' ? 'Choose entity type' : 'Edit entity'}
       style={{ left: Math.min(popup.x, window.innerWidth - 260), top: Math.min(popup.y + 8, window.innerHeight - 130) }}
       onMouseDown={event => event.preventDefault()}>
       <strong>{popup.kind === 'create' ? 'Entity type' : `Edit ${selected?.label ?? 'entity'}`}</strong>
-      <div className="ner-popup-types">{types.map(type => <button key={type} type="button" style={{ background: nerColor(type) }} onClick={() => update(type)}>{type}</button>)}</div>
-      {!types.length && <div className="ner-popup-custom"><input aria-label="Custom entity type" value={customType} maxLength={200} onChange={event => setCustomType(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') update(customType) }} /><button type="button" onClick={() => update(customType)} disabled={!customType.trim()}>Apply</button></div>}
-      {popup.kind === 'edit' && <button type="button" className="ner-delete" onClick={remove}>Delete</button>}
+      <div className="ner-popup-types">{types.map(type => <button key={type} type="button" disabled={disabled} style={{ background: nerColor(type) }} onClick={() => update(type)}>{type}</button>)}</div>
+      {!types.length && <div className="ner-popup-custom"><input aria-label="Custom entity type" disabled={disabled} value={customType} maxLength={200} onChange={event => setCustomType(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') update(customType) }} /><button type="button" onClick={() => update(customType)} disabled={disabled || !customType.trim()}>Apply</button></div>}
+      {popup.kind === 'edit' && <button type="button" className="ner-delete" disabled={disabled} onClick={remove}>Delete</button>}
     </div>}
   </section>
 }

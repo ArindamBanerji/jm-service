@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, registerAccount } from '../api'
 import ErrorBanner from '../components/ErrorBanner'
@@ -11,12 +11,21 @@ export default function Signup() {
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    const clearOldReceipt = () => {
+      if (key && localStorage.getItem('rgi-api-key') !== key) { setKey(''); setCopied(false) }
+    }
+    window.addEventListener('dlj-account-changing', clearOldReceipt)
+    return () => window.removeEventListener('dlj-account-changing', clearOldReceipt)
+  }, [key])
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (busy) return
     setBusy(true); setError(null)
     try {
       const result = await registerAccount(email, name)
+      localStorage.removeItem('rgi-domain')
+      sessionStorage.removeItem('dlj-checkout-pending')
       localStorage.setItem('rgi-api-key', result.api_key)
       window.dispatchEvent(new Event('dlj-key-updated'))
       setKey(result.api_key)

@@ -215,7 +215,7 @@ test.describe('Mobile responsiveness', () => {
 
   test('upload renders on mobile', async ({ page }) => {
     await page.goto('/#/upload');
-    await expect(page.locator('text=/upload|drop|csv/i').first()).toBeVisible();
+    await expect(page.locator('main').getByRole('heading', { name: 'Start with your labels.' })).toBeVisible();
     // No horizontal scrollbar
     const bodyWidth = await page.evaluate(() => document.body.scrollWidth);
     const viewportWidth = await page.evaluate(() => window.innerWidth);
@@ -224,6 +224,6 @@ test.describe('Mobile responsiveness', () => {
 
   test('dashboard renders on mobile', async ({ page }) => {
     await page.goto('/#/dashboard');
-    await expect(page.locator('text=/accuracy|verified|dashboard/i').first()).toBeVisible();
+    await expect(page.locator('main').getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   });
 });

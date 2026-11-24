@@ -638,3 +638,54 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Files created: `test_validation_fixes.py`
 - Tests: 14 passed (SQLite) / 14 passed (PostgreSQL); full suite 388 passed, 1 skipped
 - mypy: clean
+
+## DLJ-RESWEEP-BE — Backend Re-Sweep (Post-Fix)
+
+- Date: 2026-11-24
+- Dimensions: 8 (fix verification, interaction, auth, data integrity, validation, errors, test gaps, new issues)
+- Files analyzed: 80, including 46 application route registrations
+- Findings: P1=23, P2=24, P3=3
+- Fix verification: 12 CLOSED, 7 PARTIAL, 7 OPEN, 0 REGRESSED across the 26 published P1 findings
+- Verification: full default pytest suite 388 passed, 1 skipped. Six relevant test modules in forward and reverse order each returned 59 passed, 1 skipped on both database configurations. Playwright listed 62 tests across 7 files. Live operations and provider calls were not exercised.
+- Report: [docs/quality/dlj_resweep_backend.md](quality/dlj_resweep_backend.md)
+
+## DLJ-RESWEEP-FE — Frontend Re-Sweep (Post-Fix)
+- Date: 2026-11-24
+- Dimensions: 8 (fix verification, state mgmt, API contracts, Track 2 features, accessibility, dark mode, build/deploy, E2E coverage)
+- Components analyzed: 27 (App, 8 screens, 18 child components)
+- Findings: P1=7, P2=26, P3=8
+- Fix verification: 8 CLOSED, 1 PARTIAL, 0 OPEN, 0 REGRESSED using the IDs in the re-sweep brief. Using the original report IDs: 5 CLOSED, 1 PARTIAL, 3 OPEN, 0 REGRESSED.
+- Track 2 features: 1 COMPLETE, 10 PARTIAL, 0 BROKEN (11 feature groups defined in the report)
+- Verification: frontend type-check and production build passed; Playwright 59 passed / 3 failed, including 4/4 state-fix tests passed.
+- Report: docs/quality/dlj_resweep_frontend.md
+
+## DLJ-PW-FLOWS — Playwright Flow + Component Tests
+
+- Date: 2026-11-24
+- Files created: `e2e/flows.spec.ts`, `e2e/components.spec.ts`
+- Flow tests: 10 (multi-step interaction sequences)
+- Spot tests: 30 (component-level coverage)
+- Total PW tests: 102
+- Typecheck: passed (direct TypeScript check of both new specs; `e2e/tsconfig.json` is absent)
+- Browser verification: 40 new mocked tests passed.
+- Current UI limits covered as implemented: queue search is re-entered after returning from review; category changes save immediately; a missing image URL does not mount ImageViewer. No application code changed.
+
+## DLJ-FIX-R2-BE — Round 2 Backend Fixes
+
+- Date: 2026-11-24
+- Findings fixed: R14, R44, R13, R35, R30, R45, R18, R31, R29, R11
+- Files modified: `billing.py`, `scheduler.py`, `labeling_router.py`, `label_studio.py`, `trial_guard.py`, `jm_service.py`, `test_validation_fixes.py`, `test_deployment.py`
+- Files created: `test_resweep_fixes.py` (19 regression cases)
+- Retention cleanup locks and rechecks the cancelling key in the deletion transaction, including subscription identity, and skips tenants with another active key. Cancellation events bypass product validation. Bulk verification accepts explicit outcome and warns on implicit truth derivation. Batch conflict logs omit SQL parameters. Legacy domain creation rejects pipe separators. Verified-incorrect corrections must change category. Cancelled paid keys use the trial daily cap. Connector annotations and numeric factors are validated; config writes use a unique temporary file and atomic replacement.
+- Tests: 19 focused passed (SQLite) / 19 focused passed (PostgreSQL); full SQLite suite 407 passed, 1 skipped.
+- mypy: clean across the eight requested modules.
+
+## DLJ-FIX-R2-FE — Round 2 Frontend + Deployment Fixes
+
+- Date: 2026-11-24
+- Findings fixed: S7.1, S1.1, S1.2, S2.1, S2.2, S3.1, S8.1
+- Files modified: `Dockerfile`, `.dockerignore`, `frontend/src/screens/Upload.tsx`, `frontend/src/api.ts`, `frontend/src/App.tsx`, `frontend/src/screens/Signup.tsx`, `frontend/src/screens/ReviewCard.tsx`, `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/components/NEREditor.tsx`, `frontend/src/components/TagSelector.tsx`, `e2e/screens.spec.ts`, `e2e/track2.spec.ts`
+- Files created: `e2e/fix_round2.spec.ts`, `e2e/tsconfig.json`
+- Frontend build: passed; frontend and Playwright typechecks: passed
+- PW tests: 107 passed, including all 3 previously failing tests
+- Docker image build: unavailable in this environment (Docker CLI absent in Windows and WSL)

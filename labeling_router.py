@@ -141,6 +141,7 @@ class BulkVerifyRequest(BaseModel):
     label_ids: list[str] = Field(min_length=1, max_length=200)
     action: Literal["approve", "reject"]
     reason: str | None = Field(default=None, max_length=1000)
+    outcome: bool | None = None
 
     @field_validator("label_ids")
     @classmethod
@@ -440,6 +441,8 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
 @limiter.limit("10/minute")
 async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyRequest,
                       session: Session, tenant: Tenant) -> dict:
+    if payload.outcome is None:
+        logger.warning("Implicit bulk verification outcome is deprecated")
     scoped = scoped_domain_id(tenant, domain_id)
     domain = await repository.get_domain(session, scoped)
     if domain is None:
@@ -485,7 +488,8 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
                          "reject" if row.recommended_action == "approve" else "approve")
         await verify(VerifyRequest(domain_id=domain_id, label_id=label_id,
                                    actual_action=actual_action,
-                                   verified_outcome=payload.action == "approve",
+                                   verified_outcome=(payload.outcome if payload.outcome is not None
+                                                     else payload.action == "approve"),
                                    reason=payload.reason), session, tenant)
         processed += 1
     return {"processed": processed, "skipped": skipped, "errors": errors}
@@ -494,6 +498,7 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
 @router.post("/ingest/batch", response_model=IngestBatchResponse)
 async def ingest_batch(request: IngestBatchRequest, response: Response, session: Session,
                        tenant: Tenant) -> IngestBatchResponse:
+    request_id = uuid4().hex
     results: list[IngestResponse] = []
     for index, item in enumerate(request.items):
         try:
@@ -503,12 +508,14 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
             if isinstance(exc, HTTPException) and exc.status_code in {402, 429}:
                 raise
             if isinstance(exc, IntegrityError):
-                logger.exception("Batch ingest conflict at item %s", index)
+                logger.warning("Batch item %d conflict: %s", index, type(exc).__name__,
+                               extra={"request_id": request_id})
                 detail = f"Duplicate or conflict at item {index}"
             elif isinstance(exc, HTTPException):
                 detail = exc.detail
             else:
-                logger.exception("Batch ingest error at item %s", index)
+                logger.warning("Batch item %d failed: %s", index, type(exc).__name__,
+                               extra={"request_id": request_id})
                 detail = f"Internal error processing item {index}"
             raise HTTPException(status_code=422, detail={"item_index": index, "error": detail}) from exc
     if warning := session.info.get("volume_warning"):
@@ -609,6 +616,8 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
         raise HTTPException(409, detail="Stale label revision")
     if original.verified_at is not None and original.verified_outcome is True:
         raise HTTPException(409, detail="Cannot relabel a verified label. Use verify to change the outcome.")
+    if original.verified_at is not None and original.verified_outcome is False and request.category == original.category:
+        raise HTTPException(409, detail="Correction must change the category.")
     if original.scored_at is not None:
         domain = await repository.get_domain(session, scoped)
         if domain is None or request.category not in DomainConfig.from_dict(domain.config_json).categories:

@@ -39,12 +39,17 @@ export default function App() {
       const next = localStorage.getItem('rgi-api-key') ?? ''
       if (next === activeKey.current) return
       activeKey.current = next
+      window.dispatchEvent(new Event('dlj-account-changing'))
+      sessionStorage.removeItem('dlj-checkout-pending')
       if (location.pathname === '/signup') {
         setApiKey(next); updateDomain(''); localStorage.removeItem('rgi-domain')
         return
       }
       localStorage.removeItem('rgi-domain')
-      sessionStorage.removeItem('dlj-checkout-pending')
+      if (location.pathname === '/upload' && sessionStorage.getItem('dlj-import-active') === '1') {
+        setApiKey(next); updateDomain('')
+        return
+      }
       window.location.hash = '#/upload'
       window.location.reload()
     }

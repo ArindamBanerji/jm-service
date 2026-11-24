@@ -20,7 +20,7 @@ export default function ScoredQueue() {
   const { domainId } = useDomain()
   const [storedItems, setItems] = useState<PendingLabel[]>([])
   const [loadedDomain, setLoadedDomain] = useState('')
-  const items = loadedDomain === domainId ? storedItems : []
+  const [loadedQuery, setLoadedQuery] = useState('')
   const [total, setTotal] = useState(0)
   const [categories, setCategories] = useState<string[]>([])
   const [category, setCategory] = useState('')
@@ -39,14 +39,17 @@ export default function ScoredQueue() {
   const requestId = useRef(0)
   const currentDomain = useRef(domainId)
   currentDomain.current = domainId
+  const queryKey = JSON.stringify([domainId, category, searchInput.trim(), search, sortBy, sortOrder, pageSize, offset])
+  const queryReady = searchInput.trim() === search
+  const items = queryReady && loadedDomain === domainId && loadedQuery === queryKey ? storedItems : []
 
   useEffect(() => {
     ++requestId.current
-    setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain('')
+    setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain(''); setLoadedQuery('')
     setError(null); setToast(''); setFocusedRow(0); setPageSize(50)
     setCategory(''); setSortBy(undefined); setSortOrder('asc'); setSearchInput(''); setSearch(''); setOffset(0)
   }, [domainId])
-  useEffect(() => { setSelected(new Set()) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
+  useEffect(() => { setSelected(new Set()) }, [domainId, category, searchInput, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => { setFocusedRow(0) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(searchInput.trim()); setOffset(0) }, 300)
@@ -72,6 +75,7 @@ export default function ScoredQueue() {
   const refresh = useCallback(async () => {
     const current = ++requestId.current
     if (!domainId) { setItems([]); setTotal(0); setBusy(false); return }
+    if (!queryReady) { setBusy(false); return }
     setBusy(true); setError(null)
     try {
       const page = await getPendingPage(domainId, {
@@ -86,14 +90,15 @@ export default function ScoredQueue() {
       }
       setItems(page.rows)
       setLoadedDomain(domainId)
+      setLoadedQuery(queryKey)
     } catch (cause) {
       if (current === requestId.current && currentDomain.current === domainId) {
-        setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain('')
+        setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain(''); setLoadedQuery('')
         setError(String(cause))
       }
     }
     finally { if (current === requestId.current) setBusy(false) }
-  }, [domainId, category, search, pageSize, offset, sortBy, sortOrder])
+  }, [domainId, category, search, pageSize, offset, sortBy, sortOrder, queryKey, queryReady])
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
 
@@ -139,8 +144,9 @@ export default function ScoredQueue() {
   })
   const allSelected = items.length > 0 && items.every(item => selected.has(item.label_id))
   const submitBulk = async (action: 'approve' | 'reject') => {
-    if (!domainId || loadedDomain !== domainId || bulkBusy || selected.size === 0) return
+    if (!domainId || loadedDomain !== domainId || loadedQuery !== queryKey || busy || bulkBusy || selected.size === 0) return
     const ids = items.filter(item => selected.has(item.label_id)).map(item => item.label_id)
+    if (!ids.length) { setSelected(new Set()); setError('Selection expired. Please re-select.'); return }
     setBulkBusy(true); setError(null); setToast('')
     try {
       const result = await bulkVerify(domainId, { label_ids: ids, action })

@@ -131,6 +131,6 @@ def test_dockerignore_and_frontend_artifacts():
     assert "__pycache__" in (ROOT / ".dockerignore").read_text()
     assert (ROOT / "frontend" / "dist" / "index.html").is_file()
     dockerfile = (ROOT / "Dockerfile").read_text()
-    assert "COPY frontend/dist/ frontend/dist/" in dockerfile
-    assert "COPY --from=" not in dockerfile
+    assert "RUN npm run build" in dockerfile
+    assert "COPY --from=frontend-build /app/frontend/dist ./frontend/dist" in dockerfile
     assert "mkdir -p /data" in dockerfile

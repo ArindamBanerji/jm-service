@@ -79,8 +79,12 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         record.labels_month_key = month_key
         record.labels_this_month = 0
 
+    cancelled = record.cancelled_at
+    cancellation_effective = (cancelled is not None and
+                              (cancelled.replace(tzinfo=timezone.utc) if cancelled.tzinfo is None
+                               else cancelled.astimezone(timezone.utc)) <= now)
     check_trial_expiry(record)
-    if (record.tier or "trial") == "trial":
+    if (record.tier or "trial") == "trial" or cancellation_effective:
         if record.labels_today >= DAILY_TRIAL_CAP:
             raise HTTPException(429, detail={
                 "error": "volume_exceeded",
@@ -94,7 +98,7 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
     record.labels_today += 1
     record.labels_this_month += 1
     warning = None
-    cap = TIER_MONTHLY_CAPS[record.tier or "trial"]
+    cap = None if cancellation_effective else TIER_MONTHLY_CAPS[record.tier or "trial"]
     if cap is not None and record.labels_this_month >= int(cap * 0.9):
         warning = {"X-Volume-Warning": f"{record.labels_this_month}/{cap} labels used this month"}
     if warning:

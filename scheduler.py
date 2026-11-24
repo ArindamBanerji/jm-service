@@ -51,23 +51,31 @@ async def send_trial_expiry_emails() -> int:
 
 
 async def cleanup_cancelled_tenants() -> int:
-    """Remove tenant data once all active keys have aged past cancellation."""
+    """Delete only after locking and rechecking every key for the tenant."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
     cleaned = 0
     async with AsyncSessionLocal() as session:
-        expired_keys = (await session.scalars(select(ApiKey).where(
+        candidates = (await session.execute(select(ApiKey.id, ApiKey.paddle_subscription_id).where(
             ApiKey.is_active.is_(True), ApiKey.cancelled_at.isnot(None),
             ApiKey.cancelled_at < cutoff))).all()
-        cleaned_tenants: set[str] = set()
-        for key in expired_keys:
-            tenant_id = key.tenant_id
-            if tenant_id in cleaned_tenants:
-                key.is_active = False
+    cleaned_tenants: set[str] = set()
+    for candidate_id, subscription_id in candidates:
+        async with AsyncSessionLocal.begin() as session:
+            key = await session.scalar(select(ApiKey).where(ApiKey.id == candidate_id)
+                                       .with_for_update().execution_options(populate_existing=True))
+            if key is None or key.tenant_id in cleaned_tenants:
                 continue
+            cancelled_at = key.cancelled_at
+            if cancelled_at is not None and cancelled_at.tzinfo is None:
+                cancelled_at = cancelled_at.replace(tzinfo=timezone.utc)
+            if (cancelled_at is None or not key.is_active or cancelled_at >= cutoff
+                    or key.paddle_subscription_id != subscription_id):
+                continue
+            tenant_id = key.tenant_id
+            # A sibling key can still own live data, regardless of its subscription state.
             other_active = await session.scalar(select(ApiKey.id).where(
                 ApiKey.tenant_id == tenant_id, ApiKey.is_active.is_(True),
-                ApiKey.id != key.id,
-                (ApiKey.cancelled_at.is_(None) | (ApiKey.cancelled_at >= cutoff))))
+                ApiKey.id != key.id).limit(1))
             if other_active is not None:
                 logger.info("Skipped cleanup for tenant %s with another active key", tenant_id)
                 continue
@@ -79,8 +87,6 @@ async def cleanup_cancelled_tenants() -> int:
             cleaned_tenants.add(tenant_id)
             cleaned += 1
             logger.info("Cleaned up cancelled tenant %s", tenant_id)
-        if cleaned_tenants:
-            await session.commit()
     return cleaned
 
 

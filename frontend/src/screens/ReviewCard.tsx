@@ -33,6 +33,7 @@ export default function ReviewCard() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [showGuidelines, setShowGuidelines] = useState(false)
   const [guidelines, setGuidelines] = useState<string | null>(null)
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function ReviewCard() {
   const hasUnsavedEdits = spansDirty || tagsDirty
   const saveSpans = async () => {
     if (!item || !domainId || item.label_id !== labelId || !item.category || item.verified_at || !spansDirty || busy) return
-    setBusy(true); setError(null); setMessage('')
+    setBusy(true); setIsSaving(true); setError(null); setMessage('')
     try {
       const result = await relabelItem(domainId, labelId, {
         category: item.category, idempotency_token: item.revision_id, spans: editedSpans,
@@ -90,11 +91,11 @@ export default function ReviewCard() {
         await load()
         setError('This label changed. Review the latest spans before editing again.')
       } else setError(String(cause))
-    } finally { setBusy(false) }
+    } finally { setIsSaving(false); setBusy(false) }
   }
   const saveTags = async () => {
     if (!item || !domainId || item.label_id !== labelId || !item.category || item.verified_at || !tagsDirty || busy) return
-    setBusy(true); setError(null); setMessage('')
+    setBusy(true); setIsSaving(true); setError(null); setMessage('')
     try {
       const result = await relabelItem(domainId, labelId, {
         category: item.category, idempotency_token: item.revision_id, tags: editedTags,
@@ -107,7 +108,7 @@ export default function ReviewCard() {
         await load()
         setError('This label changed. Review the latest tags before editing again.')
       } else setError(String(cause))
-    } finally { setBusy(false) }
+    } finally { setIsSaving(false); setBusy(false) }
   }
   const submit = async (action: string) => {
     if (!item || !domainId || !labelId || item.verified_at || item.status !== 'scored') return
@@ -159,8 +160,8 @@ export default function ReviewCard() {
     {item && loadedDomain === domainId && item.label_id === labelId ? <div className="grid-2"><div className="card card-pad"><div className="eyebrow">Label</div><h2 style={{ margin: '10px 0 3px' }}>{item.label_id}</h2><p className="muted">{item.category ?? 'Pending classification'} · Annotator {item.annotator_id ?? 'unknown'}</p>
       {item.content?.content_type === 'image_classification' && item.content.image_url && <ImageViewer imageUrl={item.content.image_url} category={item.category} readOnly />}
       {item.content?.content_type !== 'image_classification' && <TextViewer text={item.text} />}
-      {item.text !== null && (item.content === null || item.content.content_type === 'text_ner') && <><NEREditor key={item.revision_id} text={item.text} spans={editedSpans} entityTypes={entityTypes} onSpansChange={setEditedSpans} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{spansDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveSpans()} disabled={busy || !spansDirty || !item.category}>Save Spans</button>{!item.category && <span className="muted">Choose a category before saving spans.</span>}</div>}</>}
-      {item.content?.content_type === 'text_multilabel' && <><TagSelector key={item.revision_id} tags={editedTags} availableTags={[...entityTypes, ...item.content.tags]} onTagsChange={setEditedTags} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{tagsDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveTags()} disabled={busy || !tagsDirty || !item.category}>Save Tags</button></div>}</>}
+      {item.text !== null && (item.content === null || item.content.content_type === 'text_ner') && <><NEREditor key={item.revision_id} text={item.text} spans={editedSpans} entityTypes={entityTypes} onSpansChange={setEditedSpans} disabled={isSaving} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{spansDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveSpans()} disabled={busy || !spansDirty || !item.category}>Save Spans</button>{!item.category && <span className="muted">Choose a category before saving spans.</span>}</div>}</>}
+      {item.content?.content_type === 'text_multilabel' && <><TagSelector key={item.revision_id} tags={editedTags} availableTags={[...entityTypes, ...item.content.tags]} onTagsChange={setEditedTags} disabled={isSaving} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{tagsDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveTags()} disabled={busy || !tagsDirty || !item.category}>Save Tags</button></div>}</>}
       {(item.text !== null || item.content?.content_type === 'image_classification') && !hasUnsavedEdits && <CategorySelector domainId={domainId} labelId={labelId} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={afterCategorySaved} />}
       <hr style={{ border: 0, borderTop: '1px solid #e7ecf2', margin: '22px 0' }} /><h3 className="section-title">Factor signals</h3>{Object.entries(item.factors).map(([factor, value]) => <FactorBar key={factor} factor={factor} value={value} />)}</div>
       <div className="stack">{item.status === 'scored' && item.confidence !== null && <div className="card card-pad"><div className="eyebrow">JM recommendation</div><h2 style={{ textTransform: 'capitalize' }}>{item.recommended_action}</h2><ConfidenceIndicator value={item.confidence} /><div className="button-row" style={{ marginTop: 20 }}>{tier && <TierBadge tier={tier.tier} />}<span className="muted">Conservation: {tier?.conservation_reason ?? (tier?.conservation_gate_pass ? 'clear' : 'unknown')}</span></div></div>}

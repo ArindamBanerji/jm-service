@@ -184,7 +184,7 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
     if not isinstance(subscription_id, str) or not 0 < len(subscription_id) <= 200:
         raise HTTPException(422, "Missing subscription ID")
 
-    tier = _product_tier(payload, event_type)
+    tier = None if event_type == "subscription.canceled" else _product_tier(payload, event_type)
     event_id = data.get("event_id")
     if not isinstance(event_id, str) or not event_id.strip() or len(event_id) > 200:
         raise HTTPException(422, "Invalid event_id")
