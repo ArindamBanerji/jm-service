@@ -748,3 +748,34 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Files created: `test_sweep3_fixes.py`
 - Tests: 15 passed (SQLite) / 15 passed (PostgreSQL); full suite 422 passed, 1 skipped
 - mypy: clean
+
+## DLJ-SWEEP4-BE — Backend Sweep Round 4 (Convergence)
+
+- Date: 2026-11-24
+- Dimensions: 6
+- New findings: P1=1, P2=3, P3=1
+- Round 3 fix verification: 4 CLOSED, 4 PARTIAL, 0 OPEN
+- Cumulative P1 closed: 21 of 40 distinct (52.5%). Two additional issues downgraded, 17 still P1.
+- Structural P1s remaining: 11 (8 scheduled in the merged plan, 3 accepted and deferred to v1.1)
+- Convergence: not ready for unrestricted Post-Track 2 feature implementation. Ready to start merged prompt 00 and the corrective waves.
+- Verification: five fix modules, 63 passed and one dialect-specific skip on each of SQLite and PostgreSQL. Full default suite: 422 passed, 1 skipped.
+- Report: docs/quality/dlj_sweep4_backend.md
+
+## DLJ-SWEEP4-FE — Frontend Sweep Round 4 (Convergence)
+
+- Date: 2026-11-24
+- Dimensions: 6
+- New findings: P1=1, P2=2, P3=0
+- Round 3 fix verification: 1 CLOSED of 5; 4 PARTIAL
+- FE P1 convergence: 1 new, 4 carried forward, 5 open
+- P2s incidentally improved: 3 partially improved, 0 fully closed
+- Convergence: not ready for Post-Track 2
+- Verification: production build and frontend/E2E typechecks passed; Chromium 110 passed, 2 failed across 11 specs.
+- Report: docs/quality/dlj_sweep4_frontend.md
+
+## DLJ-ARCH-V2-FIXES — Integration Budget + Fix Credit
+
+- Date: 2026-11-24
+- Changes: (1) Wave 4 includes a joint 04+05 integration day, bringing the schedule to 29 working days. (2) Pre-existing fix credit covers 19 launch-blocking P1s and 2 previously closed P1 regressions (R44 and R18), 21 IDs in total.
+- Effort adjustment: 38 → 37 engineer-days (3 saved through test reuse, 2 added for both engineers on integration day).
+- File modified: docs/design/dlj_arch_redesign_v2.md
