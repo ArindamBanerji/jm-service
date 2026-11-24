@@ -11,7 +11,7 @@ from threading import Lock
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -108,7 +108,9 @@ def _field(data: dict[str, Any], path: str) -> Any:
     return value
 
 
-def _task_values(task: dict[str, Any], config: ConnectorConfig) -> tuple[str, str, dict[str, float]]:
+def _task_values(task: Any, config: ConnectorConfig, index: int | None = None) -> tuple[str, str, dict[str, float]]:
+    if not isinstance(task, dict):
+        raise HTTPException(422, detail=f"Task at index {index} must be an object")
     if task.get("id") is None or not isinstance(task.get("data"), dict):
         raise HTTPException(422, detail="Task requires id and data")
     data = task["data"]
@@ -184,8 +186,8 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
         raise HTTPException(422, detail="tasks must be a list")
     await _ensure_domain(session, config)
     predictions: list[dict[str, Any]] = []
-    for task in tasks:
-        label_id, category, factors = _task_values(task, config)
+    for index, task in enumerate(tasks):
+        label_id, category, factors = _task_values(task, config, index)
         annotator_id = str(task.get("annotator_id")) if task.get("annotator_id") is not None else None
         existing = await session.scalar(select(LabelLog).where(
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
@@ -204,9 +206,12 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
             status = evaluate_domain(engine, stats)[category]
             eligible = status.tier is AutonomyTier.AUTONOMOUS and status.conservation_gate_pass
         else:
-            outcome = await _ingest(session, config.domain_id, IngestItem(
-                label_id=label_id, category=category, annotator_id=annotator_id, factors=factors),
-                config.public_domain_id)
+            try:
+                item = IngestItem(label_id=label_id, category=category,
+                                  annotator_id=annotator_id, factors=factors)
+            except ValidationError as exc:
+                raise HTTPException(422, detail=f"Invalid task at index {index}: {exc.errors(include_input=False)}") from exc
+            outcome = await _ingest(session, config.domain_id, item, config.public_domain_id)
             confidence = outcome.confidence
             eligible = outcome.auto_accepted
         count, accuracy = await repository.verified_accuracy(session, config.domain_id, category, annotator_id) if annotator_id else (0, None)

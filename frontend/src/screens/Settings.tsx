@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, getAccount, getAccountDomains, getCheckoutUrl, getGuidelines, putGuidelines, resolveAccountDomain,
   type AccountDomain, type AccountSummary } from '../api'
@@ -23,13 +23,37 @@ export default function Settings() {
   const [keyVersion, setKeyVersion] = useState(0)
   const [guidelines, setGuidelines] = useState('')
   const [guidelinesMessage, setGuidelinesMessage] = useState('')
+  const [guidelinesLoading, setGuidelinesLoading] = useState(false)
+  const [guidelinesDomain, setGuidelinesDomain] = useState('')
+  const [guidelinesSaving, setGuidelinesSaving] = useState(false)
+  const activeDomain = useRef(domainId)
+  activeDomain.current = domainId
   useEffect(() => {
-    if (!domainId || !configured) { setGuidelines(''); return }
-    let live = true
-    getGuidelines(domainId).then(result => { if (live) setGuidelines(result.guidelines ?? '') })
-      .catch(() => { if (live) setGuidelines('') })
-    return () => { live = false }
+    setGuidelines(''); setGuidelinesDomain(''); setGuidelinesMessage('')
+    if (!domainId || !configured) { setGuidelinesLoading(false); return }
+    const controller = new AbortController()
+    setGuidelinesLoading(true)
+    getGuidelines(domainId, controller.signal).then(result => {
+      if (controller.signal.aborted || activeDomain.current !== domainId) return
+      setGuidelines(result.guidelines ?? ''); setGuidelinesDomain(domainId)
+    }).catch(cause => {
+      if (!controller.signal.aborted && activeDomain.current === domainId) setError(String(cause))
+    }).finally(() => {
+      if (!controller.signal.aborted && activeDomain.current === domainId) setGuidelinesLoading(false)
+    })
+    return () => controller.abort()
   }, [domainId, configured])
+  const saveGuidelines = async () => {
+    if (!domainId || guidelinesDomain !== domainId || guidelinesLoading || guidelinesSaving) return
+    const savedDomain = domainId
+    setGuidelinesSaving(true); setGuidelinesMessage(''); setError(null)
+    try {
+      await putGuidelines(savedDomain, guidelines)
+      if (activeDomain.current === savedDomain) setGuidelinesMessage('Guidelines saved.')
+    } catch (cause) {
+      if (activeDomain.current === savedDomain) setError(String(cause))
+    } finally { setGuidelinesSaving(false) }
+  }
 
   const refresh = useCallback(async () => {
     if (!localStorage.getItem('rgi-api-key')) { setAccount(null); setDomains([]); return }
@@ -98,9 +122,9 @@ export default function Settings() {
     <section className="card card-pad" style={{ marginTop: 18 }}><h2 className="section-title">Domains</h2><p className="muted">Select a known domain or enter a public name. A new domain is created when you first score a label.</p><div className="button-row"><label className="field">Public domain name<input value={domainName} onChange={event => setDomainName(event.target.value)} placeholder="Enter domain name" /></label><button className="button" onClick={() => void useDomainName(domainName)} disabled={busy || !configured}>Use domain</button></div><p>Active domain: <strong>{domainId || 'None'}</strong></p>{domains.map(row => row.public_domain_id ? <button className="button secondary domain-choice" key={row.id} onClick={() => void useDomainName(row.public_domain_id!)}>{row.public_domain_id}</button> : <p className="muted" key={row.id}>An older domain needs its public name. Enter that name above to recover it.</p>)}</section>
     <section className="card card-pad" style={{ marginTop: 18 }}><h2 className="section-title">Annotation guidelines</h2>
       <p className="muted">Instructions for reviewers in the active domain.</p>
-      <label className="field">Guidelines<textarea rows={9} value={guidelines} onChange={event => { setGuidelines(event.target.value); setGuidelinesMessage('') }} /></label>
-      <button className="button" disabled={!domainId || !configured || new TextEncoder().encode(guidelines).length > 10 * 1024}
-        onClick={() => void putGuidelines(domainId, guidelines).then(() => setGuidelinesMessage('Guidelines saved.')).catch(cause => setError(String(cause)))}>Save guidelines</button>
+      <label className="field">Guidelines<textarea rows={9} value={guidelinesDomain === domainId ? guidelines : ''} disabled={guidelinesLoading || guidelinesDomain !== domainId} onChange={event => { setGuidelines(event.target.value); setGuidelinesMessage('') }} /></label>
+      <button className="button" disabled={!domainId || !configured || guidelinesLoading || guidelinesSaving || guidelinesDomain !== domainId || new TextEncoder().encode(guidelines).length > 10 * 1024}
+        onClick={() => void saveGuidelines()}>Save guidelines</button>
       {guidelinesMessage && <p className="success">{guidelinesMessage}</p>}
     </section>
     <ErrorBanner message={error} />

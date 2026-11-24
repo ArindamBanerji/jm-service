@@ -599,3 +599,42 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - mypy: clean on labeling_router.py, dashboard_router.py, db/models.py, db/migrate.py.
 - Build: passed.
 - Access limitation: current auth has no admin role; any authenticated key belonging to the domain's tenant can edit guidelines.
+
+## DLJ-FIX-BE1 — Billing/Webhook Hardening
+
+- Date: 2026-11-24
+- Findings fixed: P1.1, P1.5, P1.6, P1.10, P1.15
+- Files modified: `billing.py`, `db/models.py`, `db/migrate.py`, `test_billing.py`, `test_account.py`
+- Files created: `test_billing_fixes.py`
+- Webhook: A missing secret returns 503 unless `PADDLE_SANDBOX=true`. Checkout includes the purchasing key UUID. Activation resolves the linked customer first, then the explicit key. Legacy tenant-only transactions use the oldest eligible key with UUID as a tie-breaker. Customer IDs have a partial unique index.
+- Entitlements: Subscription mutations require an event ID and timezone-aware occurrence time. Each accepted event gets a durable receipt in the entitlement transaction. Replays return 409, and stale events preserve newer state. An email uniqueness conflict preserves both the tier change and the original contact. Unrecognized products return 400.
+- Tests: 10 passed (SQLite) / 10 passed (PostgreSQL). Full suite: 388 passed, 1 skipped. The PostgreSQL-only migration test also passed on PostgreSQL. Concurrent duplicate deliveries yielded one 200 and one 409 on each database.
+- mypy: clean on `billing.py`, `trial_guard.py`, and `db/models.py`.
+
+## DLJ-FIX-FE — Frontend State Race + Domain-Switch Fixes
+
+- Date: 2026-11-24
+- Findings fixed: Sweep 2 P1.1-P1.7 + P2.19 + P2.20
+- Files modified: `frontend/src/screens/ReviewCard.tsx`, `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/screens/Settings.tsx`, `frontend/src/components/CategorySelector.tsx`, `frontend/src/api.ts`, `frontend/src/App.tsx` (and generated `frontend/dist/index.html`).
+- Files created: `e2e/fix_state.spec.ts`
+- Frontend build: passed
+- PW test list: verified (62 tests total, including the four new state tests); new spec type check passed. `e2e/tsconfig.json` does not exist, so the requested project check reported that missing file.
+
+## DLJ-FIX-BE2 — Migration Safety
+- Date: 2026-11-24
+- Findings fixed: P1.3, P1.4
+- Files modified: db/migrate.py
+- Files created: test_migration_fixes.py
+- PostgreSQL timestamp additions use TIMESTAMPTZ. Previously migrated timezone-naive values are interpreted as UTC during repair. SQLite additions use TIMESTAMP.
+- The SQLite label_log rebuild stages and restores label_content in a savepoint with foreign keys enforced. A count mismatch rolls back the rebuild. Tests covered NER spans, tags, image URLs, rollback, cascade deletion, repeat upgrades and fresh-schema column types.
+- Tests: 5 passed (SQLite) / 5 passed (PostgreSQL). Each run skipped the other dialect’s timestamp test. All six regression cases passed across the two runs. Full suite with the four requested exclusions: 388 passed, 1 skipped.
+- mypy: clean on db/migrate.py, db/models.py and db/connection.py.
+
+## DLJ-FIX-BE3 — Relabel Safety + Input Validation
+
+- Date: 2026-11-24
+- Findings fixed: P1.2, P1.8, P1.9, P1.16, P1.17, P1.19, P2.6
+- Files modified: `labeling_router.py`, `label_studio.py`, `jm_service.py`, `test_tasks.py` (updated schema fixture for the new relabel rule)
+- Files created: `test_validation_fixes.py`
+- Tests: 14 passed (SQLite) / 14 passed (PostgreSQL); full suite 388 passed, 1 skipped
+- mypy: clean

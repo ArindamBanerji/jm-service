@@ -18,6 +18,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+from math import isfinite
 import asyncio
 import hashlib
 import os
@@ -147,6 +148,14 @@ class CreateDomainRequest(BaseModel):
         default_factory=dict,
         description="Optional per-factor [min, max] ranges for normalization. Defaults to [0, 1].",
     )
+
+    @field_validator("factor_ranges")
+    @classmethod
+    def valid_factor_ranges(cls, ranges: dict[str, list[float]]) -> dict[str, list[float]]:
+        for name, bounds in ranges.items():
+            if len(bounds) != 2 or not all(isfinite(value) for value in bounds) or bounds[0] > bounds[1]:
+                raise ValueError(f"factor_ranges[{name}] must contain two ordered finite numbers")
+        return ranges
 
     @field_validator("factors", "categories", "actions")
     @classmethod

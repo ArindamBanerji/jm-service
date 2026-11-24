@@ -161,9 +161,11 @@ def test_checkout_webhook_refreshes_tier(tmp_path, monkeypatch):
         assert http.get("/v1/account", headers=auth()).json()["tier"] == "trial"
         checkout = http.get("/v1/billing/checkout-url?tier=starter", headers=auth())
         assert checkout.status_code == 200 and checkout.json()["checkout_url"].startswith("https://")
-        assert calls[0][1]["json"]["custom_data"] == {"tenant_id": "tenant-a"}
-        payload = {"event_type": "subscription.created", "data": {
-            "id": "sub-1", "customer_id": "customer-1", "custom_data": {"tenant_id": "tenant-a"},
+        custom = calls[0][1]["json"]["custom_data"]
+        assert custom["tenant_id"] == "tenant-a" and custom["key_id"]
+        payload = {"event_type": "subscription.created", "event_id": "evt-account",
+                   "occurred_at": "2026-01-01T00:00:00Z", "data": {
+            "id": "sub-1", "customer_id": "customer-1", "custom_data": custom,
             "items": [{"product": {"name": "DLJ Starter"}}]}}
         body = json.dumps(payload).encode()
         ts = "1234567890"

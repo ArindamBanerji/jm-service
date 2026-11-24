@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
+import logging
 from math import isfinite
 from pathlib import Path
 from typing import Annotated, Literal
@@ -13,7 +14,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, null, or_, select, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -27,6 +28,7 @@ from rate_limit import limiter
 from trial_guard import reserve_label_capacity
 
 router = APIRouter(prefix="/v1/labels", tags=["Labeling"])
+logger = logging.getLogger(__name__)
 autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
 Session = Annotated[AsyncSession, Depends(get_db)]
 
@@ -64,9 +66,9 @@ async def put_guidelines(domain_id: str, payload: GuidelinesPayload, tenant: Ten
 
 
 class IngestItem(BaseModel):
-    label_id: str = Field(min_length=1)
-    category: str = Field(min_length=1)
-    annotator_id: str | None = None
+    label_id: str = Field(min_length=1, max_length=200)
+    category: str = Field(min_length=1, max_length=200)
+    annotator_id: str | None = Field(default=None, max_length=200)
     factors: dict[str, float] = Field(min_length=2)
     text: str | None = None
 
@@ -101,7 +103,7 @@ class IngestItem(BaseModel):
 
 
 class IngestRequest(IngestItem):
-    domain_id: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1, max_length=200)
 
 
 class IngestResponse(BaseModel):
@@ -119,11 +121,11 @@ class IngestResponse(BaseModel):
 
 
 class VerifyRequest(BaseModel):
-    domain_id: str = Field(min_length=1)
-    label_id: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1, max_length=200)
+    label_id: str = Field(min_length=1, max_length=200)
     actual_action: str = Field(min_length=1)
     verified_outcome: bool
-    annotator_id: str | None = None
+    annotator_id: str | None = Field(default=None, max_length=200)
     reason: str | None = Field(default=None, max_length=1000)
 
 
@@ -150,7 +152,7 @@ class BulkVerifyRequest(BaseModel):
 
 
 class IngestBatchRequest(BaseModel):
-    domain_id: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1, max_length=200)
     items: list[IngestItem] = Field(min_length=1, max_length=100)
 
 
@@ -162,7 +164,7 @@ class IngestBatchResponse(BaseModel):
 class TextTaskRequest(BaseModel):
     label_id: str = Field(min_length=1, max_length=200)
     text: str = Field(min_length=1)
-    category: str | None = None
+    category: str | None = Field(default=None, max_length=200)
 
     @field_validator("text")
     @classmethod
@@ -412,6 +414,15 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
     if request.actual_action not in engine.config.actions:
         raise HTTPException(status_code=422, detail="Unknown actual_action")
     assert row.category is not None
+    domain = await repository.get_domain(session, domain_id)
+    categories = DomainConfig.from_dict(domain.config_json).categories if domain is not None else []
+    if row.category not in categories:
+        raise HTTPException(status_code=422, detail=f"Category not in domain schema: {row.category}")
+    for category in categories:
+        if category not in engine.config.categories:
+            engine.config.categories.append(category)
+            for action in engine.config.actions:
+                engine.centroids[f"{category}|{action}"] = [0.5] * engine.config.n_factors
     try:
         result = await repository.verify_and_learn(
             session, engine, domain_id, request.label_id,
@@ -430,6 +441,10 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
 async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyRequest,
                       session: Session, tenant: Tenant) -> dict:
     scoped = scoped_domain_id(tenant, domain_id)
+    domain = await repository.get_domain(session, scoped)
+    if domain is None:
+        raise HTTPException(404, detail="Domain not found")
+    categories = set(DomainConfig.from_dict(domain.config_json).categories)
     rows = (await session.scalars(select(LabelLog).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
         LabelLog.label_id.in_(payload.label_ids)).with_for_update())).all()
@@ -450,6 +465,8 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
             skipped += 1
             errors.append({"label_id": label_id, "error": "not_pending_scored_label"})
             continue
+        if row.category not in categories:
+            raise HTTPException(422, detail=f"Category not in domain schema: {row.category}")
         if capacity_error is not None:
             skipped += 1
             errors.append({"label_id": label_id, "error": capacity_error})
@@ -482,10 +499,17 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
         try:
             results.append(await _ingest(session, scoped_domain_id(tenant, request.domain_id), item,
                                          request.domain_id))
-        except (HTTPException, IntegrityError, StaleDataError, ValueError) as exc:
+        except (HTTPException, SQLAlchemyError, StaleDataError, ValueError) as exc:
             if isinstance(exc, HTTPException) and exc.status_code in {402, 429}:
                 raise
-            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            if isinstance(exc, IntegrityError):
+                logger.exception("Batch ingest conflict at item %s", index)
+                detail = f"Duplicate or conflict at item {index}"
+            elif isinstance(exc, HTTPException):
+                detail = exc.detail
+            else:
+                logger.exception("Batch ingest error at item %s", index)
+                detail = f"Internal error processing item {index}"
             raise HTTPException(status_code=422, detail={"item_index": index, "error": detail}) from exc
     if warning := session.info.get("volume_warning"):
         response.headers["X-Volume-Warning"] = warning
@@ -553,14 +577,17 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
                           factors=factors, text=request.text)
         try:
             await _ingest(session, scoped, item, domain_id)
-        except IntegrityError as exc:
+        except (IntegrityError, StaleDataError) as exc:
             raise HTTPException(409, detail="Label already exists") from exc
         return {"label_id": request.label_id, "status": "scored", "category": request.category}
     domain = await repository.get_domain(session, scoped)
     if domain is None:
         config = DomainConfig(scoped, scoped, ["model_confidence", "item_difficulty"],
                               [], ["approve", "reject"])
-        await repository.create_domain(session, scoped, scoped, config, public_domain_id=domain_id)
+        try:
+            await repository.create_domain(session, scoped, scoped, config, public_domain_id=domain_id)
+        except IntegrityError as exc:
+            raise HTTPException(409, detail="Domain already exists") from exc
     elif domain.public_domain_id is None:
         domain.public_domain_id = domain_id
     session.add(LabelLog(domain_id=scoped, tenant_id=tenant, label_id=request.label_id,
@@ -580,6 +607,12 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
     original = await _current_label(session, domain_id, label_id, tenant, lock=True)
     if request.idempotency_token != str(original.id):
         raise HTTPException(409, detail="Stale label revision")
+    if original.verified_at is not None and original.verified_outcome is True:
+        raise HTTPException(409, detail="Cannot relabel a verified label. Use verify to change the outcome.")
+    if original.scored_at is not None:
+        domain = await repository.get_domain(session, scoped)
+        if domain is None or request.category not in DomainConfig.from_dict(domain.config_json).categories:
+            raise HTTPException(422, detail=f"Category not in domain schema: {request.category}")
     if request.spans is not None and request.tags is not None:
         raise HTTPException(422, detail="Edit spans or tags in one revision")
     edited_spans: list[dict] | None = None
@@ -628,9 +661,7 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
             category=request.category, factors_json=original.factors_json,
             text=original.text, annotator_id=original.annotator_id,
             recommended_action=original.recommended_action, confidence=original.confidence,
-            scored_at=original.scored_at, actual_action=original.actual_action,
-            verified_outcome=original.verified_outcome, verified_at=original.verified_at,
-            verification_reason=original.verification_reason,
+            scored_at=original.scored_at,
             annotation_id=original.annotation_id)
         session.add(successor)
     successor.source_task_id = original.source_task_id or original.label_id

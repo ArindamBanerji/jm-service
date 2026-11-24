@@ -109,7 +109,8 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
     client = TestClient(app)
 
     def post(event: str, product: str = "DLJ Starter", status: str = ""):
-        payload = {"event_type": event,
+        payload = {"event_type": event, "event_id": f"evt-{event}-{status}",
+                   "occurred_at": datetime.now(timezone.utc).isoformat(),
                    "data": {"id": "sub-1", "customer_id": "customer-1",
                             "status": status,
                             "items": [{"product": {"name": product}}]}}
@@ -150,6 +151,7 @@ def test_webhook_rejects_bad_signature(monkeypatch) -> None:
 
 
 def test_sandbox_accepts_unsigned_webhook(monkeypatch) -> None:
+    monkeypatch.setenv("PADDLE_SANDBOX", "true")
     monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
     app = FastAPI()
     app.include_router(billing.router)
@@ -206,7 +208,7 @@ def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatc
     assert response.json() == {"checkout_url": "https://checkout.paddle.com/pay/txn-1",
                                "tier": "professional"}
     assert calls[0][0] == "https://sandbox-api.paddle.com/transactions"
-    assert calls[0][1]["json"]["custom_data"] == {"tenant_id": "tenant-1"}
+    assert calls[0][1]["json"]["custom_data"] == {"tenant_id": "tenant-1", "key_id": str(key.id)}
     assert calls[0][1]["json"]["items"] == [{"price_id": "pri_pro", "quantity": 1}]
     asyncio.run(db_engine.dispose())
 
@@ -225,15 +227,17 @@ def test_webhook_links_tenant_from_custom_data(tmp_path, monkeypatch) -> None:
     asyncio.run(setup())
     monkeypatch.setattr(billing, "AsyncSessionLocal", factory)
     monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("PADDLE_SANDBOX", "true")
     app = FastAPI()
     app.include_router(billing.router)
     client = TestClient(app)
-    payload = {"event_type": "subscription.created", "data": {
+    payload = {"event_type": "subscription.created", "event_id": "evt-legacy",
+               "occurred_at": "2026-01-01T00:00:00Z", "data": {
         "id": "sub-1", "customer_id": "customer-1", "custom_data": {"tenant_id": "tenant"},
         "customer": {"email": "owner@example.com"},
         "items": [{"product": {"name": "DLJ Business"}}]}}
     assert client.post("/v1/billing/webhook", json=payload).status_code == 200
-    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
+    assert client.post("/v1/billing/webhook", json=payload).status_code == 409
 
     async def inspect_record() -> ApiKey:
         async with factory() as session:
@@ -261,9 +265,14 @@ def test_migration_adds_billing_columns_to_existing_table(tmp_path, monkeypatch)
     db_engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
     monkeypatch.setattr(migrations, "engine", db_engine)
     asyncio.run(migrations.migrate())
+    asyncio.run(migrations.migrate())
     with sqlite3.connect(db_path) as connection:
         names = {row[1] for row in connection.execute("PRAGMA table_info(api_keys)")}
-    assert {"tier", "paddle_customer_id", "paddle_subscription_id",
+        indices = {row[1]: row for row in connection.execute("PRAGMA index_list(api_keys)")}
+        customer_index = indices["uq_api_keys_paddle_customer_id"]
+        assert customer_index[2] == 1 and customer_index[4] == 1  # unique and partial
+        assert connection.execute("SELECT count(*) FROM paddle_webhook_events").fetchone() == (0,)
+    assert {"tier", "paddle_customer_id", "paddle_subscription_id", "paddle_event_id", "paddle_event_occurred_at",
             "contact_email", "trial_expiring_email_sent_at", "trial_expired_email_sent_at",
             "cancelled_at", "labels_this_month", "labels_month_key",
             "labels_today", "labels_day_key"} <= names

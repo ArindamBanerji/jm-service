@@ -18,7 +18,9 @@ export default function ScoredQueue() {
   const navigate = useNavigate()
   const [focusedRow, setFocusedRow] = useState(0)
   const { domainId } = useDomain()
-  const [items, setItems] = useState<PendingLabel[]>([])
+  const [storedItems, setItems] = useState<PendingLabel[]>([])
+  const [loadedDomain, setLoadedDomain] = useState('')
+  const items = loadedDomain === domainId ? storedItems : []
   const [total, setTotal] = useState(0)
   const [categories, setCategories] = useState<string[]>([])
   const [category, setCategory] = useState('')
@@ -38,7 +40,12 @@ export default function ScoredQueue() {
   const currentDomain = useRef(domainId)
   currentDomain.current = domainId
 
-  useEffect(() => { setCategory(''); setSortBy(undefined); setSortOrder('asc'); setSearchInput(''); setSearch(''); setOffset(0) }, [domainId])
+  useEffect(() => {
+    ++requestId.current
+    setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain('')
+    setError(null); setToast(''); setFocusedRow(0); setPageSize(50)
+    setCategory(''); setSortBy(undefined); setSortOrder('asc'); setSearchInput(''); setSearch(''); setOffset(0)
+  }, [domainId])
   useEffect(() => { setSelected(new Set()) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => { setFocusedRow(0) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => {
@@ -71,14 +78,20 @@ export default function ScoredQueue() {
         category: category || undefined, limit: pageSize, offset,
         sort_by: sortBy, sort_order: sortOrder, search: search || undefined,
       })
-      if (current !== requestId.current) return
+      if (current !== requestId.current || currentDomain.current !== domainId) return
       setTotal(page.total)
       if (offset > 0 && offset >= page.total) {
         setOffset(page.total ? Math.floor((page.total - 1) / pageSize) * pageSize : 0)
         return
       }
       setItems(page.rows)
-    } catch (cause) { if (current === requestId.current) setError(String(cause)) }
+      setLoadedDomain(domainId)
+    } catch (cause) {
+      if (current === requestId.current && currentDomain.current === domainId) {
+        setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain('')
+        setError(String(cause))
+      }
+    }
     finally { if (current === requestId.current) setBusy(false) }
   }, [domainId, category, search, pageSize, offset, sortBy, sortOrder])
   const refreshRef = useRef(refresh)
@@ -126,7 +139,7 @@ export default function ScoredQueue() {
   })
   const allSelected = items.length > 0 && items.every(item => selected.has(item.label_id))
   const submitBulk = async (action: 'approve' | 'reject') => {
-    if (!domainId || bulkBusy || selected.size === 0) return
+    if (!domainId || loadedDomain !== domainId || bulkBusy || selected.size === 0) return
     const ids = items.filter(item => selected.has(item.label_id)).map(item => item.label_id)
     setBulkBusy(true); setError(null); setToast('')
     try {
@@ -162,6 +175,6 @@ export default function ScoredQueue() {
       {!items.length && !busy && <div className="loading">{domainId ? 'No pending labels in this view.' : 'Enter a domain ID to see its queue.'}</div>}
     </div><div className="toolbar queue-pages"><span className="muted">Showing {first}–{last} of {total} · Page {Math.floor(offset / pageSize) + 1} of {pages}</span><button className="button secondary" onClick={() => setOffset(Math.max(0, offset - pageSize))} disabled={busy || offset === 0}>Previous</button><button className="button secondary" onClick={() => setOffset(offset + pageSize)} disabled={busy || offset + pageSize >= total}>Next</button></div>
     <p className="muted">Export this page downloads only the displayed pending labels in their current order. Bulk review uses one plan quota unit per processed label.</p>
-    {selected.size > 0 && <div className="bulk-action-bar" role="region" aria-label="Bulk review actions"><strong>{selected.size} selected</strong><button className="button bulk-approve" onClick={() => void submitBulk('approve')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Approve All</button><button className="button danger" onClick={() => void submitBulk('reject')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Reject All</button><button className="button secondary" onClick={() => setSelected(new Set())} disabled={bulkBusy}>Clear Selection</button></div>}
+    {loadedDomain === domainId && selected.size > 0 && <div className="bulk-action-bar" role="region" aria-label="Bulk review actions"><strong>{selected.size} selected</strong><button className="button bulk-approve" onClick={() => void submitBulk('approve')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Approve All</button><button className="button danger" onClick={() => void submitBulk('reject')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Reject All</button><button className="button secondary" onClick={() => setSelected(new Set())} disabled={bulkBusy}>Clear Selection</button></div>}
   </div>
 }

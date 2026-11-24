@@ -8,7 +8,7 @@ interface Props {
   revisionId: string
   category: string | null
   previousCategory: string | null
-  onSaved: () => Promise<void>
+  onSaved: (labelId: string) => Promise<void>
 }
 
 export default function CategorySelector({ domainId, labelId, revisionId, category, previousCategory, onSaved }: Props) {
@@ -28,11 +28,11 @@ export default function CategorySelector({ domainId, labelId, revisionId, catego
     if (!next || busy) return
     setBusy(true); setError(null)
     try {
-      await relabelItem(domainId, labelId, { category: next, idempotency_token: revisionId })
+      const result = await relabelItem(domainId, labelId, { category: next, idempotency_token: revisionId })
       setSaved(true)
-      await onSaved()
+      await onSaved(result.label_id)
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 409) await onSaved()
+      if (cause instanceof ApiError && cause.status === 409) await onSaved(labelId)
       setError(String(cause))
     } finally { setBusy(false) }
   }

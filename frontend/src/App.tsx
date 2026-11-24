@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Domain } from './domain'
 import Upload from './screens/Upload'
 import ScoredQueue from './screens/ScoredQueue'
@@ -19,9 +19,11 @@ const links = [
   ['settings', 'Settings', '⚙'],
 ]
 export default function App() {
+  const location = useLocation()
   const [domainId, updateDomain] = useState(() => localStorage.getItem('rgi-domain') ?? '')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('rgi-api-key') ?? '')
+  const activeKey = useRef(localStorage.getItem('rgi-api-key') ?? '')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('dlj-theme')
     return saved === 'light' || saved === 'dark' ? saved :
@@ -32,12 +34,31 @@ export default function App() {
     localStorage.setItem('dlj-theme', theme)
   }, [theme])
   useEffect(() => {
-    const refreshKey = () => setApiKey(localStorage.getItem('rgi-api-key') ?? '')
+    const refreshKey = (event: Event) => {
+      if (event instanceof StorageEvent && event.key !== 'rgi-api-key' && event.key !== null) return
+      const next = localStorage.getItem('rgi-api-key') ?? ''
+      if (next === activeKey.current) return
+      activeKey.current = next
+      if (location.pathname === '/signup') {
+        setApiKey(next); updateDomain(''); localStorage.removeItem('rgi-domain')
+        return
+      }
+      localStorage.removeItem('rgi-domain')
+      sessionStorage.removeItem('dlj-checkout-pending')
+      window.location.hash = '#/upload'
+      window.location.reload()
+    }
     window.addEventListener('dlj-key-updated', refreshKey)
     window.addEventListener('storage', refreshKey)
     return () => { window.removeEventListener('dlj-key-updated', refreshKey); window.removeEventListener('storage', refreshKey) }
-  }, [])
+  }, [location.pathname])
   const setDomainId = (value: string) => { updateDomain(value); localStorage.setItem('rgi-domain', value) }
+  const commitKey = () => {
+    if (apiKey === activeKey.current) return
+    if (apiKey) localStorage.setItem('rgi-api-key', apiKey)
+    else localStorage.removeItem('rgi-api-key')
+    window.dispatchEvent(new Event('dlj-key-updated'))
+  }
   return <Domain.Provider value={{ domainId, setDomainId }}>
     <KeyboardShortcuts />
     <div className="shell">
@@ -47,7 +68,7 @@ export default function App() {
         <label className="sidebar-label" htmlFor="domain">ACTIVE DOMAIN</label>
         <input id="domain" className="domain-input" list="recent-domains" value={domainId} onChange={event => setDomainId(event.target.value.trim())} placeholder="Enter domain ID" />
         <label className="sidebar-label" htmlFor="api-key">API KEY</label>
-        <input id="api-key" className="domain-input" type="password" autoComplete="off" value={apiKey} onChange={event => { setApiKey(event.target.value); localStorage.setItem('rgi-api-key', event.target.value) }} placeholder="Enter your API key" />
+        <input id="api-key" className="domain-input" type="password" autoComplete="off" value={apiKey} onChange={event => setApiKey(event.target.value)} onBlur={commitKey} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} placeholder="Enter your API key" />
         <datalist id="recent-domains">{domainId && <option value={domainId} />}</datalist>
         <nav aria-label="Main navigation">{links.map(([path, label, icon]) => <NavLink key={path} to={`/${path}`} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span aria-hidden>{icon}</span>{label}</NavLink>)}</nav>
         <NavLink to="/signup" onClick={() => setMobileOpen(false)} className="button signup-link">Sign Up</NavLink>

@@ -13,7 +13,7 @@ from sqlalchemy.pool import NullPool
 from starlette.testclient import TestClient
 
 from db.connection import enable_sqlite_foreign_keys, get_db
-from db.models import ApiKey, Base, Engine, LabelLog
+from db.models import ApiKey, Base, Domain, Engine, LabelLog
 from labeling_router import autonomy_router, router
 
 
@@ -95,6 +95,17 @@ def relabel(client, token, category="CONDITION", label_id="item-1", headers=None
                        json={"category": category, "idempotency_token": token}, headers=headers)
 
 
+def add_schema_category(client, category="CONDITION"):
+    async def update():
+        async with client.app.state.session_factory() as session:
+            domain = await session.scalar(select(Domain).where(Domain.tenant_id == "tasks-tenant"))
+            assert domain is not None
+            domain.config_json = {**domain.config_json,
+                                  "categories": [*domain.config_json["categories"], category]}
+            await session.commit()
+    asyncio.run(update())
+
+
 def test_text_task_waits_for_classification(client):
     response = task(client)
     assert response.status_code == 201, response.text
@@ -129,6 +140,7 @@ def test_oversized_utf8_text_is_rejected(client):
 
 def test_relabel_creates_audited_revision_without_rescore(client):
     assert task(client, category="MEDICATION").status_code == 201
+    add_schema_category(client)
     before = detail(client).json()
     async def state():
         async with client.app.state.session_factory() as session:
@@ -159,6 +171,7 @@ def test_relabel_creates_audited_revision_without_rescore(client):
 
 def test_stale_relabel_token_conflicts(client):
     assert task(client, category="MEDICATION").status_code == 201
+    add_schema_category(client)
     token = detail(client).json()["revision_id"]
     assert relabel(client, token).status_code == 200
     assert relabel(client, token).status_code == 409

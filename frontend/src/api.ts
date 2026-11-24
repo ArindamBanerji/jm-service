@@ -168,7 +168,13 @@ async function request<T>(path: string, init?: RequestInit, onResponse?: (respon
   const response = await fetch(`${BASE}${path}`, { ...init, headers })
   if (!response.ok) {
     let detail: unknown
-    try { detail = (await response.json()).detail } catch { detail = await response.text() }
+    try {
+      const body: unknown = await response.clone().json()
+      if (body && typeof body === 'object' && !Array.isArray(body)) {
+        const fields = body as Record<string, unknown>
+        detail = fields.detail ?? fields.error ?? JSON.stringify(body)
+      } else detail = body
+    } catch { detail = await response.text() }
     throw new ApiError(explain(detail), response.status)
   }
   onResponse?.(response)
@@ -199,7 +205,7 @@ export interface BulkVerifyResponse { processed: number; skipped: number; errors
 export const bulkVerify = (domainId: string, body: { label_ids: string[]; action: 'approve' | 'reject'; reason?: string }) => request<BulkVerifyResponse>(`/labels/${id(domainId)}/bulk-verify`, json(body))
 export type PendingSort = 'label_id' | 'category' | 'annotator_id' | 'confidence' | 'recommended_action'
 export interface PendingOptions extends Record<string, string | number | undefined> { category?: string; limit?: number; offset?: number; sort_by?: PendingSort; sort_order?: 'asc' | 'desc'; search?: string }
-export const getPending = (domainId: string, options: PendingOptions = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
+export const getPending = (domainId: string, options: PendingOptions = {}, signal?: AbortSignal) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`, { signal })
 export const getPendingPage = async (domainId: string, options: PendingOptions): Promise<{ rows: PendingLabel[]; total: number }> => {
   let total: number | null = null
   const rows = await request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`, undefined, response => {
@@ -209,7 +215,7 @@ export const getPendingPage = async (domainId: string, options: PendingOptions):
   if (total === null || !Number.isSafeInteger(total)) throw new Error('Pending total count is unavailable')
   return { rows, total }
 }
-export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/items/${id(labelId)}`)
+export const getLabelDetail = (domainId: string, labelId: string, signal?: AbortSignal) => request<LabelDetail>(`/labels/${id(domainId)}/items/${id(labelId)}`, { signal })
 export const createLabelContent = (domainId: string, labelId: string, body: LabelContent) => request<{ label_id: string; content_type: string; spans_count?: number; tags_count?: number }>(`/labels/${id(domainId)}/items/${id(labelId)}/content`, json(body))
 export const createTextTask = (domainId: string, body: { label_id: string; text: string; category?: string }) => request<TextTaskResponse>(`/labels/${id(domainId)}/tasks`, json(body))
 export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string; spans?: NerSpan[]; tags?: string[] }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
@@ -218,14 +224,14 @@ export const getCorrections = (domainId: string) => request<CorrectionsResponse>
 export const getAnnotators = (domainId: string, limit = 50) => request<AnnotatorsResponse>(`/dashboard/${id(domainId)}/annotators${params({ limit })}`)
 export const getFactors = (domainId: string) => request<FactorsResponse>(`/dashboard/${id(domainId)}/factors`)
 export const getCompounding = (domainId: string, options: { window?: number; category?: string } = {}) => request<CompoundingResponse>(`/dashboard/${id(domainId)}/compounding${params(options)}`)
-export const getAutonomy = (domainId: string) => request<AutonomyResponse>(`/domains/${id(domainId)}/autonomy`)
+export const getAutonomy = (domainId: string, signal?: AbortSignal) => request<AutonomyResponse>(`/domains/${id(domainId)}/autonomy`, { signal })
 export interface AgreementResponse {
   pairs: { annotator_a: string; annotator_b: string; kappa: number | null; overlap_count: number }[]
   overall_kappa: number | null
   total_overlapping_labels: number
 }
 export const getAgreement = (domainId: string) => request<AgreementResponse>(`/dashboard/${id(domainId)}/iaa`)
-export const getGuidelines = (domainId: string) => request<{ guidelines: string | null }>(`/domains/${id(domainId)}/guidelines`)
+export const getGuidelines = (domainId: string, signal?: AbortSignal) => request<{ guidelines: string | null }>(`/domains/${id(domainId)}/guidelines`, { signal })
 export const putGuidelines = (domainId: string, guidelines: string) =>
   request<{ guidelines: string | null }>(`/domains/${id(domainId)}/guidelines`,
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guidelines }) })

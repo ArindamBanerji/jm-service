@@ -112,6 +112,8 @@ class ApiKey(Base):
     tier: Mapped[str] = mapped_column(String(20), default="trial", nullable=False, server_default="trial")
     paddle_customer_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     paddle_subscription_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    paddle_event_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    paddle_event_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     trial_expiring_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     trial_expired_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -125,3 +127,12 @@ class ApiKey(Base):
 Index("uq_api_keys_contact_email", func.lower(ApiKey.contact_email), unique=True,
       postgresql_where=ApiKey.contact_email.is_not(None),
       sqlite_where=ApiKey.contact_email.is_not(None))
+Index("uq_api_keys_paddle_customer_id", ApiKey.paddle_customer_id, unique=True,
+      postgresql_where=ApiKey.paddle_customer_id.is_not(None),
+      sqlite_where=ApiKey.paddle_customer_id.is_not(None))
+
+
+class PaddleWebhookEvent(Base):
+    """Durable receipt committed in the same transaction as the entitlement."""
+    __tablename__ = "paddle_webhook_events"
+    event_id: Mapped[str] = mapped_column(String(200), primary_key=True)
