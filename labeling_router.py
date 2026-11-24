@@ -5,11 +5,11 @@ from dataclasses import asdict
 import json
 from math import isfinite
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
@@ -327,16 +327,28 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
 
 @router.get("/{domain_id}/pending")
 @limiter.limit("60/minute")
-async def pending(request: Request, domain_id: str, session: Session, tenant: Tenant, category: str | None = None,
-                  limit: int = Query(default=50, ge=1, le=200)) -> list[dict]:
+async def pending(request: Request, domain_id: str, response: Response, session: Session, tenant: Tenant,
+                  category: str | None = None, limit: int = Query(default=50, ge=1, le=200),
+                  offset: int = Query(default=0, ge=0),
+                  sort_by: Literal["label_id", "category", "annotator_id", "confidence", "recommended_action"] | None = None,
+                  sort_order: Literal["asc", "desc"] = "asc") -> list[dict]:
     domain_id = scoped_domain_id(tenant, domain_id)
     if await repository.get_domain(session, domain_id) is None:
         raise HTTPException(status_code=404, detail="Domain not found")
-    query = select(LabelLog).where(LabelLog.domain_id == domain_id,
-                                   LabelLog.tenant_id == tenant, LabelLog.verified_at.is_(None))
+    filters = [LabelLog.domain_id == domain_id, LabelLog.tenant_id == tenant,
+               LabelLog.verified_at.is_(None)]
     if category is not None:
-        query = query.where(LabelLog.category == category)
-    query = query.order_by(LabelLog.confidence, LabelLog.scored_at, LabelLog.id).limit(limit)
+        filters.append(LabelLog.category == category)
+    total = await session.scalar(select(func.count()).select_from(LabelLog).where(*filters))
+    response.headers["X-Total-Count"] = str(total or 0)
+    query = select(LabelLog).where(*filters)
+    if sort_by is None:
+        query = query.order_by(LabelLog.confidence.asc(), LabelLog.scored_at.asc(), LabelLog.id.asc())
+    else:
+        column = getattr(LabelLog, sort_by)
+        ordered = column.desc() if sort_order == "desc" else column.asc()
+        query = query.order_by(ordered.nulls_last(), LabelLog.scored_at.asc(), LabelLog.id.asc())
+    query = query.offset(offset).limit(limit)
     rows = (await session.scalars(query)).all()
     return [{"label_id": row.label_id, "category": row.category,
              "annotator_id": row.annotator_id, "confidence": row.confidence,

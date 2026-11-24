@@ -488,3 +488,14 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Build: passed.
 - Browser: computer-use browser host was unavailable and existing browser windows were minimized, so direct clipboard, localStorage, and incognito checks could not run. Local HTTP smoke test served the signup page (200), registered `test@example.com` (201, 64-character key, trial), and scored a label using that key (200). The isolated local service had no Resend key, so email delivery was not live-tested.
 - Final review: read every function in auth.py and the complete Signup screen; confirmed duplicate rejection, one-time response contract, delivery invocation, and StaticFiles as the final mount.
+
+## DLJ-A3 — Queue Pagination and Page Export
+- Date: 2026-11-24
+- Files created: test_queue.py (exactly 6 new cases).
+- Files modified: labeling_router.py, jm_service.py, frontend/src/api.ts, frontend/src/screens/ScoredQueue.tsx, frontend/src/index.css.
+- API defaults: `GET /v1/labels/{domain_id}/pending` remains a bare array with limit=50 (1–200), offset=0, and confidence/scored_at/ID ascending order. Optional allowlisted `sort_by` and asc/desc order apply before pagination; null values sort last and scored_at/unique ID break ties. `X-Total-Count` counts the same tenant/category/pending filter and is exposed by CORS.
+- Queue: 50/100/200 rows, server sorting, previous/next, count from header, stable refresh, reset on domain/filter/sort changes, last-page clamp, categories from autonomy, optional 80-code-point source preview, and later-page detail links. Export this page downloads only visible pending rows in displayed order; Papa.unparse quotes CSV and escapes spreadsheet formula prefixes.
+- Tests: 40 targeted passed; 302 collectable passed with the three live Docker scripts and `test_ops_e2e.py` excluded. The unmodified §10 full-suite command yielded 302 passes plus 8 pre-existing `test_ops_e2e.py` setup errors (missing live-service fixtures). `test_jm_service.py`: 29 passed. Collection baseline was 304 before A3 and 310 after it; the extra 6 relative to the design's sequential target are DLJ-SIGNUP.
+- mypy: clean on labeling_router.py, test_queue.py, jm_service.py, and db/models.py.
+- Build: passed; served dist refreshed.
+- Browser: Computer Use stopped because URL policy enforcement is unavailable for the current Windows browser, so interactive sorting, refresh, page export, and detail navigation were not observed. API tests exercised 205–213 pending rows, both sort directions, category/tenant scope, last page, tie stability, and later-page 80-code-point preview/detail. A direct Papa Parse check preserved page order, commas/quotes/newlines and escaped a formula-looking ID.

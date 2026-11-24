@@ -290,6 +290,7 @@ app.add_middleware(  # type: ignore[call-arg]
     ],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 
 

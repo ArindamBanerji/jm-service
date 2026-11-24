@@ -144,7 +144,7 @@ function explain(detail: unknown): string {
   return 'Request failed'
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, onResponse?: (response: Response) => void): Promise<T> {
   const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register'
   const apiKey = localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : '')
   const headers = new Headers(init?.headers)
@@ -155,6 +155,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try { detail = (await response.json()).detail } catch { detail = await response.text() }
     throw new ApiError(explain(detail), response.status)
   }
+  onResponse?.(response)
   if (response.headers.get('content-type')?.includes('application/pdf')) return await response.blob() as T
   if (response.headers.get('content-type')?.includes('text/html')) return await response.text() as T
   return await response.json() as T
@@ -178,7 +179,18 @@ export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (i
 export interface RegistrationResponse { api_key: string; tenant_id: string; tier: 'trial'; message: string }
 export const registerAccount = (email: string, name?: string) => request<RegistrationResponse>('/auth/register', json({ email, name: name || undefined }))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
-export const getPending = (domainId: string, options: { category?: string; limit?: number } = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
+export type PendingSort = 'label_id' | 'category' | 'annotator_id' | 'confidence' | 'recommended_action'
+export interface PendingOptions extends Record<string, string | number | undefined> { category?: string; limit?: number; offset?: number; sort_by?: PendingSort; sort_order?: 'asc' | 'desc' }
+export const getPending = (domainId: string, options: PendingOptions = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
+export const getPendingPage = async (domainId: string, options: PendingOptions): Promise<{ rows: PendingLabel[]; total: number }> => {
+  let total: number | null = null
+  const rows = await request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`, undefined, response => {
+    const header = response.headers.get('X-Total-Count')
+    if (header !== null && /^\d+$/.test(header)) total = Number(header)
+  })
+  if (total === null || !Number.isSafeInteger(total)) throw new Error('Pending total count is unavailable')
+  return { rows, total }
+}
 export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/${id(labelId)}`)
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
 export const getCorrections = (domainId: string) => request<CorrectionsResponse>(`/dashboard/${id(domainId)}/corrections`)
