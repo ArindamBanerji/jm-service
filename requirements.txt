@@ -15,4 +15,5 @@ SQLAlchemy[asyncio]==2.0.45
 asyncpg==0.32.0
 aiosqlite==0.22.1
 slowapi>=0.1.9
+sentry-sdk[fastapi]>=2.0.0
 

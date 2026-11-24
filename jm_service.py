@@ -23,6 +23,7 @@ import os
 import sqlite3
 import time
 import uuid
+import sentry_sdk
 from pathlib import Path
 from contextlib import asynccontextmanager, contextmanager
 from typing import Optional
@@ -40,6 +41,8 @@ from label_studio import router as label_studio_router
 from label_health.api import router as label_health_router
 from labeling_router import router as labeling_router
 from labeling_router import autonomy_router
+from legal_pages import router as legal_router
+from billing import router as billing_router
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from rate_limit import limiter
@@ -235,6 +238,12 @@ async def lifespan(application: FastAPI):
     yield
 
 
+_sentry_dsn = os.environ.get("SENTRY_DSN")
+if _sentry_dsn:
+    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.1,
+                    environment=os.environ.get("ENVIRONMENT", "development"))
+
+
 app = FastAPI(
     title="Judgment Memory API",
     description=(
@@ -257,10 +266,17 @@ app.include_router(autonomy_router)
 app.include_router(dashboard_router)
 app.include_router(label_studio_router)
 app.include_router(admin_router)
+app.include_router(billing_router)
+app.include_router(legal_router)
 
 app.add_middleware(  # type: ignore[call-arg]
     CORSMiddleware,  # type: ignore[arg-type]
-    allow_origins=["*"],
+    allow_origins=[
+        "https://dlj.dakshineshwari.net",
+        "https://rgi.dakshineshwari.net",
+        "http://localhost:5173",
+        "http://localhost:8100",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )

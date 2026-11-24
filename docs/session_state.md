@@ -405,3 +405,19 @@ Line-by-line analysis:
   labeling_router.py: VerifyRequest accepts optional annotator_id, rejects blank values, binds the row before learning, and loads or creates that reviewer's engine; omitted annotator_id retains the scored scope.
   test_jm_service.py: health expects status/version/checks from the current endpoint and enters the app lifespan with an isolated SQLite labeling database.
 Notes: The committed candidate was tested as an exported Git tree. Managed PostgreSQL, Docker image startup, and native Linux PDF rendering still require the separately documented deployment smoke gate.
+
+## Phase 1+2 Prompt (DLJ-P1P2)
+- Date: 2026-11-23
+- Files created: legal_pages.py, billing.py, trial_guard.py, email_service.py, test_billing.py, test_legal_pages.py.
+- Files modified: jm_service.py (CORS, Sentry, billing and legal routers), db/models.py (ApiKey tier, Lemon Squeezy fields, monthly and daily counters), db/migrate.py (idempotent api_keys column additions), requirements.txt (sentry-sdk), auth.py (request-scoped key hash), labeling_router.py and label_studio.py (transactional label quotas and warning headers), test_labeling_router.py (quota integration checks).
+- CORS: restricted to dlj.dakshineshwari.net, rgi.dakshineshwari.net, and the two requested localhost origins.
+- Legal pages: /terms, /privacy, /attribution.
+- Billing: POST /v1/billing/webhook verifies Lemon Squeezy HMAC signatures and updates an API key already linked to the customer ID. The webhook has no rate limiting decorator.
+- Trial: 14-day expiry and 50 labels per UTC day on PostgreSQL-backed labeling ingest.
+- Volume: per-key monthly caps for paid tiers with an X-Volume-Warning header at 90%; quota reservation and scoring share one database transaction.
+- Email: four Resend templates and an httpx sender with no new Resend dependency.
+- Sentry: opt-in via SENTRY_DSN.
+- Tests: 271 passed in the collectable suite; the literal repo-wide pytest command stops during collection because the three pre-existing live-Docker scripts exit without a running HTTP server. The final suite excluded those three scripts.
+- mypy: clean on all 13 changed Python files.
+- Final check: StaticFiles remains the last mount; /v1/billing/webhook has no rate limiter; frozen jm_core.py SHA-256 remains 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
+- Deployment follow-up: link a Lemon Squeezy customer ID to an ApiKey during checkout before subscription_created arrives; configure products, webhook secret, and SENTRY_DSN/RESEND_API_KEY as needed. The legacy SQLite /v1/domains/{domain_id}/score route is outside the new PostgreSQL quota guard. The 30-day deletion and trial-email timing stated in the supplied copy do not yet have scheduled jobs.

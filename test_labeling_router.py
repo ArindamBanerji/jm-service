@@ -80,6 +80,56 @@ def test_valid_key_ingest_200(client):
     assert client.post("/v1/labels/ingest", json=item(), headers=tenant_key(client, "valid")).status_code == 200
 
 
+def set_key_usage(client, *, tier="trial", daily=0, monthly=0, days_old=0):
+    async def update_usage():
+        async with client.app.state.session_factory() as session:
+            key = await session.scalar(select(ApiKey).where(
+                ApiKey.key_hash == hashlib.sha256(b"test-key").hexdigest()))
+            assert key is not None
+            now = datetime.now(timezone.utc)
+            key.tier = tier
+            key.created_at = now - timedelta(days=days_old)
+            key.labels_today = daily
+            key.labels_day_key = now.strftime("%Y-%m-%d")
+            key.labels_this_month = monthly
+            key.labels_month_key = now.strftime("%Y-%m")
+            await session.commit()
+    asyncio.run(update_usage())
+
+
+def test_trial_daily_cap_enforced_on_ingest(client):
+    set_key_usage(client, daily=50)
+    response = client.post("/v1/labels/ingest", json=item())
+    assert response.status_code == 429
+    assert response.json()["detail"]["error"] == "volume_exceeded"
+
+
+def test_batch_rolls_back_when_trial_cap_is_reached(client):
+    set_key_usage(client, daily=49)
+    payload = {"domain_id": "demo", "items": [item(label_id="L1"), item(label_id="L2")]}
+    response = client.post("/v1/labels/ingest/batch", json=payload)
+    assert response.status_code == 429
+    assert client.get("/v1/labels/demo/pending").status_code == 404
+
+
+def test_expired_trial_rejected_on_ingest(client):
+    set_key_usage(client, days_old=15)
+    response = client.post("/v1/labels/ingest", json=item())
+    assert response.status_code == 402
+    assert response.json()["detail"]["error"] == "trial_expired"
+
+
+def test_paid_volume_warning_and_cap(client):
+    set_key_usage(client, tier="starter", monthly=8_999)
+    response = client.post("/v1/labels/ingest", json=item())
+    assert response.status_code == 200
+    assert response.headers["X-Volume-Warning"] == "9000/10000 labels used this month"
+    set_key_usage(client, tier="starter", monthly=10_000)
+    response = client.post("/v1/labels/ingest", json=item(label_id="L2"))
+    assert response.status_code == 429
+    assert response.json()["detail"]["error"] == "volume_exceeded"
+
+
 def test_wrong_key_401(client):
     assert client.post("/v1/labels/ingest", json=item(), headers={"X-Api-Key": "wrong"}).status_code == 401
 
@@ -327,6 +377,7 @@ def test_pending_sorted_by_confidence(client):
 
 
 def test_ingest_then_health_report(client):
+    set_key_usage(client, tier="business")
     items = [item(label_id=f"L{i}") for i in range(200)]
     for chunk in (items[:100], items[100:]):
         response = client.post("/v1/labels/ingest/batch", json={"domain_id": "demo", "items": chunk})

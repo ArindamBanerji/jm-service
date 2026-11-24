@@ -5,7 +5,7 @@ from dataclasses import asdict
 from math import isfinite
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -19,6 +19,7 @@ from auth import Tenant, scoped_domain_id
 from jm_core import ConservationState, DomainConfig, JudgmentMemoryEngine
 from policy_engine import AutonomyTier, evaluate_domain
 from rate_limit import limiter
+from trial_guard import reserve_label_capacity
 
 router = APIRouter(prefix="/v1/labels", tags=["Labeling"])
 autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
@@ -152,6 +153,7 @@ async def _prepare_engine(session: AsyncSession, domain_id: str,
 
 async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem) -> IngestResponse:
     engine = await _prepare_engine(session, domain_id, item)
+    await reserve_label_capacity(session)
     result = await repository.score_and_persist(
         session, engine, domain_id, item.label_id, item.annotator_id,
         item.category, item.factors
@@ -176,9 +178,12 @@ async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem) -> In
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest(request: IngestRequest, session: Session, tenant: Tenant) -> IngestResponse:
+async def ingest(request: IngestRequest, response: Response, session: Session, tenant: Tenant) -> IngestResponse:
     try:
-        return await _ingest(session, scoped_domain_id(tenant, request.domain_id), request)
+        result = await _ingest(session, scoped_domain_id(tenant, request.domain_id), request)
+        if warning := session.info.get("volume_warning"):
+            response.headers["X-Volume-Warning"] = warning
+        return result
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Domain or label already exists") from exc
     except StaleDataError as exc:
@@ -218,14 +223,19 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
 
 
 @router.post("/ingest/batch", response_model=IngestBatchResponse)
-async def ingest_batch(request: IngestBatchRequest, session: Session, tenant: Tenant) -> IngestBatchResponse:
+async def ingest_batch(request: IngestBatchRequest, response: Response, session: Session,
+                       tenant: Tenant) -> IngestBatchResponse:
     results: list[IngestResponse] = []
     for index, item in enumerate(request.items):
         try:
             results.append(await _ingest(session, scoped_domain_id(tenant, request.domain_id), item))
         except (HTTPException, IntegrityError, StaleDataError, ValueError) as exc:
+            if isinstance(exc, HTTPException) and exc.status_code in {402, 429}:
+                raise
             detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
             raise HTTPException(status_code=422, detail={"item_index": index, "error": detail}) from exc
+    if warning := session.info.get("volume_warning"):
+        response.headers["X-Volume-Warning"] = warning
     return IngestBatchResponse(results=results, batch_size=len(results))
 
 

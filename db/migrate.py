@@ -34,6 +34,22 @@ async def migrate() -> None:
                                     f"ALTER TABLE label_log ADD COLUMN {column} VARCHAR(200)"))
                     sync_connection.execute(text(
                         f"CREATE INDEX IF NOT EXISTS ix_{table}_tenant_id ON {table} (tenant_id)"))
+                if inspector.has_table("api_keys"):
+                    names = {column["name"] for column in inspector.get_columns("api_keys")}
+                    additions = {
+                        "tier": "VARCHAR(20) NOT NULL DEFAULT 'trial'",
+                        "lemon_squeezy_customer_id": "VARCHAR(200)",
+                        "lemon_squeezy_subscription_id": "VARCHAR(200)",
+                        "cancelled_at": "TIMESTAMP",
+                        "labels_this_month": "INTEGER NOT NULL DEFAULT 0",
+                        "labels_month_key": "VARCHAR(7) NOT NULL DEFAULT ''",
+                        "labels_today": "INTEGER NOT NULL DEFAULT 0",
+                        "labels_day_key": "VARCHAR(10) NOT NULL DEFAULT ''",
+                    }
+                    for column, definition in additions.items():
+                        if column not in names:
+                            sync_connection.execute(text(
+                                f"ALTER TABLE api_keys ADD COLUMN {column} {definition}"))
             await connection.run_sync(upgrade)
             await connection.run_sync(Base.metadata.create_all)
     finally:

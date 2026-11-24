@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,7 +173,8 @@ async def setup(payload: dict[str, Any], session: Session, _: Authorized) -> dic
 
 
 @router.post("/predict")
-async def predict(payload: dict[str, Any], session: Session, _: Authorized, tenant: Tenant) -> dict[str, list[dict[str, Any]]]:
+async def predict(payload: dict[str, Any], response: Response, session: Session, _: Authorized,
+                  tenant: Tenant) -> dict[str, list[dict[str, Any]]]:
     config = _bind_config(_config(payload.get("project"), tenant), tenant)
     tasks = payload.get("tasks")
     if not isinstance(tasks, list):
@@ -214,6 +215,8 @@ async def predict(payload: dict[str, Any], session: Session, _: Authorized, tena
                             "model_version": "jm-v1", "eligibility": {
                                 "checks_passed": [name for name, passed in checks.items() if passed],
                                 "checks_failed": [name for name, passed in checks.items() if not passed]}})
+    if warning := session.info.get("volume_warning"):
+        response.headers["X-Volume-Warning"] = warning
     return {"results": predictions}
 
 

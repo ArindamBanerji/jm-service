@@ -44,6 +44,7 @@ async def require_tenant(session: Session,
     if tenant is None:
         raise HTTPException(status_code=401, detail="Invalid API key")
     session.info["tenant_id"] = tenant
+    session.info["api_key_hash"] = hashlib.sha256((x_api_key or "").encode()).hexdigest()
     return tenant
 
 
