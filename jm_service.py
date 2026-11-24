@@ -18,6 +18,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import asyncio
 import hashlib
 import os
 import sqlite3
@@ -43,6 +44,7 @@ from labeling_router import router as labeling_router
 from labeling_router import autonomy_router
 from legal_pages import router as legal_router
 from billing import router as billing_router
+from scheduler import scheduler_loop
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from rate_limit import limiter
@@ -235,7 +237,15 @@ async def lifespan(application: FastAPI):
         hashlib.sha256(Path(__file__).with_name("jm_core.py").read_bytes()).hexdigest()
         == "1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09"
     )
-    yield
+    task = asyncio.create_task(scheduler_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 _sentry_dsn = os.environ.get("SENTRY_DSN")

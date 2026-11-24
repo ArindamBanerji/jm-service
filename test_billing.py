@@ -15,6 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import billing
+from auth import generate_api_key
+from db.connection import get_db
 import db.migrate as migrations
 from db.models import ApiKey, Base
 from email_service import (api_key_email, cancellation_email, trial_expired_email,
@@ -106,9 +108,10 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
     app.include_router(billing.router)
     client = TestClient(app)
 
-    def post(event: str, product: str = "DLJ Starter"):
+    def post(event: str, product: str = "DLJ Starter", status: str = ""):
         payload = {"event_type": event,
                    "data": {"id": "sub-1", "customer_id": "customer-1",
+                            "status": status,
                             "items": [{"product": {"name": product}}]}}
         body = json.dumps(payload).encode()
         ts = "1234567890"
@@ -132,6 +135,8 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
     assert saved.paddle_subscription_id == "sub-1"
     assert saved.tier == "professional"
     assert saved.cancelled_at is not None
+    assert post("subscription.updated", "DLJ Professional", "active").status_code == 200
+    assert asyncio.run(inspect_record()).cancelled_at is None
     asyncio.run(db_engine.dispose())
 
 
@@ -153,6 +158,97 @@ def test_sandbox_accepts_unsigned_webhook(monkeypatch) -> None:
     assert response.status_code == 200
 
 
+def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatch) -> None:
+    db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'checkout.db').as_posix()}")
+    factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    plain, key = generate_api_key("tenant-1", "Tenant")
+
+    async def setup() -> None:
+        async with db_engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with factory() as session:
+            session.add(key)
+            await session.commit()
+
+    asyncio.run(setup())
+    async def db_override():
+        async with factory() as session:
+            yield session
+
+    app = FastAPI()
+    app.include_router(billing.router)
+    app.dependency_overrides[get_db] = db_override
+    client = TestClient(app)
+    assert client.get("/v1/billing/checkout-url").status_code == 401
+
+    calls = []
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *_args):
+            return None
+        async def post(self, url, **kwargs):
+            calls.append((url, kwargs))
+            class Response:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return {"data": {"checkout": {"url": "https://checkout.paddle.com/pay/txn-1"}}}
+            return Response()
+
+    monkeypatch.setattr(billing.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
+    monkeypatch.setenv("PADDLE_API_KEY", "test-key")
+    monkeypatch.setenv("PADDLE_PRICE_MAP", "starter=pri_starter,professional=pri_pro")
+    monkeypatch.setenv("PADDLE_SANDBOX", "true")
+    response = client.get("/v1/billing/checkout-url?tier=professional",
+                          headers={"X-Api-Key": plain})
+    assert response.status_code == 200
+    assert response.json() == {"checkout_url": "https://checkout.paddle.com/pay/txn-1",
+                               "tier": "professional"}
+    assert calls[0][0] == "https://sandbox-api.paddle.com/transactions"
+    assert calls[0][1]["json"]["custom_data"] == {"tenant_id": "tenant-1"}
+    assert calls[0][1]["json"]["items"] == [{"price_id": "pri_pro", "quantity": 1}]
+    asyncio.run(db_engine.dispose())
+
+
+def test_webhook_links_tenant_from_custom_data(tmp_path, monkeypatch) -> None:
+    db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'webhook.db').as_posix()}")
+    factory = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def setup() -> None:
+        async with db_engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with factory() as session:
+            session.add(record())
+            await session.commit()
+
+    asyncio.run(setup())
+    monkeypatch.setattr(billing, "AsyncSessionLocal", factory)
+    monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    app = FastAPI()
+    app.include_router(billing.router)
+    client = TestClient(app)
+    payload = {"event_type": "subscription.created", "data": {
+        "id": "sub-1", "customer_id": "customer-1", "custom_data": {"tenant_id": "tenant"},
+        "customer": {"email": "owner@example.com"},
+        "items": [{"product": {"name": "DLJ Business"}}]}}
+    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
+    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
+
+    async def inspect_record() -> ApiKey:
+        async with factory() as session:
+            found = await session.scalar(select(ApiKey).where(ApiKey.tenant_id == "tenant"))
+            assert found is not None
+            return found
+
+    saved = asyncio.run(inspect_record())
+    assert saved.paddle_customer_id == "customer-1"
+    assert saved.paddle_subscription_id == "sub-1"
+    assert saved.contact_email == "owner@example.com"
+    assert saved.tier == "business"
+    asyncio.run(db_engine.dispose())
+
+
 def test_migration_adds_billing_columns_to_existing_table(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "old.db"
     legacy_provider = "_".join(("lemon", "squeezy"))
@@ -168,5 +264,6 @@ def test_migration_adds_billing_columns_to_existing_table(tmp_path, monkeypatch)
     with sqlite3.connect(db_path) as connection:
         names = {row[1] for row in connection.execute("PRAGMA table_info(api_keys)")}
     assert {"tier", "paddle_customer_id", "paddle_subscription_id",
+            "contact_email", "trial_expiring_email_sent_at", "trial_expired_email_sent_at",
             "cancelled_at", "labels_this_month", "labels_month_key",
             "labels_today", "labels_day_key"} <= names

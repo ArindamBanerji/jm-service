@@ -435,3 +435,15 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Tests: 272 passed in the collectable suite (excluding the three pre-existing live-Docker scripts); the requested targeted runs passed 16 billing tests and 49 legal/deployment/service tests.
 - mypy: clean on billing.py, db/models.py, db/migrate.py, legal_pages.py, and test_billing.py.
 - Final check: webhook has no rate limiting decorator; existing customer-to-ApiKey linkage is still required before subscription.created can upgrade an account. Configure PADDLE_WEBHOOK_SECRET before accepting production traffic.
+
+## Checkout Flow + Scheduler (DLJ-CHECKOUT)
+- Date: 2026-11-23
+- Files created: scheduler.py, test_scheduler.py.
+- Files modified: billing.py (authenticated checkout transaction and custom_data fallback), db/models.py (contact email and once-only trial notice timestamps), db/migrate.py (new columns), jm_service.py (scheduler lifecycle), test_billing.py, docs/session_state.md.
+- Checkout flow: GET /v1/billing/checkout-url requires an API key, creates a Paddle transaction with `custom_data.tenant_id`, and returns Paddle's `checkout.url`. Paddle does not document `custom_data` as a hosted checkout URL query parameter, so the service uses the transactions API.
+- Webhook: subscription.created resolves a previously linked customer or falls back to `custom_data.tenant_id`, links `paddle_customer_id`, and saves `data.customer.email` when supplied. An active subscription.updated event clears cancellation. No rate limiting decorator is on the webhook.
+- Scheduler: an asyncio task starts with FastAPI lifespan, runs hourly, and is cancelled on shutdown. Trial notices are delivered through Resend once when `contact_email` is present; otherwise the missing address is logged. Cancellation cleanup deletes LabelLog, Engine, Annotator, and Domain rows after 30 days and deactivates the key, while skipping tenants with another active key.
+- Env vars: PADDLE_API_KEY, PADDLE_PRICE_MAP (`starter=pri_xxx,...`), PADDLE_SANDBOX (defaults to true), optional PADDLE_WEBHOOK_SECRET for sandbox signature verification, and RESEND_API_KEY for email. Paddle must have a configured default payment link for the transaction response to include a checkout URL.
+- Tests: 277 passed in the collectable suite. Literal repo-wide pytest still exits during collection from three pre-existing live-Docker scripts without a running HTTP server; those scripts were excluded for the passing run.
+- mypy: clean on billing.py, scheduler.py, db/models.py, db/migrate.py, jm_service.py, test_billing.py, and test_scheduler.py.
+- Final check: StaticFiles remains the last mount; checkout-url has require_tenant; webhook has no rate limiting decorator; frozen jm_core.py SHA-256 remains 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
