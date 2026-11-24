@@ -45,6 +45,7 @@ Authorized = Annotated[None, Depends(_authorize)]
 class ConnectorConfig(BaseModel):
     tenant_id: str | None = None
     domain_id: str = Field(min_length=1)
+    public_domain_id: str | None = None
     project_id: str = Field(min_length=1)
     factor_map: dict[str, str] = Field(min_length=2)
     category_field: str = "data.category"
@@ -94,6 +95,7 @@ def _bind_config(config: ConnectorConfig, tenant: str) -> ConnectorConfig:
     if config.tenant_id is not None and config.tenant_id != tenant:
         raise HTTPException(404, detail="Project not found")
     return config.model_copy(update={"domain_id": scoped_domain_id(tenant, config.domain_id),
+                                      "public_domain_id": config.domain_id,
                                       "tenant_id": tenant})
 
 
@@ -131,7 +133,8 @@ async def _ensure_domain(session: AsyncSession, config: ConnectorConfig) -> None
         await repository.create_domain(session, config.domain_id, config.domain_id,
                                        DomainConfig(config.domain_id, config.domain_id,
                                                     list(config.factor_map), ["default"],
-                                                    ["approve", "reject"]))
+                                                    ["approve", "reject"]),
+                                       public_domain_id=config.public_domain_id)
     elif set(domain.config_json["factors"]) != set(config.factor_map):
         raise HTTPException(409, detail="Configured factors differ from the existing domain")
 
@@ -200,7 +203,8 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
             eligible = status.tier is AutonomyTier.AUTONOMOUS and status.conservation_gate_pass
         else:
             outcome = await _ingest(session, config.domain_id, IngestItem(
-                label_id=label_id, category=category, annotator_id=annotator_id, factors=factors))
+                label_id=label_id, category=category, annotator_id=annotator_id, factors=factors),
+                config.public_domain_id)
             confidence = outcome.confidence
             eligible = outcome.auto_accepted
         count, accuracy = await repository.verified_accuracy(session, config.domain_id, category, annotator_id) if annotator_id else (0, None)
@@ -259,7 +263,7 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
         await _ingest(session, config.domain_id, IngestItem(
             label_id=ingest_id, category=category,
             annotator_id=str(annotation["completed_by"]) if annotation.get("completed_by") is not None else None,
-            factors=factors))
+            factors=factors), config.public_domain_id)
         row = await session.scalar(select(LabelLog).where(
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
             LabelLog.label_id == ingest_id).with_for_update())

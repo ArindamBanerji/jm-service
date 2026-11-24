@@ -165,13 +165,16 @@ async def _category_stats(session: AsyncSession, domain_id: str,
 
 
 async def _prepare_engine(session: AsyncSession, domain_id: str,
-                          item: IngestItem) -> JudgmentMemoryEngine:
+                          item: IngestItem, public_domain_id: str | None = None) -> JudgmentMemoryEngine:
     domain = await repository.get_domain(session, domain_id)
     if domain is None:
         config = DomainConfig(domain_id, domain_id, list(item.factors), [item.category],
                               ["approve", "reject"])
-        await repository.create_domain(session, domain_id, domain_id, config)
+        await repository.create_domain(session, domain_id, domain_id, config,
+                                       public_domain_id=public_domain_id)
     else:
+        if domain.public_domain_id is None and public_domain_id is not None:
+            domain.public_domain_id = public_domain_id
         config = DomainConfig.from_dict(domain.config_json)
         if set(item.factors) != set(config.factors):
             raise HTTPException(status_code=422, detail="Factor names differ from the domain schema")
@@ -193,8 +196,9 @@ async def _prepare_engine(session: AsyncSession, domain_id: str,
     return engine
 
 
-async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem) -> IngestResponse:
-    engine = await _prepare_engine(session, domain_id, item)
+async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem,
+                  public_domain_id: str | None = None) -> IngestResponse:
+    engine = await _prepare_engine(session, domain_id, item, public_domain_id)
     await reserve_label_capacity(session)
     result = await repository.score_and_persist(
         session, engine, domain_id, item.label_id, item.annotator_id,
@@ -222,7 +226,8 @@ async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem) -> In
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(request: IngestRequest, response: Response, session: Session, tenant: Tenant) -> IngestResponse:
     try:
-        result = await _ingest(session, scoped_domain_id(tenant, request.domain_id), request)
+        result = await _ingest(session, scoped_domain_id(tenant, request.domain_id), request,
+                               request.domain_id)
         if warning := session.info.get("volume_warning"):
             response.headers["X-Volume-Warning"] = warning
         return result
@@ -270,7 +275,8 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
     results: list[IngestResponse] = []
     for index, item in enumerate(request.items):
         try:
-            results.append(await _ingest(session, scoped_domain_id(tenant, request.domain_id), item))
+            results.append(await _ingest(session, scoped_domain_id(tenant, request.domain_id), item,
+                                         request.domain_id))
         except (HTTPException, IntegrityError, StaleDataError, ValueError) as exc:
             if isinstance(exc, HTTPException) and exc.status_code in {402, 429}:
                 raise
@@ -308,7 +314,7 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
     for item in items:
         if item.label_id not in existing_ids:
             try:
-                await _ingest(session, scoped, item)
+                await _ingest(session, scoped, item, domain_id)
             except (IntegrityError, StaleDataError) as exc:
                 raise HTTPException(409, detail="Sample seed conflicted; retry") from exc
             created += 1

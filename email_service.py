@@ -54,7 +54,7 @@ def trial_expiring_email() -> tuple[str, str]:
     html = """<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto">
     <h2>Your trial is ending soon</h2>
     <p>Your 14-day free trial of RGI Data Label Judgment expires in 2 days.</p>
-    <p>Upgrade to keep scoring: <a href="https://dlj.dakshineshwari.net/settings">Manage subscription</a></p>
+    <p>Upgrade to keep scoring: <a href="https://dlj.dakshineshwari.net/#/settings">Manage subscription</a></p>
     <p>— Arindam Banerji, Dakshineshwari LLC</p></div>"""
     return subject, html
 
@@ -65,7 +65,7 @@ def trial_expired_email() -> tuple[str, str]:
     <h2>Trial ended</h2>
     <p>Your 14-day free trial of RGI Data Label Judgment has ended.</p>
     <p>Your data is preserved for 30 days. Upgrade to resume scoring:</p>
-    <p><a href="https://dlj.dakshineshwari.net/settings">Upgrade now</a></p>
+    <p><a href="https://dlj.dakshineshwari.net/#/settings">Upgrade now</a></p>
     <p>— Arindam Banerji, Dakshineshwari LLC</p></div>"""
     return subject, html
 
@@ -76,6 +76,6 @@ def cancellation_email() -> tuple[str, str]:
     <h2>Subscription cancelled</h2>
     <p>Your RGI Data Label Judgment subscription has been cancelled.</p>
     <p>Your data will be retained for 30 days and then deleted.</p>
-    <p>Changed your mind? <a href="https://dlj.dakshineshwari.net/settings">Reactivate</a></p>
+    <p>Changed your mind? <a href="https://dlj.dakshineshwari.net/#/settings">Reactivate</a></p>
     <p>— Arindam Banerji, Dakshineshwari LLC</p></div>"""
     return subject, html

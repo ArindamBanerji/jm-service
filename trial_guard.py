@@ -11,7 +11,7 @@ from db.models import ApiKey
 
 TRIAL_DAYS = 14
 DAILY_TRIAL_CAP = 50
-UPGRADE_URL = "https://dlj.dakshineshwari.net/settings"
+UPGRADE_URL = "https://dlj.dakshineshwari.net/#/settings"
 
 TIER_MONTHLY_CAPS: dict[str, int | None] = {
     "trial": None,

@@ -19,7 +19,7 @@ h1{font-size:1.8rem}h2{font-size:1.3rem;margin-top:2rem}a{color:#2563eb}</style>
 It scores, verifies, and improves label quality. It is not an annotation platform and does
 not replace human review.</p>
 <h2>2. Accounts and API Keys</h2>
-<p>Each tenant receives one API key. You are responsible for key security.
+<p>Each tenant uses an API key for authenticated scoring. You are responsible for key security.
 Dakshineshwari LLC may revoke keys for abuse or violation of these terms.</p>
 <h2>3. Payments</h2>
 <p>Payments are processed by Paddle, which acts as the merchant of record.
@@ -71,9 +71,10 @@ IP address logged for rate limiting only.</p>
 annotator IDs, actions, verification outcomes, timestamps. Source text is retained with
 the label and shown only through authenticated, tenant-scoped label detail requests.
 Pending lists expose at most the first 80 Unicode characters as a preview.</p>
-<p><strong>Account data:</strong> Tenant name, API key hash (never plaintext), creation date,
-tier, Paddle customer ID.</p>
-<p>No cookies on the API. The Review UI uses localStorage for domain selection and its API key.</p>
+<p><strong>Account data:</strong> Tenant name, contact email when provided, API key hash (never plaintext), creation date,
+tier, usage counters, and Paddle customer ID when linked.</p>
+<p>No cookies on the API. The Review UI uses localStorage for domain selection and its API key.
+Clearing the key in Settings removes that browser copy; it does not revoke the server key.</p>
 <h2>2. How We Use Data</h2>
 <p>Solely to provide the service. Not sold. Not used for training.
 Not shared with third parties except infrastructure providers listed below.</p>

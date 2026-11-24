@@ -198,3 +198,13 @@ export const getAnnotators = (domainId: string, limit = 50) => request<Annotator
 export const getFactors = (domainId: string) => request<FactorsResponse>(`/dashboard/${id(domainId)}/factors`)
 export const getCompounding = (domainId: string, options: { window?: number; category?: string } = {}) => request<CompoundingResponse>(`/dashboard/${id(domainId)}/compounding${params(options)}`)
 export const getAutonomy = (domainId: string) => request<AutonomyResponse>(`/domains/${id(domainId)}/autonomy`)
+export interface AccountSummary {
+  tenant_id: string; tenant_name: string; tier: string; created_at: string
+  is_active: boolean; cancelled_at: string | null; trial_expires_at: string | null; trial_expired: boolean
+  usage: { labels_today: number; labels_this_month: number; daily_cap: number | null; monthly_cap: number | null; day_key: string; month_key: string }
+}
+export interface AccountDomain { id: string; public_domain_id: string | null; needs_name: boolean }
+export const getAccount = () => request<AccountSummary>('/account')
+export const getAccountDomains = () => request<AccountDomain[]>('/account/domains')
+export const resolveAccountDomain = (domainId: string) => request<{ public_domain_id: string }>('/account/domains/resolve', json({ domain_id: domainId }))
+export const getCheckoutUrl = (tier: string) => request<{ checkout_url: string; tier: string }>(`/billing/checkout-url${params({ tier })}`)

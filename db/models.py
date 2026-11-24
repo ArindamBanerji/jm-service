@@ -17,6 +17,7 @@ class Domain(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
     domain_id: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    public_domain_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     tenant_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True, default="")
     domain_name: Mapped[str] = mapped_column(String(200))
     config_json: Mapped[dict] = mapped_column(JSON)

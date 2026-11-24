@@ -24,6 +24,9 @@ async def migrate() -> None:
                     if "tenant_id" not in names:
                         sync_connection.execute(text(
                             f"ALTER TABLE {table} ADD COLUMN tenant_id VARCHAR(200) NOT NULL DEFAULT ''"))
+                    if table == "domains" and "public_domain_id" not in names:
+                        sync_connection.execute(text(
+                            "ALTER TABLE domains ADD COLUMN public_domain_id VARCHAR(200)"))
                     if table == "label_log" and "superseded_by" not in names:
                         sync_connection.execute(text(
                             "ALTER TABLE label_log ADD COLUMN superseded_by VARCHAR(200)"))

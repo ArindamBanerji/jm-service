@@ -499,3 +499,13 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - mypy: clean on labeling_router.py, test_queue.py, jm_service.py, and db/models.py.
 - Build: passed; served dist refreshed.
 - Browser: Computer Use stopped because URL policy enforcement is unavailable for the current Windows browser, so interactive sorting, refresh, page export, and detail navigation were not observed. API tests exercised 205–213 pending rows, both sort directions, category/tenant scope, last page, tie stability, and later-page 80-code-point preview/detail. A direct Papa Parse check preserved page order, commas/quotes/newlines and escaped a formula-looking ID.
+
+## DLJ-A4 — Settings and Account Summary
+- Date: 2026-11-24
+- Account API: Authenticated `GET /v1/account` returns the active key's tenant ID/name, tier, active/created/trial/cancel status, UTC day/month period keys, usage counters, and applicable caps. It excludes plaintext keys, hashes, contact email, and billing credentials. `GET /v1/account/domains` returns only tenant-owned public domain IDs; `POST /v1/account/domains/resolve` recovers a legacy public name for the owning tenant.
+- Public-ID migration: Added nullable `domains.public_domain_id` with repeatable SQLite/PostgreSQL migration. New ingests and Label Studio carry the public name; repeat ingest backfills an older domain. Legacy hashed domains remain unresolved until the owner supplies the name.
+- Billing and UI: Settings handles missing/replaced/cleared local keys, trial and cancelled states, usage, domain selection, Paddle checkout errors, and pending return with backend refresh. Upgrade links point to `/#/settings`. Existing Paddle transaction creation and webhook signature policy remain in `billing.py`; legal pages describe local keys, counters, and stored text.
+- Tests: Exactly 4 new `test_account.py` cases. Billing/deployment/service gate: 63 passed. Collectable suite: 306 passed with the three live Docker scripts and `test_ops_e2e.py` excluded. The unmodified shared command yielded 306 passes plus 8 pre-existing `test_ops_e2e.py` setup errors from missing live-service fixtures.
+- mypy: clean on 10 changed/related Python source files.
+- Build: passed; refreshed `frontend/dist`.
+- Browser: Chrome tested the built UI against an isolated local SQLite service and a mocked Paddle checkout. Direct Settings deep link, domain change, local key replace/clear, missing checkout configuration error, checkout return pending state, and refreshed Starter tier after a signed local webhook all worked. No Paddle sandbox or live checkout was exercised.

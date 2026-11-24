@@ -8,12 +8,14 @@ import AnnotatorProfiles from './screens/AnnotatorProfiles'
 import HealthReport from './screens/HealthReport'
 import LoadingSpinner from './components/LoadingSpinner'
 import Signup from './screens/Signup'
+import Settings from './screens/Settings'
 
 const Dashboard = lazy(() => import('./screens/Dashboard'))
 
 const links = [
   ['upload', 'Upload', '↥'], ['queue', 'Scored Queue', '☷'], ['dashboard', 'Dashboard', '◫'],
   ['annotators', 'Annotator Profiles', '♙'], ['health', 'Label Health Report', '◇'],
+  ['settings', 'Settings', '⚙'],
 ]
 export default function App() {
   const [domainId, updateDomain] = useState(() => localStorage.getItem('rgi-domain') ?? '')
@@ -49,6 +51,7 @@ export default function App() {
         <Route path="/annotators" element={<AnnotatorProfiles />} />
         <Route path="/health" element={<HealthReport />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/upload" replace />} />
       </Routes></Suspense></main>
     </div>

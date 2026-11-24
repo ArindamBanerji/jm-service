@@ -21,9 +21,11 @@ def _tenant(session: AsyncSession) -> str:
 
 
 async def create_domain(session: AsyncSession, domain_id: str, domain_name: str,
-                        config: DomainConfig, tenant_id: str | None = None) -> Domain:
+                        config: DomainConfig, tenant_id: str | None = None,
+                        public_domain_id: str | None = None) -> Domain:
     domain = Domain(domain_id=domain_id, tenant_id=tenant_id if tenant_id is not None else _tenant(session),
-                    domain_name=domain_name, config_json=config.to_dict())
+                    domain_name=domain_name, public_domain_id=public_domain_id,
+                    config_json=config.to_dict())
     session.add(domain)
     await session.flush()
     return domain

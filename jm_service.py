@@ -38,6 +38,7 @@ from db.connection import engine as labeling_engine
 from pydantic import BaseModel, Field, field_validator
 from dashboard_router import router as dashboard_router
 from auth import router as admin_router, signup_router
+from account import router as account_router
 from label_studio import router as label_studio_router
 from label_health.api import router as label_health_router
 from labeling_router import router as labeling_router
@@ -277,6 +278,7 @@ app.include_router(dashboard_router)
 app.include_router(label_studio_router)
 app.include_router(admin_router)
 app.include_router(signup_router)
+app.include_router(account_router)
 app.include_router(billing_router)
 app.include_router(legal_router)
 
