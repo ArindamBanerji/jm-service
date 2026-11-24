@@ -12,3 +12,6 @@ e_jm_param_sweep_heatmap.png
 experiments/*/results/*.json
 experiments/*/results/*.png
 experiments/*/results/*.pdf
+
+node_modules/
+test-results/

@@ -29,10 +29,11 @@ Paddle handles the commercial transaction.</p>
 <h2>4. Data Handling</h2>
 <p><strong>Label Health Report (free):</strong> Data processed in memory, never stored,
 discarded after response. No account required.</p>
-<p><strong>Paid tiers:</strong> Label data, factors, annotator IDs, and engine state stored
+<p><strong>Authenticated scoring:</strong> Label data, optional source text, factors, annotator IDs, and engine state stored
 in managed PostgreSQL. Data belongs to you. Your data is not used for training or
 any other purpose beyond providing the service.</p>
-<p>No PII is required. The service operates on label IDs, categories, and numeric factors.</p>
+<p>Source text is optional and limited to 32 KiB UTF-8 per label. Do not submit identifiable
+patient information unless you are authorized to provide it for this service.</p>
 <h2>5. Service Level</h2>
 <p>Free trial: best-effort availability, no SLA.<br>
 Starter/Professional: 99% monthly uptime target.<br>
@@ -66,11 +67,13 @@ table{border-collapse:collapse;width:100%}th,td{border:1px solid #d1d5db;padding
 <h2>1. Data We Collect</h2>
 <p><strong>Anonymous reports:</strong> CSV data processed in memory, not stored, not logged.
 IP address logged for rate limiting only.</p>
-<p><strong>Authenticated usage:</strong> Label IDs, categories, factor values, annotator IDs
-(customer-supplied identifiers, not names), actions, verification outcomes, timestamps.</p>
+<p><strong>Authenticated usage:</strong> Label IDs, categories, optional source text, factor values,
+annotator IDs, actions, verification outcomes, timestamps. Source text is retained with
+the label and shown only through authenticated, tenant-scoped label detail requests.
+Pending lists expose at most the first 80 Unicode characters as a preview.</p>
 <p><strong>Account data:</strong> Tenant name, API key hash (never plaintext), creation date,
 tier, Paddle customer ID.</p>
-<p>No cookies on the API. The Review UI uses localStorage for domain selection only.</p>
+<p>No cookies on the API. The Review UI uses localStorage for domain selection and its API key.</p>
 <h2>2. How We Use Data</h2>
 <p>Solely to provide the service. Not sold. Not used for training.
 Not shared with third parties except infrastructure providers listed below.</p>
@@ -89,8 +92,9 @@ Anonymous reports: zero retention.</p>
 <tr><td>Resend</td><td>Transactional email</td></tr>
 </tbody></table>
 <h2>7. GDPR</h2>
-<p>Data processed under legitimate interest (service provision). No special categories
-of data processed. Data Processing Addendum available on request for Enterprise tier.</p>
+<p>Optional source text may contain sensitive data supplied by a customer. Customers
+control what they submit and must have an appropriate basis for processing it.
+Data Processing Addendum available on request for Enterprise tier.</p>
 <h2>8. Contact</h2>
 <p>Privacy questions: <a href="mailto:arindam.banerji@gmail.com">arindam.banerji@gmail.com</a></p>
 </body></html>"""

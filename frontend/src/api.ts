@@ -17,6 +17,7 @@ export interface IngestItem {
   category: string
   annotator_id?: string | null
   factors: Record<string, number>
+  text?: string | null
 }
 export interface IngestRequest extends IngestItem { domain_id: string }
 export interface IngestResponse {
@@ -52,6 +53,14 @@ export interface PendingLabel extends IngestItem {
   annotator_id: string | null
   recommended_action: string
   confidence: number
+  text_preview: string | null
+}
+export interface LabelDetail extends Omit<PendingLabel, 'text_preview'> {
+  domain_id: string
+  text: string | null
+  actual_action: string | null
+  verified_outcome: boolean | null
+  verified_at: string | null
 }
 export type PendingResponse = PendingLabel[]
 export interface Inversion { trusted_factor: string; actual_signal_factor: string; interpretation: string }
@@ -136,7 +145,7 @@ function explain(detail: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const authenticated = !path.startsWith('/label-health/')
+  const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register'
   const apiKey = localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : '')
   const headers = new Headers(init?.headers)
   if (authenticated && apiKey) headers.set('X-Api-Key', apiKey)
@@ -166,8 +175,11 @@ export const ingestLabel = (body: IngestRequest) => request<IngestResponse>('/la
 export const ingestBatch = (body: IngestBatchRequest) => request<IngestBatchResponse>('/labels/ingest/batch', json(body))
 export const seedSample = (domainId: string) => request<SampleSeedResponse>(`/labels/${id(domainId)}/sample`, { method: 'POST' })
 export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (import.meta.env.DEV && import.meta.env.VITE_API_KEY))
+export interface RegistrationResponse { api_key: string; tenant_id: string; tier: 'trial'; message: string }
+export const registerAccount = (email: string, name?: string) => request<RegistrationResponse>('/auth/register', json({ email, name: name || undefined }))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
 export const getPending = (domainId: string, options: { category?: string; limit?: number } = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
+export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/${id(labelId)}`)
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
 export const getCorrections = (domainId: string) => request<CorrectionsResponse>(`/dashboard/${id(domainId)}/corrections`)
 export const getAnnotators = (domainId: string, limit = 50) => request<AnnotatorsResponse>(`/dashboard/${id(domainId)}/annotators${params({ limit })}`)

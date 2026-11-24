@@ -33,6 +33,21 @@ class IngestItem(BaseModel):
     category: str = Field(min_length=1)
     annotator_id: str | None = None
     factors: dict[str, float] = Field(min_length=2)
+    text: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def valid_text(cls, value: str | None) -> str | None:
+        if value == "":
+            return None
+        if value is not None:
+            try:
+                size = len(value.encode("utf-8"))
+            except UnicodeEncodeError as exc:
+                raise ValueError("text must be valid UTF-8") from exc
+            if size > 32 * 1024:
+                raise ValueError("text must be at most 32 KiB UTF-8")
+        return value
 
     @field_validator("label_id", "category", "annotator_id")
     @classmethod
@@ -111,6 +126,7 @@ def _sample_items() -> list[IngestItem]:
         return [IngestItem(
             label_id=row["label_id"], category=row["category"],
             annotator_id=row["annotator_id"],
+            text=row["text"],
             factors={"model_confidence": row["factor_model_confidence"],
                      "item_difficulty": row["factor_item_difficulty"]},
         ) for row in rows]
@@ -182,7 +198,7 @@ async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem) -> In
     await reserve_label_capacity(session)
     result = await repository.score_and_persist(
         session, engine, domain_id, item.label_id, item.annotator_id,
-        item.category, item.factors
+        item.category, item.factors, item.text
     )
     stats = await _category_stats(session, domain_id, engine.config.categories)
     status = evaluate_domain(engine, stats)[item.category]
@@ -280,6 +296,14 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
     existing_ids = set((await session.scalars(select(LabelLog.label_id).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
         LabelLog.label_id.in_(ids)))).all())
+    if existing_ids:
+        existing_rows = (await session.scalars(select(LabelLog).where(
+            LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+            LabelLog.label_id.in_(existing_ids)))).all()
+        fixture_text = {item.label_id: item.text for item in items}
+        for row in existing_rows:
+            if row.text is None:
+                row.text = fixture_text[row.label_id]
     created = 0
     for item in items:
         if item.label_id not in existing_ids:
@@ -316,8 +340,26 @@ async def pending(request: Request, domain_id: str, session: Session, tenant: Te
     rows = (await session.scalars(query)).all()
     return [{"label_id": row.label_id, "category": row.category,
              "annotator_id": row.annotator_id, "confidence": row.confidence,
-             "recommended_action": row.recommended_action, "factors": row.factors_json}
+             "recommended_action": row.recommended_action, "factors": row.factors_json,
+             "text_preview": row.text[:80] if row.text is not None else None}
             for row in rows]
+
+
+@router.get("/{domain_id}/{label_id}")
+@limiter.limit("60/minute")
+async def label_detail(request: Request, domain_id: str, label_id: str,
+                       session: Session, tenant: Tenant) -> dict:
+    row = await session.scalar(select(LabelLog).where(
+        LabelLog.domain_id == scoped_domain_id(tenant, domain_id),
+        LabelLog.tenant_id == tenant, LabelLog.label_id == label_id))
+    if row is None:
+        raise HTTPException(404, detail="Label not found")
+    return {"domain_id": domain_id, "label_id": row.label_id, "category": row.category,
+            "annotator_id": row.annotator_id, "factors": row.factors_json,
+            "recommended_action": row.recommended_action, "confidence": row.confidence,
+            "text": row.text, "actual_action": row.actual_action,
+            "verified_outcome": row.verified_outcome,
+            "verified_at": row.verified_at.isoformat() if row.verified_at else None}
 
 
 @autonomy_router.get("/{domain_id}/autonomy")

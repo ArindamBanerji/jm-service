@@ -91,9 +91,9 @@ async def load_or_create_engine(session: AsyncSession, domain_id: str,
 
 async def record_score(session: AsyncSession, domain_id: str, label_id: str,
                        annotator_id: str | None, category: str, factors: dict[str, float],
-                       recommended_action: str, confidence: float) -> LabelLog:
+                       recommended_action: str, confidence: float, text: str | None = None) -> LabelLog:
     row = LabelLog(domain_id=domain_id, tenant_id=_tenant(session), label_id=label_id, annotator_id=annotator_id,
-                   category=category, factors_json=factors, recommended_action=recommended_action,
+                   category=category, factors_json=factors, text=text, recommended_action=recommended_action,
                    confidence=confidence)
     session.add(row)
     await session.flush()
@@ -181,10 +181,10 @@ async def get_annotator(session: AsyncSession, domain_id: str, annotator_id: str
 
 async def score_and_persist(session: AsyncSession, engine: JudgmentMemoryEngine, domain_id: str,
                             label_id: str, annotator_id: str | None, category: str,
-                            factors: dict[str, float]) -> ScoreResult:
+                            factors: dict[str, float], text: str | None = None) -> ScoreResult:
     result = engine.score(factors, category)
     await record_score(session, domain_id, label_id, annotator_id, category,
-                       factors, result.recommended_action, result.confidence)
+                       factors, result.recommended_action, result.confidence, text)
     await save_engine_state(session, domain_id, annotator_id, engine)
     return result
 
@@ -211,6 +211,7 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     assert successor is not None
     successor.annotation_id = old_row.annotation_id
     successor.source_task_id = old_row.source_task_id
+    successor.text = old_row.text
     old_row.superseded_by = label_id
     await session.flush()
     return result

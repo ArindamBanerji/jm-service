@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from db.models import ApiKey
+from db.models import ApiKey, LabelLog
 from test_labeling_router import client, set_key_usage
 
 
@@ -51,16 +51,24 @@ def test_success_creates_twelve_pending(client):
     pending = client.get(f"/v1/labels/{DOMAIN}/pending").json()
     assert len(pending) == 12
     assert {row["label_id"] for row in pending} == {f"med-{1 + i * 41:04d}" for i in range(12)}
+    assert client.get(f"/v1/labels/{DOMAIN}/med-0001").json()["text"] == "Aspirin appears in the medication list."
     assert usage(client) == (12, 12)
 
 
 def test_replay_preserves_counts_and_quota(client):
     assert client.post(URL).status_code == 200
+    async def clear_text():
+        async with client.app.state.session_factory() as session:
+            row = await session.scalar(select(LabelLog).where(LabelLog.label_id == "med-0001"))
+            row.text = None
+            await session.commit()
+    asyncio.run(clear_text())
     before = usage(client)
     response = client.post(URL)
     assert response.status_code == 200, response.text
     assert response.json() == {"domain_id": DOMAIN, "created": 0, "existing": 12, "pending": 12}
     assert usage(client) == before
+    assert client.get(f"/v1/labels/{DOMAIN}/med-0001").json()["text"] == "Aspirin appears in the medication list."
 
 
 def test_insufficient_quota_rolls_back(client):

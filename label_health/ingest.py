@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from jm_core import DomainConfig
 
-_RESERVED = {"label_id", "category", "verified_outcome", "annotator_id", "action", "timestamp",
+_RESERVED = {"label_id", "category", "verified_outcome", "annotator_id", "text", "action", "timestamp",
              "proposed_action", "actual_action", "verified", "existing_label"}
 
 @dataclass

@@ -5,6 +5,7 @@ import { useDomain } from '../domain'
 import ConfidenceIndicator from '../components/ConfidenceIndicator'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
+import SignupBanner from '../components/SignupBanner'
 
 export default function ScoredQueue() {
   const { domainId } = useDomain()
@@ -20,7 +21,7 @@ export default function ScoredQueue() {
   }, [domainId, category])
   useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 30000); return () => clearInterval(timer) }, [refresh])
   const categories = [...new Set(items.map(item => item.category))]
-  return <div className="page"><div className="eyebrow">02 / Review workflow</div><h1>Scored Queue <span className="pill">{items.length} unverified</span></h1><p className="subtitle">Most uncertain labels first. The list refreshes every 30 seconds.</p>
+  return <div className="page"><div className="eyebrow">02 / Review workflow</div><h1>Scored Queue <span className="pill">{items.length} unverified</span></h1><p className="subtitle">Most uncertain labels first. The list refreshes every 30 seconds.</p><SignupBanner />
     <div className="toolbar"><label className="field">Category<select value={category} onChange={event => setCategory(event.target.value)}><option value="">All categories</option>{categories.map(value => <option key={value}>{value}</option>)}</select></label><label className="field">Status<select value="pending" disabled><option value="pending">Unverified only</option></select></label><button className="button secondary" onClick={() => void refresh()} disabled={busy}>Refresh</button></div>
     <ErrorBanner message={error} />{busy && !items.length && <LoadingSpinner />}
     <div className="card table-wrap"><table className="table"><thead><tr><th>Label ID</th><th>Category</th><th>Annotator</th><th>Confidence</th><th>Recommendation</th><th></th></tr></thead><tbody>{items.map(item => <tr key={item.label_id}><td><strong>{item.label_id}</strong></td><td>{item.category}</td><td>{item.annotator_id ?? '—'}</td><td><ConfidenceIndicator value={item.confidence} /></td><td>{item.recommended_action}</td><td><Link className="button secondary" to={`/review/${encodeURIComponent(item.label_id)}`} state={{ label: item, domainId }}>Review →</Link></td></tr>)}</tbody></table>

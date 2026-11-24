@@ -6,6 +6,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
 import MetricCard from '../components/MetricCard'
 import TierBadge from '../components/TierBadge'
+import SignupBanner from '../components/SignupBanner'
 
 const percent = (value: number | null) => value === null ? '—' : `${(value * 100).toFixed(1)}%`
 export default function Dashboard() {
@@ -23,7 +24,7 @@ export default function Dashboard() {
       .catch(cause => { if (live) setError(String(cause)) }).finally(() => { if (live) setBusy(false) })
     return () => { live = false }
   }, [domainId])
-  return <div className="page"><div className="eyebrow">04 / System intelligence</div><h1>Dashboard</h1><p className="subtitle">Watch verified evidence turn into earned autonomy, one category at a time.</p><ErrorBanner message={error} />
+  return <div className="page"><div className="eyebrow">04 / System intelligence</div><h1>Dashboard</h1><p className="subtitle">Watch verified evidence turn into earned autonomy, one category at a time.</p><SignupBanner /><ErrorBanner message={error} />
     {busy && <LoadingSpinner />}{!domainId && <div className="notice">Enter a domain ID to view its dashboard.</div>}
     {overview && <><div className="grid-3" style={{ marginBottom: 18 }}><MetricCard label="OVERALL ACCURACY" value={percent(overview.overall_accuracy)} detail="Verified labels" /><MetricCard label="VERIFIED" value={overview.total_verified.toLocaleString()} detail="Human-reviewed outcomes" /><MetricCard label="TOTAL LABELS" value={overview.total_labels.toLocaleString()} detail="Scored in this domain" /></div>
       <div className="grid-2"><div className="card card-pad"><h2 className="section-title">Autonomy ladder</h2><p className="muted">GREEN stays on confirmation. Only AUTONOMOUS is eligible for automatic acceptance.</p><div className="stack">{overview.categories.map(item => <div className="card card-pad" key={item.category} style={{ boxShadow: 'none', padding: 15 }}><div className="button-row" style={{ justifyContent: 'space-between' }}><strong>{item.category}</strong><TierBadge tier={item.tier} /></div><p className="muted" style={{ marginBottom: 4 }}>{percent(item.accuracy)} accuracy · {item.verified_count} verified</p><small className="muted">{item.next_tier_requirements ?? 'Highest tier reached'}{!item.conservation_gate_pass && ` · Gate: ${item.conservation_reason ?? 'paused'}`}</small></div>)}</div>{!overview.categories.length && <p className="muted">No categories yet.</p>}</div>

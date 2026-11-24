@@ -7,6 +7,7 @@ import { useDomain } from '../domain'
 import CsvDropzone from '../components/CsvDropzone'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
+import SignupBanner from '../components/SignupBanner'
 
 export default function Upload() {
   const { domainId, setDomainId } = useDomain()
@@ -60,7 +61,7 @@ export default function Upload() {
       navigate('/queue')
     } catch (cause) { setError(`${String(cause)}${progress ? ` (${progress} rows already ingested)` : ''}`) } finally { setBusy(false) }
   }
-  return <div className="page"><div className="eyebrow">01 / Onboarding</div><h1>Start with your labels.</h1><p className="subtitle">Upload an existing CSV. See its health first, then score labels into a review queue.</p>
+  return <div className="page"><div className="eyebrow">01 / Onboarding</div><h1>Start with your labels.</h1><p className="subtitle">Upload an existing CSV. See its health first, then score labels into a review queue.</p><SignupBanner />
     <div className="card card-pad"><CsvDropzone onFile={next => { void analyze(next) }} busy={busy} /><p className="muted">CSV requires at least 200 rows, label_id, category, verified outcome, and two numeric factor columns. The health report is free and does not save your data.</p>
       <button className="button secondary" onClick={trySample} disabled={busy}>Try with sample data</button><p className="muted">Explore 500 fictional medical labels without an API key.</p>
       {file && <p><strong>{file.name}</strong> <span className="muted">· {(file.size / 1024).toFixed(0)} KB</span></p>}

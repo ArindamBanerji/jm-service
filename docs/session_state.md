@@ -468,3 +468,23 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Tests: 282 passed
 - mypy: clean
 - Build: passed
+
+## DLJ-A2 — Source Text Round Trip
+- Date: 2026-11-24
+- Schema/API: Added nullable `label_log.text` with repeatable SQLite/PostgreSQL migration; optional 32 KiB UTF-8 text in single and batch ingest; authenticated `GET /v1/labels/{domain_id}/{label_id}` detail; pending rows expose only an optional 80-code-point `text_preview`. Empty text maps to NULL; nonempty whitespace and Unicode are preserved.
+- Read/rollback behavior: Old rows display “Source text unavailable.” Detail reads are tenant and domain scoped, including verified labels and IDs outside the first pending page. Batch errors roll back scoring and quota. Sample reseed fills missing text only from the server-owned fixture without charging again. Existing data and the additive column remain on app rollback.
+- Tests: 8 new cases; 86 targeted passed, 290 collectable passed with the three live Docker scripts and standalone `test_ops_e2e.py` excluded; 29 legacy service integration tests passed. The unmodified §10 full-suite command yielded 290 passes plus 8 setup errors in `test_ops_e2e.py` because its live-service fixtures are not provided.
+- mypy: clean on changed Python modules/tests and shared gate modules.
+- Build: passed; `frontend/dist` refreshed and sample fixture present.
+- Browser: built UI on isolated local SQLite with a local test key. Prefixed and unprefixed 200-row CSVs both produced reports with 2 factors and scored 200 labels. Quoted multiline Unicode and literal `<b>` markup survived upload, storage, and detail rendering as text. Verified label reopened read-only; legacy row showed the missing-text state.
+
+## DLJ-SIGNUP — Self-Serve Registration
+- Date: 2026-11-24
+- Files created: test_signup.py, frontend/src/screens/Signup.tsx, frontend/src/components/SignupBanner.tsx.
+- Files modified: auth.py (public register endpoint), db/models.py (case-insensitive unique email index), db/migrate.py (repeatable index migration), email_service.py (API key delivery wrapper), jm_service.py (router mount), App.tsx (route and sidebar), api.ts (register call), Upload.tsx, ScoredQueue.tsx, Dashboard.tsx, index.css.
+- Endpoint: `POST /v1/auth/register` is public and limited to 5 requests/minute per IP. It validates and normalizes email, rejects duplicates, creates a trial tenant/key, returns the plaintext key in the registration response only, and invokes email delivery. Actual delivery requires `RESEND_API_KEY`; failure is logged while the browser copy remains available.
+- Tests: 6 new signup cases; 296 passed in the collectable suite. The requested full-suite command yielded 296 passes plus 8 setup errors in the pre-existing `test_ops_e2e.py` because its live-service fixtures are unavailable. `test_jm_service.py`: 29 passed.
+- mypy: clean on auth.py, db/models.py, db/migrate.py, jm_service.py, and email_service.py.
+- Build: passed.
+- Browser: computer-use browser host was unavailable and existing browser windows were minimized, so direct clipboard, localStorage, and incognito checks could not run. Local HTTP smoke test served the signup page (200), registered `test@example.com` (201, 64-character key, trial), and scored a label using that key (200). The isolated local service had no Resend key, so email delivery was not live-tested.
+- Final review: read every function in auth.py and the complete Signup screen; confirmed duplicate rejection, one-time response contract, delivery invocation, and StaticFiles as the final mount.

@@ -32,6 +32,8 @@ async def migrate() -> None:
                             if column not in names:
                                 sync_connection.execute(text(
                                     f"ALTER TABLE label_log ADD COLUMN {column} VARCHAR(200)"))
+                        if "text" not in names:
+                            sync_connection.execute(text("ALTER TABLE label_log ADD COLUMN text TEXT"))
                     sync_connection.execute(text(
                         f"CREATE INDEX IF NOT EXISTS ix_{table}_tenant_id ON {table} (tenant_id)"))
                 if inspector.has_table("api_keys"):
@@ -61,6 +63,9 @@ async def migrate() -> None:
                         if column not in names:
                             sync_connection.execute(text(
                                 f"ALTER TABLE api_keys ADD COLUMN {column} {definition}"))
+                    sync_connection.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_contact_email "
+                        "ON api_keys (lower(contact_email)) WHERE contact_email IS NOT NULL"))
             await connection.run_sync(upgrade)
             await connection.run_sync(Base.metadata.create_all)
     finally:

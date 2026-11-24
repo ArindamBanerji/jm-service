@@ -44,6 +44,11 @@ def api_key_email(api_key: str) -> tuple[str, str]:
     return subject, html
 
 
+async def send_api_key_email(to: str, api_key: str) -> bool:
+    subject, html = api_key_email(api_key)
+    return await send_email(to, subject, html)
+
+
 def trial_expiring_email() -> tuple[str, str]:
     subject = "Your DLJ trial expires in 2 days"
     html = """<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto">

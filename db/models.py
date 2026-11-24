@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, Uuid, func, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, Uuid, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -59,6 +59,7 @@ class LabelLog(Base):
     annotator_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     category: Mapped[str] = mapped_column(String(200), index=True)
     factors_json: Mapped[dict] = mapped_column(JSON)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommended_action: Mapped[str] = mapped_column(String(200))
     actual_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
     verified_outcome: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
@@ -98,3 +99,8 @@ class ApiKey(Base):
     labels_month_key: Mapped[str] = mapped_column(String(7), default="", nullable=False, server_default=text("''"))
     labels_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default=text("0"))
     labels_day_key: Mapped[str] = mapped_column(String(10), default="", nullable=False, server_default=text("''"))
+
+
+Index("uq_api_keys_contact_email", func.lower(ApiKey.contact_email), unique=True,
+      postgresql_where=ApiKey.contact_email.is_not(None),
+      sqlite_where=ApiKey.contact_email.is_not(None))
