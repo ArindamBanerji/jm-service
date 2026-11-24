@@ -1,0 +1,7005 @@
+{
+  "domain_id": "medical-ner-demo-v1",
+  "rows": [
+    {
+      "label_id": "med-0001",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.08,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0002",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.37,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0003",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.66,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0004",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.1,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0005",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.39,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0006",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.68,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0007",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.12,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0008",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.41,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0009",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.7,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0010",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.14,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0011",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.43,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0012",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.72,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0013",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.16,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0014",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.45,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0015",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.74,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0016",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.18,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0017",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.47,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0018",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.76,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0019",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.2,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0020",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.49,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0021",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.78,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0022",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.22,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0023",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.51,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0024",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.8,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0025",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.24,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0026",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.53,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0027",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.82,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0028",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.26,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0029",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.55,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0030",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.84,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0031",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.28,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0032",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.57,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0033",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.86,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0034",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.3,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0035",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.59,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0036",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.88,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0037",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.32,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0038",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.61,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0039",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.9,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0040",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.34,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0041",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.63,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0042",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.92,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0043",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.36,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0044",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.65,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0045",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.09,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0046",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.38,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0047",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.67,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0048",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.11,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0049",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.4,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0050",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.69,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0051",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.13,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0052",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.42,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0053",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.71,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0054",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.15,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0055",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.44,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0056",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.73,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0057",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.17,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0058",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.46,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0059",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.75,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0060",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.19,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0061",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.48,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0062",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.77,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0063",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.21,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0064",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.5,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0065",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.79,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0066",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.23,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0067",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.52,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0068",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.81,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0069",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.25,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0070",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.54,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0071",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.83,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0072",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.27,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0073",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.56,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0074",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.85,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0075",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.29,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0076",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.58,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0077",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.87,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0078",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.31,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0079",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.6,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0080",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.89,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0081",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.33,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0082",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.62,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0083",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.91,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0084",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.35,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0085",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.64,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0086",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.08,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0087",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.37,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0088",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.66,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0089",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.1,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0090",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.39,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0091",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.68,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0092",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.12,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0093",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.41,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0094",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.7,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0095",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.14,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0096",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.43,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0097",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.72,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0098",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.16,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0099",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.45,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0100",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.74,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0101",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.18,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0102",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.47,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0103",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.76,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0104",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.2,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0105",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.49,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0106",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.78,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0107",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.22,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0108",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.51,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0109",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.8,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0110",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.24,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0111",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.53,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0112",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.82,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0113",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.26,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0114",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.55,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0115",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.84,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0116",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.28,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0117",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.57,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0118",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.86,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0119",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.3,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0120",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.59,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0121",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.88,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0122",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.32,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0123",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.61,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0124",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.9,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0125",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.34,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0126",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.63,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0127",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.92,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0128",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.36,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0129",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.65,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0130",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.09,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0131",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.38,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0132",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.67,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0133",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.11,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0134",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.4,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0135",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.69,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0136",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.13,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0137",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.42,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0138",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.71,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0139",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.15,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0140",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.44,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0141",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.73,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0142",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.17,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0143",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.46,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0144",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.75,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0145",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.19,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0146",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.48,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0147",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.77,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0148",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.21,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0149",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.5,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0150",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.79,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0151",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.23,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0152",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.52,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0153",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.81,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0154",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.25,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0155",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.54,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0156",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.83,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0157",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.27,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0158",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.56,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0159",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.85,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0160",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.29,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0161",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.58,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0162",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.87,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0163",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.31,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0164",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.6,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0165",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.89,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0166",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.33,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0167",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.62,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0168",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.91,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0169",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.35,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0170",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.64,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0171",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.08,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0172",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.37,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0173",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.66,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0174",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.1,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0175",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.39,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0176",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.68,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0177",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.12,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0178",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.41,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0179",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.7,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0180",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.14,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0181",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.43,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0182",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.72,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0183",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.16,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0184",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.45,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0185",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.74,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0186",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.18,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0187",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.47,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0188",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.76,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0189",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.2,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0190",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.49,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0191",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.78,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0192",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.22,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0193",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.51,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0194",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.8,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0195",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.24,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0196",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.53,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0197",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.82,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0198",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.26,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0199",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.55,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0200",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.84,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0201",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.28,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0202",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.57,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0203",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.86,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0204",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.3,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0205",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.59,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0206",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.88,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0207",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.32,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0208",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.61,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0209",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.9,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0210",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.34,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0211",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.63,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0212",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.92,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0213",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.36,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0214",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.65,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0215",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.09,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0216",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.38,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0217",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.67,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0218",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.11,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0219",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.4,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0220",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.69,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0221",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.13,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0222",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.42,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0223",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.71,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0224",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.15,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0225",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.44,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0226",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.73,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0227",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.17,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0228",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.46,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0229",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.75,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0230",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.19,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0231",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.48,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0232",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.77,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0233",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.21,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0234",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.5,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0235",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.79,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0236",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.23,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0237",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.52,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0238",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.81,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0239",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.25,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0240",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.54,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0241",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.83,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0242",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.27,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0243",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.56,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0244",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.85,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0245",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.29,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0246",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.58,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0247",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.87,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0248",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.31,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0249",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.6,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0250",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.89,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0251",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.33,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0252",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.62,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0253",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.91,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0254",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.35,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0255",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.64,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0256",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.08,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0257",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.37,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0258",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.66,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0259",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.1,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0260",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.39,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0261",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.68,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0262",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.12,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0263",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.41,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0264",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.7,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0265",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.14,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0266",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.43,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0267",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.72,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0268",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.16,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0269",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.45,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0270",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.74,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0271",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.18,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0272",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.47,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0273",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.76,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0274",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.2,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0275",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.49,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0276",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.78,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0277",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.22,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0278",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.51,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0279",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.8,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0280",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.24,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0281",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.53,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0282",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.82,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0283",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.26,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0284",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.55,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0285",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.84,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0286",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.28,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0287",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.57,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0288",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.86,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0289",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.3,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0290",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.59,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0291",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.88,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0292",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.32,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0293",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.61,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0294",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.9,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0295",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.34,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0296",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.63,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0297",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.92,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0298",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.36,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0299",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.65,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0300",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.09,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0301",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.38,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0302",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.67,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0303",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.11,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0304",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.4,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0305",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.69,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0306",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.13,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0307",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.42,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0308",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.71,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0309",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.15,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0310",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.44,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0311",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.73,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0312",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.17,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0313",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.46,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0314",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.75,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0315",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.19,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0316",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.48,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0317",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.77,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0318",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.21,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0319",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.5,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0320",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.79,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0321",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.23,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0322",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.52,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0323",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.81,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0324",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.25,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0325",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.54,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0326",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.83,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0327",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.27,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0328",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.56,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0329",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.85,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0330",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.29,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0331",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.58,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0332",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.87,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0333",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.31,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0334",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.6,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0335",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.89,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0336",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.33,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0337",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.62,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0338",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.91,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0339",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.35,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0340",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.64,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0341",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.08,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0342",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.37,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0343",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.66,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0344",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.1,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0345",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.39,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0346",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.68,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0347",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.12,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0348",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.41,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0349",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.7,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0350",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.14,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0351",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.43,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0352",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.72,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0353",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.16,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0354",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.45,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0355",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.74,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0356",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.18,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0357",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.47,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0358",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.76,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0359",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.2,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0360",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.49,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0361",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.78,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0362",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.22,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0363",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.51,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0364",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.8,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0365",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.24,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0366",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.53,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0367",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.82,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0368",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.26,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0369",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.55,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0370",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.84,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0371",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.28,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0372",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.57,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0373",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.86,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0374",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.3,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0375",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.59,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0376",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.88,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0377",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.32,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0378",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.61,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0379",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.9,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0380",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.34,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0381",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.63,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0382",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.92,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0383",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.36,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0384",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.65,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0385",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.09,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0386",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.38,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0387",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.67,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0388",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.11,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0389",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.4,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0390",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.69,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0391",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.13,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0392",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.42,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0393",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.71,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0394",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.15,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0395",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.44,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0396",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.73,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0397",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.17,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0398",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.46,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0399",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.75,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0400",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.19,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0401",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.48,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0402",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.77,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0403",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.21,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0404",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.5,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0405",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.79,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0406",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.23,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0407",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.52,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0408",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.81,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0409",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.25,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0410",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.54,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0411",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.83,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0412",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.27,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0413",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.56,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0414",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.85,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0415",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.29,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0416",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.58,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0417",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.87,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0418",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.31,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0419",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.6,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0420",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.89,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0421",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.33,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0422",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.62,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0423",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.91,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0424",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.35,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0425",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.64,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0426",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.08,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0427",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.37,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0428",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.66,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0429",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.1,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0430",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.39,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0431",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.68,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0432",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.12,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0433",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.41,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0434",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.7,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0435",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.14,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0436",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.43,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0437",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.72,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0438",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.16,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0439",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.45,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0440",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.52,
+      "factor_item_difficulty": 0.74,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0441",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.89,
+      "factor_item_difficulty": 0.18,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0442",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.65,
+      "factor_item_difficulty": 0.47,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0443",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.41,
+      "factor_item_difficulty": 0.76,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0444",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.78,
+      "factor_item_difficulty": 0.2,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0445",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.54,
+      "factor_item_difficulty": 0.49,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0446",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.91,
+      "factor_item_difficulty": 0.78,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0447",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.67,
+      "factor_item_difficulty": 0.22,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0448",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.43,
+      "factor_item_difficulty": 0.51,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0449",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.8,
+      "factor_item_difficulty": 0.8,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0450",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.56,
+      "factor_item_difficulty": 0.24,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0451",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.93,
+      "factor_item_difficulty": 0.53,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0452",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.69,
+      "factor_item_difficulty": 0.82,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0453",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.45,
+      "factor_item_difficulty": 0.26,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0454",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.82,
+      "factor_item_difficulty": 0.55,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0455",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.58,
+      "factor_item_difficulty": 0.84,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0456",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.95,
+      "factor_item_difficulty": 0.28,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0457",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.71,
+      "factor_item_difficulty": 0.57,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0458",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.47,
+      "factor_item_difficulty": 0.86,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0459",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.84,
+      "factor_item_difficulty": 0.3,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0460",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.6,
+      "factor_item_difficulty": 0.59,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0461",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.36,
+      "factor_item_difficulty": 0.88,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0462",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.73,
+      "factor_item_difficulty": 0.32,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0463",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.49,
+      "factor_item_difficulty": 0.61,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0464",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.86,
+      "factor_item_difficulty": 0.9,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0465",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.62,
+      "factor_item_difficulty": 0.34,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0466",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.38,
+      "factor_item_difficulty": 0.63,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0467",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.75,
+      "factor_item_difficulty": 0.92,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0468",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.51,
+      "factor_item_difficulty": 0.36,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0469",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.88,
+      "factor_item_difficulty": 0.65,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0470",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.64,
+      "factor_item_difficulty": 0.09,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0471",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.4,
+      "factor_item_difficulty": 0.38,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0472",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.77,
+      "factor_item_difficulty": 0.67,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0473",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.53,
+      "factor_item_difficulty": 0.11,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0474",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.9,
+      "factor_item_difficulty": 0.4,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0475",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.66,
+      "factor_item_difficulty": 0.69,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0476",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.42,
+      "factor_item_difficulty": 0.13,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0477",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.79,
+      "factor_item_difficulty": 0.42,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0478",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.55,
+      "factor_item_difficulty": 0.71,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0479",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.92,
+      "factor_item_difficulty": 0.15,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0480",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.68,
+      "factor_item_difficulty": 0.44,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": null
+    },
+    {
+      "label_id": "med-0481",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.44,
+      "factor_item_difficulty": 0.73,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0482",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.81,
+      "factor_item_difficulty": 0.17,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0483",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.57,
+      "factor_item_difficulty": 0.46,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0484",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.94,
+      "factor_item_difficulty": 0.75,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": false
+    },
+    {
+      "label_id": "med-0485",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.7,
+      "factor_item_difficulty": 0.19,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0486",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.46,
+      "factor_item_difficulty": 0.48,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0487",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.83,
+      "factor_item_difficulty": 0.77,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0488",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.59,
+      "factor_item_difficulty": 0.21,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0489",
+      "category": "TEST",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.35,
+      "factor_item_difficulty": 0.5,
+      "text": "The chart lists urinalysis.",
+      "span": {
+        "start": 16,
+        "end": 26,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0490",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.72,
+      "factor_item_difficulty": 0.79,
+      "text": "The chart includes amoxicillin.",
+      "span": {
+        "start": 19,
+        "end": 30,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0491",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.48,
+      "factor_item_difficulty": 0.23,
+      "text": "The note records anemia.",
+      "span": {
+        "start": 17,
+        "end": 23,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0492",
+      "category": "TEST",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.85,
+      "factor_item_difficulty": 0.52,
+      "text": "An MRI scan appears in the test list.",
+      "span": {
+        "start": 3,
+        "end": 11,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0493",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.61,
+      "factor_item_difficulty": 0.81,
+      "text": "Aspirin appears in the medication list.",
+      "span": {
+        "start": 0,
+        "end": 7,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0494",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.37,
+      "factor_item_difficulty": 0.25,
+      "text": "The note mentions asthma.",
+      "span": {
+        "start": 18,
+        "end": 24,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0495",
+      "category": "TEST",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.74,
+      "factor_item_difficulty": 0.54,
+      "text": "A glucose test is listed.",
+      "span": {
+        "start": 2,
+        "end": 14,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0496",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.5,
+      "factor_item_difficulty": 0.83,
+      "text": "The note lists ibuprofen as a medication.",
+      "span": {
+        "start": 15,
+        "end": 24,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0497",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-1",
+      "factor_model_confidence": 0.87,
+      "factor_item_difficulty": 0.27,
+      "text": "A condition entry lists migraine.",
+      "span": {
+        "start": 24,
+        "end": 32,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0498",
+      "category": "TEST",
+      "annotator_id": "demo-ann-2",
+      "factor_model_confidence": 0.63,
+      "factor_item_difficulty": 0.56,
+      "text": "The note requests a blood count.",
+      "span": {
+        "start": 20,
+        "end": 31,
+        "label": "TEST"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0499",
+      "category": "MEDICATION",
+      "annotator_id": "demo-ann-3",
+      "factor_model_confidence": 0.39,
+      "factor_item_difficulty": 0.85,
+      "text": "A medication entry mentions metformin.",
+      "span": {
+        "start": 28,
+        "end": 37,
+        "label": "MEDICATION"
+      },
+      "verified_outcome": true
+    },
+    {
+      "label_id": "med-0500",
+      "category": "CONDITION",
+      "annotator_id": "demo-ann-4",
+      "factor_model_confidence": 0.76,
+      "factor_item_difficulty": 0.29,
+      "text": "The chart mentions arthritis.",
+      "span": {
+        "start": 19,
+        "end": 28,
+        "label": "CONDITION"
+      },
+      "verified_outcome": true
+    }
+  ]
+}

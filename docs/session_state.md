@@ -460,3 +460,11 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Updated four phases, scope boundaries, effort and test budgets. Added §10 with executable Phase A specs, Phase B outlines, dependencies, risk mitigations, integration checks and verification commands.
 - Execution plan: 4 Phase A prompts (DLJ-A1 through DLJ-A4); sequential pytest targets 282, 290, 296 and 300. Mandatory check matched documented operations to OpenAPI plus hidden legal routes and every model column to SQLAlchemy metadata. Mypy clean on jm_service.py and db/models.py.
 - Next: DLJ-A1 (Sample Data + Demo Mode).
+
+## DLJ-A1 — Sample Data + Demo Mode
+- Date: 2026-11-24
+- Files created: scripts/generate_sample.py, frontend/public/demo/sample_data.json, test_sample.py
+- Files modified: Upload.tsx, labeling_router.py, api.ts
+- Tests: 282 passed
+- mypy: clean
+- Build: passed

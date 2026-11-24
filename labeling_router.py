@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import json
 from math import isfinite
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
@@ -90,6 +92,30 @@ class IngestBatchRequest(BaseModel):
 class IngestBatchResponse(BaseModel):
     results: list[IngestResponse]
     batch_size: int
+
+
+SAMPLE_DOMAIN = "medical-ner-demo-v1"
+SAMPLE_MARKER = "DLJ sample: medical-ner-demo-v1"
+
+
+def _sample_items() -> list[IngestItem]:
+    root = Path(__file__).resolve().parent / "frontend"
+    fixture = root / "dist" / "demo" / "sample_data.json"
+    if not fixture.is_file():
+        fixture = root / "public" / "demo" / "sample_data.json"
+    try:
+        data = json.loads(fixture.read_text(encoding="utf-8"))
+        if data["domain_id"] != SAMPLE_DOMAIN or len(data["rows"]) != 500:
+            raise ValueError("Unexpected sample fixture")
+        rows = data["rows"][::41][:12]
+        return [IngestItem(
+            label_id=row["label_id"], category=row["category"],
+            annotator_id=row["annotator_id"],
+            factors={"model_confidence": row["factor_model_confidence"],
+                     "item_difficulty": row["factor_item_difficulty"]},
+        ) for row in rows]
+    except (OSError, KeyError, ValueError) as exc:
+        raise HTTPException(503, detail="Sample fixture unavailable") from exc
 
 
 async def _category_stats(session: AsyncSession, domain_id: str,
@@ -237,6 +263,42 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
     if warning := session.info.get("volume_warning"):
         response.headers["X-Volume-Warning"] = warning
     return IngestBatchResponse(results=results, batch_size=len(results))
+
+
+@router.post("/{domain_id}/sample")
+async def seed_sample(domain_id: str, response: Response, session: Session, tenant: Tenant) -> dict[str, str | int]:
+    if domain_id != SAMPLE_DOMAIN:
+        raise HTTPException(404, detail="Sample domain not found")
+    items = _sample_items()
+    scoped = scoped_domain_id(tenant, domain_id)
+    if session.get_bind().dialect.name == "postgresql":
+        await session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:scope))"), {"scope": scoped})
+    domain = await repository.get_domain(session, scoped)
+    if domain is not None and domain.domain_name != SAMPLE_MARKER:
+        raise HTTPException(409, detail="Domain name is already in use")
+    ids = [item.label_id for item in items]
+    existing_ids = set((await session.scalars(select(LabelLog.label_id).where(
+        LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+        LabelLog.label_id.in_(ids)))).all())
+    created = 0
+    for item in items:
+        if item.label_id not in existing_ids:
+            try:
+                await _ingest(session, scoped, item)
+            except (IntegrityError, StaleDataError) as exc:
+                raise HTTPException(409, detail="Sample seed conflicted; retry") from exc
+            created += 1
+            if domain is None:
+                domain = await repository.get_domain(session, scoped)
+                assert domain is not None
+                domain.domain_name = SAMPLE_MARKER
+    pending_ids = (await session.scalars(select(LabelLog.label_id).where(
+        LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+        LabelLog.label_id.in_(ids), LabelLog.verified_at.is_(None)))).all()
+    if warning := session.info.get("volume_warning"):
+        response.headers["X-Volume-Warning"] = warning
+    return {"domain_id": domain_id, "created": created,
+            "existing": len(existing_ids), "pending": len(pending_ids)}
 
 
 @router.get("/{domain_id}/pending")

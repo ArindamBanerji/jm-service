@@ -34,6 +34,7 @@ export interface IngestResponse {
 }
 export interface IngestBatchRequest { domain_id: string; items: IngestItem[] }
 export interface IngestBatchResponse { results: IngestResponse[]; batch_size: number }
+export interface SampleSeedResponse { domain_id: string; created: number; existing: number; pending: number }
 export interface VerifyRequest {
   domain_id: string
   label_id: string
@@ -128,6 +129,7 @@ function explain(detail: unknown): string {
   if (detail && typeof detail === 'object') {
     const value = detail as Record<string, unknown>
     if ('item_index' in value) return `CSV row ${Number(value.item_index) + 1}: ${explain(value.error)}`
+    if ('message' in value) return String(value.message)
     if ('msg' in value) return String(value.msg)
   }
   return 'Request failed'
@@ -162,6 +164,8 @@ export const uploadForReport = (file: File) => request<string>('/label-health/re
 export const downloadReportPdf = (file: File) => request<Blob>('/label-health/report/pdf', upload(file))
 export const ingestLabel = (body: IngestRequest) => request<IngestResponse>('/labels/ingest', json(body))
 export const ingestBatch = (body: IngestBatchRequest) => request<IngestBatchResponse>('/labels/ingest/batch', json(body))
+export const seedSample = (domainId: string) => request<SampleSeedResponse>(`/labels/${id(domainId)}/sample`, { method: 'POST' })
+export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (import.meta.env.DEV && import.meta.env.VITE_API_KEY))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
 export const getPending = (domainId: string, options: { category?: string; limit?: number } = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
