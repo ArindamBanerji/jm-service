@@ -50,6 +50,7 @@ def check_volume_cap(api_key_record: ApiKey) -> dict[str, str] | None:
     if used >= cap:
         raise HTTPException(429, detail={
             "error": "volume_exceeded",
+            "scope": "monthly",
             "message": f"Monthly volume cap ({cap:,} labels) reached for {tier} tier.",
             "upgrade_url": UPGRADE_URL,
         })
@@ -83,6 +84,7 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         if record.labels_today >= DAILY_TRIAL_CAP:
             raise HTTPException(429, detail={
                 "error": "volume_exceeded",
+                "scope": "daily",
                 "message": f"Daily trial cap ({DAILY_TRIAL_CAP} labels) reached.",
                 "upgrade_url": UPGRADE_URL,
             })

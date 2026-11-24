@@ -67,6 +67,14 @@ export interface LabelDetail extends Omit<PendingLabel, 'text_preview' | 'catego
   revision_id: string
   previous_category: string | null
   status: 'pending_classification' | 'scored'
+  content: LabelContent | null
+}
+export interface NerSpan { start: number; end: number; label: string; text: string }
+export interface LabelContent {
+  content_type: 'text_ner' | 'text_multilabel' | 'image_classification'
+  spans: NerSpan[]
+  tags: string[]
+  image_url: string | null
 }
 export interface TextTaskResponse { label_id: string; status: 'pending_classification' | 'scored'; category: string | null }
 export interface RelabelResponse { label_id: string; category: string; revision_id: string; previous_category: string | null }
@@ -187,8 +195,10 @@ export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (i
 export interface RegistrationResponse { api_key: string; tenant_id: string; tier: 'trial'; message: string }
 export const registerAccount = (email: string, name?: string) => request<RegistrationResponse>('/auth/register', json({ email, name: name || undefined }))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
+export interface BulkVerifyResponse { processed: number; skipped: number; errors: { label_id: string; error: string }[] }
+export const bulkVerify = (domainId: string, body: { label_ids: string[]; action: 'approve' | 'reject'; reason?: string }) => request<BulkVerifyResponse>(`/labels/${id(domainId)}/bulk-verify`, json(body))
 export type PendingSort = 'label_id' | 'category' | 'annotator_id' | 'confidence' | 'recommended_action'
-export interface PendingOptions extends Record<string, string | number | undefined> { category?: string; limit?: number; offset?: number; sort_by?: PendingSort; sort_order?: 'asc' | 'desc' }
+export interface PendingOptions extends Record<string, string | number | undefined> { category?: string; limit?: number; offset?: number; sort_by?: PendingSort; sort_order?: 'asc' | 'desc'; search?: string }
 export const getPending = (domainId: string, options: PendingOptions = {}) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`)
 export const getPendingPage = async (domainId: string, options: PendingOptions): Promise<{ rows: PendingLabel[]; total: number }> => {
   let total: number | null = null
@@ -199,9 +209,10 @@ export const getPendingPage = async (domainId: string, options: PendingOptions):
   if (total === null || !Number.isSafeInteger(total)) throw new Error('Pending total count is unavailable')
   return { rows, total }
 }
-export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/${id(labelId)}`)
+export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/items/${id(labelId)}`)
+export const createLabelContent = (domainId: string, labelId: string, body: LabelContent) => request<{ label_id: string; content_type: string; spans_count?: number; tags_count?: number }>(`/labels/${id(domainId)}/items/${id(labelId)}/content`, json(body))
 export const createTextTask = (domainId: string, body: { label_id: string; text: string; category?: string }) => request<TextTaskResponse>(`/labels/${id(domainId)}/tasks`, json(body))
-export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
+export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string; spans?: NerSpan[] }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
 export const getCorrections = (domainId: string) => request<CorrectionsResponse>(`/dashboard/${id(domainId)}/corrections`)
 export const getAnnotators = (domainId: string, limit = 50) => request<AnnotatorsResponse>(`/dashboard/${id(domainId)}/annotators${params({ limit })}`)

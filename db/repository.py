@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import case, func, select, update
@@ -13,7 +13,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.sql.dml import Insert
 
 from jm_core import DomainConfig, JudgmentMemoryEngine, LearnResult, ScoreResult
-from db.models import Annotator, Domain, Engine, LabelLog
+from db.models import Annotator, Domain, Engine, LabelContent, LabelLog
 
 
 def _tenant(session: AsyncSession) -> str:
@@ -102,8 +102,30 @@ async def record_score(session: AsyncSession, domain_id: str, label_id: str,
     return row
 
 
+async def get_label_content(session: AsyncSession, label_log_id: UUID) -> LabelContent | None:
+    return await session.scalar(select(LabelContent).where(LabelContent.label_log_id == label_log_id))
+
+
+async def record_label_content(session: AsyncSession, label_log_id: UUID, content_type: str,
+                               spans: list[dict], tags: list[str],
+                               image_url: str | None) -> LabelContent:
+    row = LabelContent(label_log_id=label_log_id, content_type=content_type,
+                       spans_json=spans, tags_json=tags, image_url=image_url)
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def copy_label_content(session: AsyncSession, source: UUID, target: UUID) -> None:
+    existing = await get_label_content(session, source)
+    if existing is not None:
+        await record_label_content(session, target, existing.content_type,
+                                   existing.spans_json, existing.tags_json, existing.image_url)
+
+
 async def record_verification(session: AsyncSession, domain_id: str, label_id: str,
-                              actual_action: str, verified_outcome: bool) -> LabelLog:
+                              actual_action: str, verified_outcome: bool,
+                              reason: str | None = None) -> LabelLog:
     row = await session.scalar(select(LabelLog).where(LabelLog.domain_id == domain_id,
                                                      LabelLog.tenant_id == _tenant(session),
                                                      LabelLog.label_id == label_id).with_for_update())
@@ -114,6 +136,7 @@ async def record_verification(session: AsyncSession, domain_id: str, label_id: s
     row.actual_action = actual_action
     row.verified_outcome = verified_outcome
     row.verified_at = datetime.now(timezone.utc)
+    row.verification_reason = reason
     await session.flush()
     return row
 
@@ -221,7 +244,8 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
 
 
 async def verify_and_learn(session: AsyncSession, engine: JudgmentMemoryEngine, domain_id: str,
-                           label_id: str, actual_action: str, verified_outcome: bool) -> LearnResult:
+                           label_id: str, actual_action: str, verified_outcome: bool,
+                           reason: str | None = None) -> LearnResult:
     row = await session.scalar(select(LabelLog).where(LabelLog.domain_id == domain_id,
                                                      LabelLog.tenant_id == _tenant(session),
                                                      LabelLog.label_id == label_id).with_for_update())
@@ -244,6 +268,6 @@ async def verify_and_learn(session: AsyncSession, engine: JudgmentMemoryEngine, 
                           confirmed=row.recommended_action == actual_action,
                           outcome_correct=verified_outcome, track_outcome=True)
     del engine.decision_log[decision_id]
-    await record_verification(session, domain_id, label_id, actual_action, verified_outcome)
+    await record_verification(session, domain_id, label_id, actual_action, verified_outcome, reason)
     await save_engine_state(session, domain_id, row.annotator_id, engine)
     return result

@@ -509,3 +509,73 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - mypy: clean on 10 changed/related Python source files.
 - Build: passed; refreshed `frontend/dist`.
 - Browser: Chrome tested the built UI against an isolated local SQLite service and a mocked Paddle checkout. Direct Settings deep link, domain change, local key replace/clear, missing checkout configuration error, checkout return pending state, and refreshed Starter tier after a signed local webhook all worked. No Paddle sandbox or live checkout was exercised.
+
+## DLJ-B1 — Text Tasks and Category Revisions
+- Date: 2026-11-24
+- Endpoints: `POST /v1/labels/{domain_id}/tasks` creates bounded source-text work items, unscored until classified or scored through ordinary quota-aware ingest when a category is supplied. `POST /v1/labels/{domain_id}/items/{label_id}/relabel` requires the current revision ID as token and appends an audited category revision without scoring or training an already scored item.
+- Schema/read behavior: Nullable unscored label fields and revision actor/time/prior/token fields have repeatable SQLite/PostgreSQL migration. Pending and dashboard counts exclude unscored tasks. Detail follows the latest revision and exposes its revision ID. Upload creates text tasks; ReviewCard offers category selection.
+- Tests: Exactly 8 new `test_tasks.py` cases. Target: 42 passed on SQLite and 42 on PostgreSQL. Collectable suite: 314 passed on each with standalone live-service scripts excluded. The unmodified shared pytest command yielded 314 passes and 8 pre-existing `test_ops_e2e.py` setup errors from absent live-service fixtures.
+- mypy/build: clean; frontend build passed.
+- Browser: Native Computer Use stopped because URL policy enforcement was unavailable for the Windows browser. No B1 interactive review result was observed.
+
+## DLJ-B2 — Structured NER Content and Read-Only Viewer
+- Date: 2026-11-24
+- Schema/API: Added one-to-one `label_content` with UUID parent FK, unique `label_log_id`, ON DELETE CASCADE, content type, spans/tags JSON arrays, and nullable HTTPS image URL (2,048-character limit). Migration creates the table repeatably; SQLite connections enable foreign-key enforcement. Authenticated `POST /v1/labels/{domain_id}/items/{label_id}/content` attaches content to the tenant-scoped current revision. Authenticated detail at `/items/{label_id}` and the legacy detail route return content only when present; pending rows remain bounded. Relabel copies content to the successor revision.
+- Validation: NER spans use half-open Unicode code-point offsets into exact stored text; reject missing text, empty/out-of-range/overlapping spans, mismatched substrings, and labels outside domain categories. Multilabel tags use the same category vocabulary. Image references require bounded HTTPS URLs and reject data/base64 URLs. Duplicate content for a revision returns 409.
+- Viewer: NEW `NERViewer` renders escaped React text with focusable highlighted entities, inline labels, a color legend, and a textual entity list. `Array.from(text)` handles emoji, combining characters, and repeated substrings; ReviewCard shows it below TextViewer when NER spans exist.
+- Tests: Exactly 8 new `test_content.py` cases. Target: 50 passed on SQLite and 50 on PostgreSQL. Collectable suite: 322 passed on each database with the standalone live operations script excluded. The unmodified shared command yielded 322 passes plus 8 pre-existing `test_ops_e2e.py` setup errors because its live-service fixtures are unavailable. Cascade deletion was exercised on both databases.
+- mypy: clean on changed Python modules/tests and shared service module. Build: passed; built assets refreshed.
+- Browser: Headless Chrome against the built UI and isolated local SQLite service showed two keyboard-focusable highlights at the expected code-point offsets, the entity legend, and literal HTML displayed as text. The local service was stopped after the check.
+
+## DLJ-B3 — Bulk Review
+- Date: 2026-11-24
+- Files created: `test_bulk_review.py` (exactly 8 cases).
+- Files modified: `labeling_router.py` (bulk-verify endpoint), `db/models.py`, `db/repository.py`, `db/migrate.py` (optional verification reason), `trial_guard.py` (structured cap scope), `frontend/src/screens/ScoredQueue.tsx` (page checkboxes, keyboard selection and fixed action bar), `frontend/src/api.ts` (bulkVerify), `frontend/src/index.css`.
+- Endpoint: Authenticated `POST /v1/labels/{domain_id}/bulk-verify`, rate limited 10/minute, 1–200 unique IDs. It validates the whole tenant/domain set before changes, skips already verified rows, reserves one quota unit per processed row, and returns processed/skipped counts plus per-label errors. Approve confirms the recommendation; reject overrides it. Each processed row calls the existing `verify` → `verify_and_learn` path, preserving conservation and engine updates. Trial daily and paid monthly caps return partial results with explicit skip reasons; optional reason is stored on the verified log.
+- Queue: Selection is page scoped and clears on domain/filter/sort/page changes. Ctrl+A selects the visible page, Escape clears it, and completion shows counts, refreshes the queue, and hides the action bar when empty. The UI states that bulk review consumes a plan quota unit per processed label.
+- Tests: 8 passed on SQLite / 8 passed on PostgreSQL. Full collectable suite: 330 passed on SQLite / 330 passed with PostgreSQL configured, excluding the standalone live scripts. Legacy migration and labeling regression gate: 50 passed. Collection with only the three Docker scripts excluded remains 338, including eight standalone `test_ops_e2e.py` functions that require live-service fixtures.
+- mypy: clean on six changed/related Python files. Build: passed.
+- Browser: Headless Chrome against the built UI and isolated local SQLite service with 51 pending labels confirmed page selection reset, Ctrl+A, Escape, two-label bulk approval, updated 49-row count, toast, and action-bar dismissal. The local service and temporary browser script were stopped/removed.
+
+## DLJ-POST-T2-REVIEW — Post-Track 2 Design Review
+- Date: 2026-11-24
+- Files created: docs/design/dlj_post_track2_design_v2.md
+- Review: 13 checklist items evaluated against live codebase (10 listed in v1 §13 plus 3 from the review brief)
+- Findings: 1 PASS / 7 ISSUE / 5 BLOCKER
+- Execution plan: 12 Codex prompts, 30 days estimated
+
+## DLJ-POST-T2-DESIGN — Execution specification
+- Updated docs/design/dlj_post_track2_design_v2.md in place with the five feature contracts, dual-DB migration, API payloads, worker behavior and release gates.
+- Execution plan: 12 ordered Codex prompts, 30 engineering days. Track 2 work still in progress is estimated separately.
+- B3 compatibility check: test_bulk_review.py passed 8/8 on SQLite and 8/8 on PostgreSQL.
+
+## DLJ-B4 — Scoped Search
+- Date: 2026-11-24
+- Files created: `test_search.py` (exactly 6 cases).
+- Files modified: `labeling_router.py` (search on pending), `frontend/src/screens/ScoredQueue.tsx` (search input and 300 ms debounce), `frontend/src/api.ts` (search option), `frontend/src/index.css` (search styling).
+- Parameter: `GET /v1/labels/{domain_id}/pending?search=<query>` accepts at most 200 characters. A nonblank query matches case-insensitive literal substrings in `label_id`, `annotator_id`, `category`, or stored `text`. Search uses the existing tenant/domain/category/pending filters before count, sorting, and pagination. Empty or whitespace-only search leaves the queue unfiltered. `X-Total-Count` reports the filtered count; the response remains a bare array.
+- Queue: Full-width search input below filters, 300 ms debounce, clear control, filtered result count, first-page reset, and preserved sort order. Selection resets when the applied search changes.
+- Tests: 6 passed (SQLite) / 6 passed (PostgreSQL). Full collectable suite: 336 passed (SQLite) / 336 passed (PostgreSQL), with the three live Docker scripts and standalone live operations script excluded.
+- mypy: clean on `labeling_router.py` and `db/repository.py`.
+- Build: passed (`tsc` and Vite).
+- Final review: read every function in `labeling_router.py` and `ScoredQueue.tsx`; confirmed filtered count and rows share the same predicates, sort applies before pagination, and empty search matches the unfiltered queue.
+
+## DLJ-PW-EXPAND — Playwright Test Expansion
+- Date: 2026-11-24
+- Files created/modified: e2e/track2.spec.ts
+- Tests added: 21 Playwright tests covering signup, sample data, settings, enhanced queue, review card, and signup banner.
+- Previous PW count: 31 observed (7 smoke + 24 screens; the requested 32 baseline was off by one).
+- New PW count: 52 in 3 files.
+- Build: passed.
+- Test list: verified (--list). No browser run or server start, as requested.
+- TypeScript: e2e/tsconfig.json does not exist; direct tsc check of track2.spec.ts passed.
+
+## DLJ-B5 — Inline NER Span Editor
+- Date: 2026-11-24
+- Files created: `frontend/src/components/NEREditor.tsx`, `test_span_edit.py`, `e2e/ner_editor.spec.ts`.
+- Files modified: `labeling_router.py`, `frontend/src/screens/ReviewCard.tsx`, `frontend/src/components/NERViewer.tsx`, `frontend/src/api.ts`, `frontend/src/index.css`.
+- API: `POST /v1/labels/{domain_id}/items/{label_id}/relabel` accepts optional `spans` alongside the existing category and current revision token. It validates at most 100 nonoverlapping, bounded Unicode code-point spans against stored text, derives omitted span text, and rejects mismatches. A span-only change creates an audited successor revision; stale tokens return 409. Relabel resolves the current revision from the original label ID for repeat edits.
+- Storage: The existing one-to-one `label_content` table owns NER spans and content type. Edited spans are written as `text_ner` on the successor revision; `label_log` remains the source-text and revision table. No redundant `label_log.spans` column was added.
+- UI: ReviewCard provides drag selection, inline entity-type choice, highlight click to change or delete, Escape to close, unsaved indicator, and Save Spans. The read-only NER viewer remains for verified labels. Both viewers use the same stable entity colors. Empty domain categories show a custom type input in the editor.
+- Tests: 9 new Python cases; 345 passed on SQLite and 345 passed on PostgreSQL in the full collectable suite (live Docker scripts and standalone live operations script excluded). Two new Playwright tests passed against the Vite UI with mocked API responses, covering Unicode selection/save, type change, and deletion.
+- mypy: clean on `labeling_router.py`, `db/models.py`, and `db/repository.py`. Build: passed (`tsc` and Vite).

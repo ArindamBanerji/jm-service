@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 from starlette.testclient import TestClient
 
-from db.connection import get_db
+from db.connection import enable_sqlite_foreign_keys, get_db
 from db.models import ApiKey, Base, Engine, LabelLog
 from labeling_router import autonomy_router, router
 
@@ -34,6 +34,7 @@ def open_tasks_client(tmp_path):
     else:
         admin = None
         engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'tasks.db').as_posix()}")
+        enable_sqlite_foreign_keys(engine)
 
     async def setup():
         async with engine.begin() as connection:

@@ -67,10 +67,25 @@ class LabelLog(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verification_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     prior_revision_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     revision_actor: Mapped[str | None] = mapped_column(String(200), nullable=True)
     revision_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class LabelContent(Base):
+    __tablename__ = "label_content"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True,
+                                     default=uuid4, server_default=text("gen_random_uuid()"))
+    label_log_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("label_log.id", ondelete="CASCADE"),
+        unique=True, nullable=False, index=True)
+    content_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    spans_json: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
+    tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
 
 
 class Annotator(Base):

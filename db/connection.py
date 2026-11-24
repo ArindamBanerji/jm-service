@@ -5,7 +5,8 @@ import os
 from collections.abc import AsyncIterator
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 def normalize_database_url(url: str) -> tuple[str, dict[str, bool]]:
     if url.startswith("postgresql://"):
@@ -36,6 +37,18 @@ DATABASE_URL, CONNECT_ARGS = normalize_database_url(
     os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/jm_labeling"))
 engine = create_async_engine(DATABASE_URL, connect_args=CONNECT_ARGS,
                              **({"pool_size": 5, "max_overflow": 10} if DATABASE_URL.startswith("postgresql") else {}))
+
+
+def enable_sqlite_foreign_keys(db_engine: AsyncEngine) -> None:
+    if db_engine.dialect.name == "sqlite":
+        @event.listens_for(db_engine.sync_engine, "connect")
+        def set_foreign_keys(dbapi_connection, connection_record) -> None:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+
+enable_sqlite_foreign_keys(engine)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
