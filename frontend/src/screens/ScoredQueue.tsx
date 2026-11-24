@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
 import { bulkVerify, getAutonomy, getPendingPage, type PendingLabel, type PendingSort } from '../api'
 import { useDomain } from '../domain'
@@ -15,6 +15,8 @@ const columns: { key: PendingSort; title: string }[] = [
 ]
 
 export default function ScoredQueue() {
+  const navigate = useNavigate()
+  const [focusedRow, setFocusedRow] = useState(0)
   const { domainId } = useDomain()
   const [items, setItems] = useState<PendingLabel[]>([])
   const [total, setTotal] = useState(0)
@@ -38,6 +40,7 @@ export default function ScoredQueue() {
 
   useEffect(() => { setCategory(''); setSortBy(undefined); setSortOrder('asc'); setSearchInput(''); setSearch(''); setOffset(0) }, [domainId])
   useEffect(() => { setSelected(new Set()) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
+  useEffect(() => { setFocusedRow(0) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(searchInput.trim()); setOffset(0) }, 300)
     return () => clearTimeout(timer)
@@ -95,16 +98,26 @@ export default function ScoredQueue() {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target
       const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)
+        target instanceof HTMLSelectElement || target instanceof HTMLButtonElement ||
+        target instanceof HTMLAnchorElement || (target instanceof HTMLElement && target.isContentEditable)
       if (event.key === 'Escape') { setSelected(new Set()); return }
       if (!editing && !bulkBusy && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && items.length) {
         event.preventDefault()
         setSelected(new Set(items.map(item => item.label_id)))
       }
+      if (editing || event.ctrlKey || event.metaKey || event.altKey || !items.length || bulkBusy) return
+      if (event.key === 'j' || event.key === 'k') {
+        event.preventDefault()
+        setFocusedRow(current => Math.max(0, Math.min(items.length - 1, current + (event.key === 'j' ? 1 : -1))))
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        navigate(`/review/${encodeURIComponent(items[focusedRow]?.label_id ?? '')}`)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [items, bulkBusy])
+  }, [items, bulkBusy, focusedRow, navigate])
   const toggleOne = (labelId: string) => setSelected(previous => {
     const next = new Set(previous)
     if (next.has(labelId)) next.delete(labelId)
@@ -145,7 +158,7 @@ export default function ScoredQueue() {
     <div className="toolbar"><label className="field">Category<select value={category} onChange={event => { setCategory(event.target.value); setOffset(0) }}><option value="">All categories</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}</select></label><label className="field">Status<select value="pending" disabled><option value="pending">Unverified only</option></select></label><label className="field">Rows per page<select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setOffset(0) }}>{[50, 100, 200].map(value => <option key={value} value={value}>{value}</option>)}</select></label><label className="field"><span>Source preview</span><input type="checkbox" checked={showPreview} onChange={event => setShowPreview(event.target.checked)} /></label><button className="button secondary" onClick={() => void refresh()} disabled={busy}>Refresh</button><button className="button secondary" onClick={exportPage} disabled={busy || !items.length}>Export this page</button></div>
     <div className="queue-search"><label htmlFor="queue-search-input">Search labels</label><div className="queue-search-control"><span aria-hidden="true">⌕</span><input id="queue-search-input" type="search" placeholder="Search labels..." value={searchInput} maxLength={200} onChange={event => setSearchInput(event.target.value)} />{searchInput && <button type="button" aria-label="Clear search" onClick={() => { setSearchInput(''); setSearch(''); setOffset(0) }}>×</button>}</div>{search && <span className="muted" role="status">{total} results for ‘{search}’</span>}</div>
     <ErrorBanner message={error} />{toast && <div className="success" role="status">{toast}</div>}{busy && !items.length && <LoadingSpinner />}
-    <div className="card table-wrap"><table className="table"><thead><tr><th><input type="checkbox" aria-label="Select all on this page" checked={allSelected} disabled={busy || bulkBusy || !items.length} onChange={event => setSelected(event.target.checked ? new Set(items.map(item => item.label_id)) : new Set())} /></th>{columns.map(column => <th key={column.key}><button className="table-sort" onClick={() => changeSort(column.key)} aria-label={`Sort by ${column.title}`}>{column.title}{sortBy === column.key ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>)}{showPreview && <th>Source preview</th>}<th>Review</th></tr></thead><tbody>{items.map(item => <tr key={item.label_id} className={selected.has(item.label_id) ? 'queue-selected' : ''}><td><input type="checkbox" aria-label={`Select ${item.label_id}`} checked={selected.has(item.label_id)} disabled={bulkBusy} onChange={() => toggleOne(item.label_id)} /></td><td><strong>{item.label_id}</strong></td><td>{item.category}</td><td>{item.annotator_id ?? '—'}</td><td><ConfidenceIndicator value={item.confidence} /></td><td>{item.recommended_action}</td>{showPreview && <td className="preview-cell">{item.text_preview ?? 'Source text unavailable.'}</td>}<td><Link className="button secondary" to={`/review/${encodeURIComponent(item.label_id)}`} state={{ label: item, domainId }}>Review →</Link></td></tr>)}</tbody></table>
+    <div className="card table-wrap"><table className="table"><thead><tr><th><input type="checkbox" aria-label="Select all on this page" checked={allSelected} disabled={busy || bulkBusy || !items.length} onChange={event => setSelected(event.target.checked ? new Set(items.map(item => item.label_id)) : new Set())} /></th>{columns.map(column => <th key={column.key}><button className="table-sort" onClick={() => changeSort(column.key)} aria-label={`Sort by ${column.title}`}>{column.title}{sortBy === column.key ? (sortOrder === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>)}{showPreview && <th>Source preview</th>}<th>Review</th></tr></thead><tbody>{items.map((item, index) => <tr key={item.label_id} className={[selected.has(item.label_id) ? 'queue-selected' : '', focusedRow === index ? 'queue-focused' : ''].join(' ')}><td><input type="checkbox" aria-label={`Select ${item.label_id}`} checked={selected.has(item.label_id)} disabled={bulkBusy} onChange={() => toggleOne(item.label_id)} /></td><td><strong>{item.label_id}</strong></td><td>{item.category}</td><td>{item.annotator_id ?? '—'}</td><td><ConfidenceIndicator value={item.confidence} /></td><td>{item.recommended_action}</td>{showPreview && <td className="preview-cell">{item.text_preview ?? 'Source text unavailable.'}</td>}<td><Link className="button secondary" to={`/review/${encodeURIComponent(item.label_id)}`} state={{ label: item, domainId }}>Review →</Link></td></tr>)}</tbody></table>
       {!items.length && !busy && <div className="loading">{domainId ? 'No pending labels in this view.' : 'Enter a domain ID to see its queue.'}</div>}
     </div><div className="toolbar queue-pages"><span className="muted">Showing {first}–{last} of {total} · Page {Math.floor(offset / pageSize) + 1} of {pages}</span><button className="button secondary" onClick={() => setOffset(Math.max(0, offset - pageSize))} disabled={busy || offset === 0}>Previous</button><button className="button secondary" onClick={() => setOffset(offset + pageSize)} disabled={busy || offset + pageSize >= total}>Next</button></div>
     <p className="muted">Export this page downloads only the displayed pending labels in their current order. Bulk review uses one plan quota unit per processed label.</p>

@@ -579,3 +579,23 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - UI: ReviewCard provides drag selection, inline entity-type choice, highlight click to change or delete, Escape to close, unsaved indicator, and Save Spans. The read-only NER viewer remains for verified labels. Both viewers use the same stable entity colors. Empty domain categories show a custom type input in the editor.
 - Tests: 9 new Python cases; 345 passed on SQLite and 345 passed on PostgreSQL in the full collectable suite (live Docker scripts and standalone live operations script excluded). Two new Playwright tests passed against the Vite UI with mocked API responses, covering Unicode selection/save, type change, and deletion.
 - mypy: clean on `labeling_router.py`, `db/models.py`, and `db/repository.py`. Build: passed (`tsc` and Vite).
+
+## DLJ-C2+C3 — TagSelector + Image Viewer
+- Date: 2026-11-24
+- Files created: `test_tags_image.py`, `frontend/src/components/TagSelector.tsx`, `frontend/src/components/ImageViewer.tsx`, `e2e/tags_image.spec.ts`.
+- Files modified: `labeling_router.py` (optional tags in relabel), `frontend/src/screens/ReviewCard.tsx` (tag editor and image viewer), `frontend/src/api.ts` (tag request type), `frontend/src/index.css` (component styling).
+- Features: Multi-label chips with autocomplete, custom tags, case-insensitive duplicate guard, keyboard removal and dismissal, unsaved state, and Save Tags. Image classification shows a bounded, contained image, category badge, loading state, and broken-image message. The existing CategorySelector remains available for image category relabeling.
+- Storage/API: The existing `label_content.tags_json`, `content_type`, and `image_url` fields back these views; no duplicate `label_log` columns were added. Tag edits use the existing category and revision token, create an audited successor revision, trim and deduplicate tags case-insensitively, and enforce 20 tags and 50 characters each. Plain text content upgrades to `text_multilabel` on tag save.
+- Tests: 6 passed (SQLite) / 6 passed (PostgreSQL). Full collectable suite: 351 passed (SQLite), excluding the live Docker and operations scripts. Two Playwright browser checks passed for tag autocomplete/edit/save and image error handling.
+- mypy: clean on `labeling_router.py`.
+- Build: passed (`tsc` and Vite).
+
+## DLJ-D1+D2 — Polish (Shortcuts, Dark Mode, Guidelines, IAA)
+- Date: 2026-11-24
+- Files created: test_polish.py, e2e/polish.spec.ts, frontend/src/components/KeyboardShortcuts.tsx, frontend/src/components/ShortcutsModal.tsx, frontend/src/components/GuidelinesPanel.tsx, frontend/src/components/IAAPanel.tsx
+- Files modified: frontend/src/App.tsx (shortcuts mount and theme toggle), frontend/src/screens/ReviewCard.tsx (guidelines toggle and text-entry shortcut guard), frontend/src/screens/ScoredQueue.tsx (j/k/Enter focus), frontend/src/screens/Dashboard.tsx (IAA card), frontend/src/screens/Settings.tsx (guidelines editor), frontend/src/api.ts, frontend/src/index.css (dark mode), labeling_router.py (guidelines endpoints), dashboard_router.py (IAA endpoint), db/models.py (guidelines column), db/migrate.py
+- Features: Global keyboard shortcuts and ? help modal, dark mode toggle with system preference, annotation guidelines editable in Settings and viewable on Review, IAA using current verified annotations paired by source_task_id with Cohen's kappa.
+- Tests: 8 passed (SQLite) / 8 passed (PostgreSQL); full collectable suite 359 passed; 2 Playwright polish checks passed.
+- mypy: clean on labeling_router.py, dashboard_router.py, db/models.py, db/migrate.py.
+- Build: passed.
+- Access limitation: current auth has no admin role; any authenticated key belonging to the domain's tenant can edit guidelines.

@@ -28,6 +28,8 @@ async def migrate() -> None:
                     if table == "domains" and "public_domain_id" not in names:
                         sync_connection.execute(text(
                             "ALTER TABLE domains ADD COLUMN public_domain_id VARCHAR(200)"))
+                    if table == "domains" and "guidelines" not in names:
+                        sync_connection.execute(text("ALTER TABLE domains ADD COLUMN guidelines TEXT"))
                     if table == "label_log" and "superseded_by" not in names:
                         sync_connection.execute(text(
                             "ALTER TABLE label_log ADD COLUMN superseded_by VARCHAR(200)"))

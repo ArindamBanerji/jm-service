@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from db.connection import get_db
-from db.models import LabelLog
+from db.models import Domain, LabelLog
 from db import repository
 from auth import Tenant, scoped_domain_id
 from jm_core import ConservationState, DomainConfig, JudgmentMemoryEngine
@@ -29,6 +29,38 @@ from trial_guard import reserve_label_capacity
 router = APIRouter(prefix="/v1/labels", tags=["Labeling"])
 autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
 Session = Annotated[AsyncSession, Depends(get_db)]
+
+
+class GuidelinesPayload(BaseModel):
+    guidelines: str | None = None
+
+    @field_validator("guidelines")
+    @classmethod
+    def limit_guidelines(cls, value: str | None) -> str | None:
+        if value is not None and len(value.encode("utf-8")) > 10 * 1024:
+            raise ValueError("Guidelines must be at most 10 KiB UTF-8")
+        return value
+
+
+async def guidelines_domain(domain_id: str, tenant: Tenant, session: Session) -> Domain:
+    domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
+    if domain is None:
+        raise HTTPException(404, detail="Domain not found")
+    return domain
+
+
+@autonomy_router.get("/{domain_id}/guidelines", response_model=GuidelinesPayload)
+async def get_guidelines(domain_id: str, tenant: Tenant, session: Session) -> GuidelinesPayload:
+    domain = await guidelines_domain(domain_id, tenant, session)
+    return GuidelinesPayload(guidelines=domain.guidelines)
+
+
+@autonomy_router.put("/{domain_id}/guidelines", response_model=GuidelinesPayload)
+async def put_guidelines(domain_id: str, payload: GuidelinesPayload, tenant: Tenant,
+                         session: Session) -> GuidelinesPayload:
+    domain = await guidelines_domain(domain_id, tenant, session)
+    domain.guidelines = payload.guidelines
+    return payload
 
 
 class IngestItem(BaseModel):
@@ -169,6 +201,7 @@ class RelabelRequest(BaseModel):
     category: str = Field(min_length=1, max_length=200)
     idempotency_token: str = Field(min_length=1, max_length=200)
     spans: list[EditableNerSpan] | None = Field(default=None, max_length=100)
+    tags: list[str] | None = Field(default=None, max_length=20)
 
     @field_validator("category")
     @classmethod
@@ -176,6 +209,23 @@ class RelabelRequest(BaseModel):
         if not value.strip() or "|" in value:
             raise ValueError("Invalid category")
         return value
+
+    @field_validator("tags")
+    @classmethod
+    def valid_edit_tags(cls, values: list[str] | None) -> list[str] | None:
+        if values is None:
+            return None
+        unique: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            tag = value.strip()
+            if not tag or len(tag) > 50:
+                raise ValueError("Tags must be nonempty and at most 50 characters")
+            key = tag.casefold()
+            if key not in seen:
+                unique.append(tag)
+                seen.add(key)
+        return unique
 
 
 class NerSpan(BaseModel):
@@ -530,6 +580,8 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
     original = await _current_label(session, domain_id, label_id, tenant, lock=True)
     if request.idempotency_token != str(original.id):
         raise HTTPException(409, detail="Stale label revision")
+    if request.spans is not None and request.tags is not None:
+        raise HTTPException(422, detail="Edit spans or tags in one revision")
     edited_spans: list[dict] | None = None
     if request.spans is not None:
         if original.text is None:
@@ -548,6 +600,10 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
             edited_spans.append({"start": span.start, "end": span.end,
                                  "label": span.label, "text": mention})
             previous_end = span.end
+    if request.tags is not None:
+        existing_content = await repository.get_label_content(session, original.id)
+        if existing_content is not None and existing_content.content_type != "text_multilabel":
+            raise HTTPException(422, detail="Only multilabel content supports tag edits")
     prior_category = original.category
     successor_label_id = f"revision:{uuid4().hex}"
     now = datetime.now(timezone.utc)
@@ -584,10 +640,12 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
     successor.idempotency_token = request.idempotency_token
     original.superseded_by = successor_label_id
     await session.flush()
-    if edited_spans is None:
-        await repository.copy_label_content(session, original.id, successor.id)
-    else:
+    if edited_spans is not None:
         await repository.record_label_content(session, successor.id, "text_ner", edited_spans, [], None)
+    elif request.tags is not None:
+        await repository.record_label_content(session, successor.id, "text_multilabel", [], request.tags, None)
+    else:
+        await repository.copy_label_content(session, original.id, successor.id)
     return {"label_id": label_id, "category": request.category,
             "revision_id": str(successor.id), "previous_category": prior_category}
 

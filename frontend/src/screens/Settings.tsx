@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, getAccount, getAccountDomains, getCheckoutUrl, resolveAccountDomain,
+import { ApiError, getAccount, getAccountDomains, getCheckoutUrl, getGuidelines, putGuidelines, resolveAccountDomain,
   type AccountDomain, type AccountSummary } from '../api'
 import { useDomain } from '../domain'
 import ErrorBanner from '../components/ErrorBanner'
@@ -21,6 +21,15 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [keyVersion, setKeyVersion] = useState(0)
+  const [guidelines, setGuidelines] = useState('')
+  const [guidelinesMessage, setGuidelinesMessage] = useState('')
+  useEffect(() => {
+    if (!domainId || !configured) { setGuidelines(''); return }
+    let live = true
+    getGuidelines(domainId).then(result => { if (live) setGuidelines(result.guidelines ?? '') })
+      .catch(() => { if (live) setGuidelines('') })
+    return () => { live = false }
+  }, [domainId, configured])
 
   const refresh = useCallback(async () => {
     if (!localStorage.getItem('rgi-api-key')) { setAccount(null); setDomains([]); return }
@@ -87,6 +96,13 @@ export default function Settings() {
     {account && <div className="grid-2" style={{ marginTop: 18 }}><section className="card card-pad"><h2 className="section-title">Key usage</h2><p>Today ({account.usage.day_key} UTC): <strong>{account.usage.labels_today.toLocaleString()}</strong>{account.usage.daily_cap !== null && ` / ${account.usage.daily_cap.toLocaleString()}`}</p><p>This month ({account.usage.month_key} UTC): <strong>{account.usage.labels_this_month.toLocaleString()}</strong> / {account.tier === 'trial' ? '50/day trial limit' : account.usage.monthly_cap === null ? 'Unlimited' : account.usage.monthly_cap.toLocaleString()}</p><p className="muted">These are counters for this API key. Domain totals are on the Dashboard.</p></section>
       <section className="card card-pad"><h2 className="section-title">Subscription</h2>{pending && <div className="notice">Awaiting checkout confirmation. Your tier will update when Paddle confirms the subscription.</div>}<p className="muted">Choose a plan to open Paddle checkout. Your current tier remains in effect until confirmed.</p><div className="button-row"><label className="field">Plan<select value={tier} onChange={event => setTier(event.target.value)}>{tiers.map(value => <option key={value} value={value}>{value}</option>)}</select></label><button className="button" onClick={() => void checkout()} disabled={busy}>Upgrade with Paddle</button></div></section></div>}
     <section className="card card-pad" style={{ marginTop: 18 }}><h2 className="section-title">Domains</h2><p className="muted">Select a known domain or enter a public name. A new domain is created when you first score a label.</p><div className="button-row"><label className="field">Public domain name<input value={domainName} onChange={event => setDomainName(event.target.value)} placeholder="Enter domain name" /></label><button className="button" onClick={() => void useDomainName(domainName)} disabled={busy || !configured}>Use domain</button></div><p>Active domain: <strong>{domainId || 'None'}</strong></p>{domains.map(row => row.public_domain_id ? <button className="button secondary domain-choice" key={row.id} onClick={() => void useDomainName(row.public_domain_id!)}>{row.public_domain_id}</button> : <p className="muted" key={row.id}>An older domain needs its public name. Enter that name above to recover it.</p>)}</section>
+    <section className="card card-pad" style={{ marginTop: 18 }}><h2 className="section-title">Annotation guidelines</h2>
+      <p className="muted">Instructions for reviewers in the active domain.</p>
+      <label className="field">Guidelines<textarea rows={9} value={guidelines} onChange={event => { setGuidelines(event.target.value); setGuidelinesMessage('') }} /></label>
+      <button className="button" disabled={!domainId || !configured || new TextEncoder().encode(guidelines).length > 10 * 1024}
+        onClick={() => void putGuidelines(domainId, guidelines).then(() => setGuidelinesMessage('Guidelines saved.')).catch(cause => setError(String(cause)))}>Save guidelines</button>
+      {guidelinesMessage && <p className="success">{guidelinesMessage}</p>}
+    </section>
     <ErrorBanner message={error} />
   </div>
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
-from itertools import groupby
+from itertools import combinations, groupby
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -122,6 +122,59 @@ class Compounding(BaseModel):
     baseline_accuracy: float | None = Field(description="Cumulative accuracy at the first completed window.")
     current_accuracy: float | None
     improvement: float | None = Field(description="Current minus baseline accuracy in percentage points.")
+
+
+class AgreementPair(BaseModel):
+    annotator_a: str
+    annotator_b: str
+    kappa: float | None
+    overlap_count: int
+
+
+class Agreement(BaseModel):
+    pairs: list[AgreementPair]
+    overall_kappa: float | None
+    total_overlapping_labels: int
+
+
+def cohen_kappa(left: list[str], right: list[str]) -> float | None:
+    observed = sum(a == b for a, b in zip(left, right)) / len(left)
+    categories = set(left) | set(right)
+    expected = sum((left.count(category) / len(left)) * (right.count(category) / len(right))
+                   for category in categories)
+    if expected == 1:
+        return 1.0 if observed == 1 else None
+    return (observed - expected) / (1 - expected)
+
+
+@router.get("/{domain_id}/iaa", response_model=Agreement)
+@limiter.limit("60/minute")
+async def agreement(request: Request, domain: DashboardDomain, session: Session) -> Agreement:
+    rows = (await session.execute(select(
+        LabelLog.source_task_id, LabelLog.annotator_id, LabelLog.category, LabelLog.id
+    ).where(LabelLog.domain_id == domain.domain_id,
+            LabelLog.tenant_id == session.info.get("tenant_id", ""),
+            LabelLog.source_task_id.is_not(None), LabelLog.annotator_id.is_not(None),
+            LabelLog.category.is_not(None), verified)
+        .order_by(LabelLog.source_task_id, LabelLog.annotator_id, LabelLog.id))).all()
+    tasks: dict[str, dict[str, set[str]]] = {}
+    for task, annotator, category, _ in rows:
+        tasks.setdefault(task, {}).setdefault(annotator, set()).add(category)
+    by_pair: dict[tuple[str, str], tuple[list[str], list[str]]] = {}
+    for annotations in tasks.values():
+        for a, b in combinations(sorted(annotations), 2):
+            if len(annotations[a]) != 1 or len(annotations[b]) != 1:
+                continue
+            left, right = by_pair.setdefault((a, b), ([], []))
+            left.append(next(iter(annotations[a])))
+            right.append(next(iter(annotations[b])))
+    pairs = [AgreementPair(annotator_a=a, annotator_b=b, kappa=cohen_kappa(left, right),
+                           overlap_count=len(left))
+             for (a, b), (left, right) in sorted(by_pair.items())]
+    all_left = [category for left, _ in by_pair.values() for category in left]
+    all_right = [category for _, right in by_pair.values() for category in right]
+    return Agreement(pairs=pairs, overall_kappa=cohen_kappa(all_left, all_right) if all_left else None,
+                     total_overlapping_labels=sum(pair.overlap_count for pair in pairs))
 
 
 def _utc(value: datetime) -> datetime:

@@ -9,6 +9,7 @@ import HealthReport from './screens/HealthReport'
 import LoadingSpinner from './components/LoadingSpinner'
 import Signup from './screens/Signup'
 import Settings from './screens/Settings'
+import KeyboardShortcuts from './components/KeyboardShortcuts'
 
 const Dashboard = lazy(() => import('./screens/Dashboard'))
 
@@ -21,6 +22,15 @@ export default function App() {
   const [domainId, updateDomain] = useState(() => localStorage.getItem('rgi-domain') ?? '')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('rgi-api-key') ?? '')
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('dlj-theme')
+    return saved === 'light' || saved === 'dark' ? saved :
+      window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem('dlj-theme', theme)
+  }, [theme])
   useEffect(() => {
     const refreshKey = () => setApiKey(localStorage.getItem('rgi-api-key') ?? '')
     window.addEventListener('dlj-key-updated', refreshKey)
@@ -29,6 +39,7 @@ export default function App() {
   }, [])
   const setDomainId = (value: string) => { updateDomain(value); localStorage.setItem('rgi-domain', value) }
   return <Domain.Provider value={{ domainId, setDomainId }}>
+    <KeyboardShortcuts />
     <div className="shell">
       <button className="mobile-menu" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle navigation">☰</button>
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
@@ -40,7 +51,7 @@ export default function App() {
         <datalist id="recent-domains">{domainId && <option value={domainId} />}</datalist>
         <nav aria-label="Main navigation">{links.map(([path, label, icon]) => <NavLink key={path} to={`/${path}`} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span aria-hidden>{icon}</span>{label}</NavLink>)}</nav>
         <NavLink to="/signup" onClick={() => setMobileOpen(false)} className="button signup-link">Sign Up</NavLink>
-        <div className="sidebar-foot">Review what matters.<br />Learn from every verified label.</div>
+        <div className="sidebar-foot"><button className="theme-toggle" aria-label="Toggle dark mode" onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}</button><br />Review what matters.<br />Learn from every verified label.</div>
       </aside>
       <main className="main"><Suspense fallback={<LoadingSpinner />}><Routes>
         <Route path="/" element={<Navigate to="/upload" replace />} />

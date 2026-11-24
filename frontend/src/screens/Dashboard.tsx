@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { getCompounding, getCorrections, getOverview, type CompoundingResponse, type CorrectionsResponse, type OverviewResponse } from '../api'
+import { getAgreement, getCompounding, getCorrections, getOverview, type AgreementResponse, type CompoundingResponse, type CorrectionsResponse, type OverviewResponse } from '../api'
+import IAAPanel from '../components/IAAPanel'
 import { useDomain } from '../domain'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -16,6 +17,14 @@ export default function Dashboard() {
   const [curve, setCurve] = useState<CompoundingResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [agreement, setAgreement] = useState<AgreementResponse | null>(null)
+  useEffect(() => {
+    if (!domainId) { setAgreement(null); return }
+    let live = true
+    getAgreement(domainId).then(result => { if (live) setAgreement(result) })
+      .catch(() => { if (live) setAgreement(null) })
+    return () => { live = false }
+  }, [domainId])
   useEffect(() => {
     if (!domainId) { setOverview(null); return }
     let live = true; setBusy(true); setError(null)
@@ -31,6 +40,7 @@ export default function Dashboard() {
         <div className="card card-pad"><h2 className="section-title">Compounding accuracy</h2><p className="muted">Running verified accuracy · baseline {percent(curve?.baseline_accuracy ?? null)} · current {percent(curve?.current_accuracy ?? null)}</p><div style={{ width: '100%', height: 285 }}><ResponsiveContainer><LineChart data={overview.compounding_curve}><CartesianGrid strokeDasharray="3 3" stroke="#e9eef5" /><XAxis dataKey="verified_count" tick={{ fontSize: 11 }} /><YAxis domain={[0, 1]} tickFormatter={v => `${Math.round(v * 100)}%`} tick={{ fontSize: 11 }} /><Tooltip formatter={(v) => `${(Number(v) * 100).toFixed(1)}%`} /><Line type="monotone" dataKey="accuracy" stroke="#416de2" strokeWidth={3} dot={false} /></LineChart></ResponsiveContainer></div><p className="muted">Baseline to current: {curve?.improvement === null || curve?.improvement === undefined ? '—' : `${curve.improvement >= 0 ? '+' : ''}${curve.improvement.toFixed(1)} percentage points`}</p></div></div>
       {overview.inversion && <div className="card card-pad" style={{ marginTop: 18, background: '#fffaec', borderColor: '#f4d895' }}><div className="eyebrow" style={{ color: '#9d6811' }}>Signal inversion detected</div><h2 className="section-title" style={{ marginTop: 10 }}>Your annotators trust {overview.inversion.trusted_factor} most. But {overview.inversion.actual_signal_factor} is more predictive.</h2><p className="muted">{overview.inversion.interpretation}</p></div>}
       <div className="card card-pad" style={{ marginTop: 18 }}><div className="button-row" style={{ justifyContent: 'space-between' }}><h2 className="section-title">Correction patterns</h2><span className="pill">{corrections?.total_corrections ?? 0} corrections</span></div><p className="muted">Where human reviewers changed the system's recommendation.</p><div className="grid-3">{corrections?.patterns.slice(0, 3).map((pattern, index) => <div className="card card-pad" key={index} style={{ boxShadow: 'none' }}><strong>{pattern.category}</strong><p>{pattern.recommended_action} → {pattern.actual_action}</p><span className="muted">{pattern.count} corrections · {pattern.percentage_of_category.toFixed(1)}% of category corrections</span></div>)}</div>{!corrections?.patterns.length && <p className="muted">No action corrections recorded yet.</p>}</div>
+      <IAAPanel data={agreement} />
     </>}
   </div>
 }

@@ -212,13 +212,23 @@ export const getPendingPage = async (domainId: string, options: PendingOptions):
 export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/items/${id(labelId)}`)
 export const createLabelContent = (domainId: string, labelId: string, body: LabelContent) => request<{ label_id: string; content_type: string; spans_count?: number; tags_count?: number }>(`/labels/${id(domainId)}/items/${id(labelId)}/content`, json(body))
 export const createTextTask = (domainId: string, body: { label_id: string; text: string; category?: string }) => request<TextTaskResponse>(`/labels/${id(domainId)}/tasks`, json(body))
-export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string; spans?: NerSpan[] }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
+export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string; spans?: NerSpan[]; tags?: string[] }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
 export const getCorrections = (domainId: string) => request<CorrectionsResponse>(`/dashboard/${id(domainId)}/corrections`)
 export const getAnnotators = (domainId: string, limit = 50) => request<AnnotatorsResponse>(`/dashboard/${id(domainId)}/annotators${params({ limit })}`)
 export const getFactors = (domainId: string) => request<FactorsResponse>(`/dashboard/${id(domainId)}/factors`)
 export const getCompounding = (domainId: string, options: { window?: number; category?: string } = {}) => request<CompoundingResponse>(`/dashboard/${id(domainId)}/compounding${params(options)}`)
 export const getAutonomy = (domainId: string) => request<AutonomyResponse>(`/domains/${id(domainId)}/autonomy`)
+export interface AgreementResponse {
+  pairs: { annotator_a: string; annotator_b: string; kappa: number | null; overlap_count: number }[]
+  overall_kappa: number | null
+  total_overlapping_labels: number
+}
+export const getAgreement = (domainId: string) => request<AgreementResponse>(`/dashboard/${id(domainId)}/iaa`)
+export const getGuidelines = (domainId: string) => request<{ guidelines: string | null }>(`/domains/${id(domainId)}/guidelines`)
+export const putGuidelines = (domainId: string, guidelines: string) =>
+  request<{ guidelines: string | null }>(`/domains/${id(domainId)}/guidelines`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guidelines }) })
 export interface AccountSummary {
   tenant_id: string; tenant_name: string; tier: string; created_at: string
   is_active: boolean; cancelled_at: string | null; trial_expires_at: string | null; trial_expired: boolean
