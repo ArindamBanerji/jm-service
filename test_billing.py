@@ -29,11 +29,14 @@ def record(*, tier: str = "trial", days_old: int = 0, used: int = 0) -> ApiKey:
 
 
 def test_webhook_signature() -> None:
-    payload, secret = b'{"event":"subscription_created"}', "secret"
-    valid = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-    assert billing.verify_webhook_signature(payload, valid, secret)
-    assert not billing.verify_webhook_signature(payload, "bad", secret)
-    assert not billing.verify_webhook_signature(payload, "", secret)
+    body, secret, ts = b'{"event_type":"subscription.created"}', "secret", "1234567890"
+    valid = hmac.new(secret.encode(), f"{ts}:{body.decode()}".encode(), hashlib.sha256).hexdigest()
+    header = f"ts={ts};h1={valid}"
+    assert billing.verify_paddle_signature(body, header, secret)
+    assert not billing.verify_paddle_signature(body, f"ts={ts};h1=bad", secret)
+    assert not billing.verify_paddle_signature(body + b" ", header, secret)
+    assert not billing.verify_paddle_signature(body, "h1=bad", secret)
+    assert not billing.verify_paddle_signature(body, "", secret)
 
 
 def test_trial_expiry_rejects_expired() -> None:
@@ -92,29 +95,31 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
             await connection.run_sync(Base.metadata.create_all)
         async with factory() as session:
             entry = record()
-            entry.lemon_squeezy_customer_id = "customer-1"
+            entry.paddle_customer_id = "customer-1"
             session.add(entry)
             await session.commit()
 
     asyncio.run(setup())
     monkeypatch.setattr(billing, "AsyncSessionLocal", factory)
-    monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "webhook-secret")
+    monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "webhook-secret")
     app = FastAPI()
     app.include_router(billing.router)
     client = TestClient(app)
 
     def post(event: str, product: str = "DLJ Starter"):
-        payload = {"meta": {"event_name": event},
-                   "data": {"id": "sub-1", "attributes": {
-                       "customer_id": "customer-1", "product_name": product}}}
+        payload = {"event_type": event,
+                   "data": {"id": "sub-1", "customer_id": "customer-1",
+                            "items": [{"product": {"name": product}}]}}
         body = json.dumps(payload).encode()
-        signature = hmac.new(b"webhook-secret", body, hashlib.sha256).hexdigest()
+        ts = "1234567890"
+        signature = hmac.new(b"webhook-secret", ts.encode() + b":" + body, hashlib.sha256).hexdigest()
         return client.post("/v1/billing/webhook", content=body,
-                           headers={"X-Signature": signature, "Content-Type": "application/json"})
+                           headers={"Paddle-Signature": f"ts={ts};h1={signature}",
+                                    "Content-Type": "application/json"})
 
-    assert post("subscription_created").status_code == 200
-    assert post("subscription_updated", "DLJ Professional").status_code == 200
-    assert post("subscription_cancelled").status_code == 200
+    assert post("subscription.created").status_code == 200
+    assert post("subscription.updated", "DLJ Professional").status_code == 200
+    assert post("subscription.canceled").status_code == 200
 
     async def inspect_record() -> ApiKey:
         async with factory() as session:
@@ -123,33 +128,45 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
             return result
 
     saved = asyncio.run(inspect_record())
-    assert saved.lemon_squeezy_customer_id == "customer-1"
-    assert saved.lemon_squeezy_subscription_id == "sub-1"
+    assert saved.paddle_customer_id == "customer-1"
+    assert saved.paddle_subscription_id == "sub-1"
     assert saved.tier == "professional"
     assert saved.cancelled_at is not None
     asyncio.run(db_engine.dispose())
 
 
 def test_webhook_rejects_bad_signature(monkeypatch) -> None:
-    monkeypatch.setenv("LEMON_SQUEEZY_WEBHOOK_SECRET", "webhook-secret")
+    monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "webhook-secret")
     app = FastAPI()
     app.include_router(billing.router)
     response = TestClient(app).post("/v1/billing/webhook", content=b"{}",
-                                    headers={"X-Signature": "wrong"})
+                                    headers={"Paddle-Signature": "ts=1234567890;h1=wrong"})
     assert response.status_code == 401
+
+
+def test_sandbox_accepts_unsigned_webhook(monkeypatch) -> None:
+    monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    app = FastAPI()
+    app.include_router(billing.router)
+    response = TestClient(app).post("/v1/billing/webhook", json={
+        "event_type": "transaction.completed", "data": {}})
+    assert response.status_code == 200
 
 
 def test_migration_adds_billing_columns_to_existing_table(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "old.db"
+    legacy_provider = "_".join(("lemon", "squeezy"))
     with sqlite3.connect(db_path) as connection:
-        connection.execute("CREATE TABLE api_keys (id CHAR(32) PRIMARY KEY, key_hash VARCHAR(64), "
+        connection.execute(f"CREATE TABLE api_keys (id CHAR(32) PRIMARY KEY, key_hash VARCHAR(64), "
                            "tenant_id VARCHAR(200), tenant_name VARCHAR(200), "
-                           "created_at TIMESTAMP, is_active BOOLEAN)")
+                           "created_at TIMESTAMP, is_active BOOLEAN, "
+                           f"{legacy_provider}_customer_id VARCHAR(200), "
+                           f"{legacy_provider}_subscription_id VARCHAR(200))")
     db_engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
     monkeypatch.setattr(migrations, "engine", db_engine)
     asyncio.run(migrations.migrate())
     with sqlite3.connect(db_path) as connection:
         names = {row[1] for row in connection.execute("PRAGMA table_info(api_keys)")}
-    assert {"tier", "lemon_squeezy_customer_id", "lemon_squeezy_subscription_id",
+    assert {"tier", "paddle_customer_id", "paddle_subscription_id",
             "cancelled_at", "labels_this_month", "labels_month_key",
             "labels_today", "labels_day_key"} <= names

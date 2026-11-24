@@ -1,4 +1,4 @@
-"""Lemon Squeezy subscription webhooks."""
+"""Paddle subscription webhooks."""
 from __future__ import annotations
 
 import hashlib
@@ -23,7 +23,7 @@ TIER_VOLUME_CAPS: dict[str, int | None] = {
     "enterprise": None,
 }
 
-LEMON_SQUEEZY_TIER_MAP = {
+PADDLE_TIER_MAP = {
     "DLJ Starter": "starter",
     "DLJ Professional": "professional",
     "DLJ Business": "business",
@@ -31,70 +31,86 @@ LEMON_SQUEEZY_TIER_MAP = {
 }
 
 
-def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
-    if not signature or not secret:
+def verify_paddle_signature(raw_body: bytes, header: str, secret: str) -> bool:
+    """Verify Paddle-Signature using HMAC-SHA256(secret, timestamp:raw_body)."""
+    if not header or not secret:
         return False
-    expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    parts: dict[str, str] = {}
+    for segment in header.split(";"):
+        if "=" in segment:
+            key, value = segment.split("=", 1)
+            parts[key.strip()] = value.strip()
+    timestamp = parts.get("ts", "")
+    signature = parts.get("h1", "")
+    if not timestamp or not signature:
+        return False
+    signed_payload = timestamp.encode() + b":" + raw_body
+    expected = hmac.new(secret.encode(), signed_payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
 @router.post("/webhook")
-async def lemon_squeezy_webhook(request: Request) -> dict[str, str]:
-    secret = os.environ.get("LEMON_SQUEEZY_WEBHOOK_SECRET", "")
-    if not secret:
-        raise HTTPException(500, "Webhook secret not configured")
+async def paddle_webhook(request: Request) -> dict[str, str]:
     body = await request.body()
-    signature = request.headers.get("X-Signature", "")
-    if not verify_webhook_signature(body, signature, secret):
+    secret = os.environ.get("PADDLE_WEBHOOK_SECRET", "")
+    signature = request.headers.get("Paddle-Signature", "")
+    if secret and not verify_paddle_signature(body, signature, secret):
         raise HTTPException(401, "Invalid webhook signature")
 
     try:
         data = await request.json()
-        meta = data.get("meta", {})
-        event_name = meta.get("event_name", "")
-        resource = data.get("data", {})
-        attrs = resource.get("attributes", {})
+        event_type = data.get("event_type", "")
+        payload = data.get("data", {})
     except (ValueError, AttributeError, TypeError) as exc:
         raise HTTPException(422, "Invalid webhook payload") from exc
-    if not isinstance(attrs, dict):
-        raise HTTPException(422, "Invalid webhook attributes")
+    if not isinstance(payload, dict) or not isinstance(event_type, str):
+        raise HTTPException(422, "Invalid webhook data")
 
-    if event_name not in {"subscription_created", "subscription_updated", "subscription_cancelled"}:
+    if not event_type.startswith("subscription."):
         return {"status": "ok"}
 
-    subscription_id = str(resource.get("id") or "")
+    subscription_id = str(payload.get("id") or "")
     if not subscription_id:
         raise HTTPException(422, "Missing subscription ID")
-    tier = None
-    if event_name != "subscription_cancelled":
-        tier = LEMON_SQUEEZY_TIER_MAP.get(attrs.get("product_name", ""))
-        if tier is None:
-            raise HTTPException(422, "Unknown subscription product")
+
+    customer_id = str(payload.get("customer_id") or "")
+    items = payload.get("items", [])
+    product_name = ""
+    if isinstance(items, list) and items:
+        product = items[0].get("product", {}) if isinstance(items[0], dict) else {}
+        product_name = product.get("name", "") if isinstance(product, dict) else ""
+    tier = PADDLE_TIER_MAP.get(product_name)
 
     async with AsyncSessionLocal() as session:
-        if event_name == "subscription_created":
-            customer_id = str(attrs.get("customer_id") or "")
+        if event_type == "subscription.created":
             if not customer_id:
                 raise HTTPException(422, "Missing customer ID")
             record = await session.scalar(select(ApiKey).where(
-                ApiKey.lemon_squeezy_customer_id == customer_id,
+                ApiKey.paddle_customer_id == customer_id,
                 ApiKey.is_active.is_(True)))
             if record is None:
                 raise HTTPException(409, "No API key linked to this checkout")
-            record.lemon_squeezy_customer_id = customer_id
-            record.lemon_squeezy_subscription_id = subscription_id
-            record.tier = tier or "trial"
+            record.paddle_subscription_id = subscription_id
+            record.tier = tier or "starter"
             record.cancelled_at = None
 
-        else:
+        elif event_type == "subscription.updated":
             record = await session.scalar(select(ApiKey).where(
-                ApiKey.lemon_squeezy_subscription_id == subscription_id))
+                ApiKey.paddle_subscription_id == subscription_id))
             if record is None:
                 raise HTTPException(409, "Unknown subscription ID")
-            if event_name == "subscription_updated":
-                record.tier = tier or record.tier
-            else:
-                record.cancelled_at = datetime.now(timezone.utc)
+            if tier:
+                record.tier = tier
+
+        elif event_type == "subscription.canceled":
+            record = await session.scalar(select(ApiKey).where(
+                ApiKey.paddle_subscription_id == subscription_id))
+            if record is None:
+                raise HTTPException(409, "Unknown subscription ID")
+            record.cancelled_at = datetime.now(timezone.utc)
+
+        else:
+            return {"status": "ok"}
         await session.commit()
 
     return {"status": "ok"}

@@ -22,10 +22,10 @@ not replace human review.</p>
 <p>Each tenant receives one API key. You are responsible for key security.
 Dakshineshwari LLC may revoke keys for abuse or violation of these terms.</p>
 <h2>3. Payments</h2>
-<p>Payments are processed by Lemon Squeezy, Inc., which acts as the merchant of record.
+<p>Payments are processed by Paddle, which acts as the merchant of record.
 Billing disputes, refund requests, and payment questions should be directed to the
-Lemon Squeezy customer portal. Dakshineshwari LLC provides the service;
-Lemon Squeezy handles the commercial transaction.</p>
+Paddle customer portal. Dakshineshwari LLC provides the service;
+Paddle handles the commercial transaction.</p>
 <h2>4. Data Handling</h2>
 <p><strong>Label Health Report (free):</strong> Data processed in memory, never stored,
 discarded after response. No account required.</p>
@@ -43,7 +43,7 @@ Enterprise: custom SLA in separate agreement.</p>
 The service provides recommendations; human review decisions remain your responsibility.
 Liability is limited to fees paid in the prior 12 months.</p>
 <h2>7. Termination</h2>
-<p>You may cancel anytime via the Lemon Squeezy customer portal. Data is retained for
+<p>You may cancel anytime via the Paddle customer portal. Data is retained for
 30 days after cancellation, then deleted. You may request immediate deletion by email.</p>
 <h2>8. Acceptable Use</h2>
 <p>No abuse of anonymous endpoints. No reverse-engineering of the scoring engine.
@@ -69,7 +69,7 @@ IP address logged for rate limiting only.</p>
 <p><strong>Authenticated usage:</strong> Label IDs, categories, factor values, annotator IDs
 (customer-supplied identifiers, not names), actions, verification outcomes, timestamps.</p>
 <p><strong>Account data:</strong> Tenant name, API key hash (never plaintext), creation date,
-tier, Lemon Squeezy customer ID.</p>
+tier, Paddle customer ID.</p>
 <p>No cookies on the API. The Review UI uses localStorage for domain selection only.</p>
 <h2>2. How We Use Data</h2>
 <p>Solely to provide the service. Not sold. Not used for training.
@@ -85,7 +85,7 @@ Anonymous reports: zero retention.</p>
 <h2 id="sub-processors">6. Sub-processors</h2>
 <table><thead><tr><th>Provider</th><th>Purpose</th></tr></thead><tbody>
 <tr><td>Railway</td><td>Application hosting, PostgreSQL</td></tr>
-<tr><td>Lemon Squeezy</td><td>Payment processing (merchant of record)</td></tr>
+<tr><td>Paddle</td><td>Payment processing (merchant of record)</td></tr>
 <tr><td>Resend</td><td>Transactional email</td></tr>
 </tbody></table>
 <h2>7. GDPR</h2>

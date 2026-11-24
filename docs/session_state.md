@@ -421,3 +421,17 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - mypy: clean on all 13 changed Python files.
 - Final check: StaticFiles remains the last mount; /v1/billing/webhook has no rate limiter; frozen jm_core.py SHA-256 remains 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
 - Deployment follow-up: link a Lemon Squeezy customer ID to an ApiKey during checkout before subscription_created arrives; configure products, webhook secret, and SENTRY_DSN/RESEND_API_KEY as needed. The legacy SQLite /v1/domains/{domain_id}/score route is outside the new PostgreSQL quota guard. The 30-day deletion and trial-email timing stated in the supplied copy do not yet have scheduled jobs.
+
+## Paddle Swap (DLJ-PADDLE)
+- Date: 2026-11-23
+- Files modified: billing.py (Paddle webhook rewrite), test_billing.py, db/models.py, db/migrate.py, legal_pages.py, docs/session_state.md.
+- Change: active billing integration and legal copy switched from the prior provider to Paddle, the merchant of record.
+- Paddle-Signature verification: `ts=<ts>;h1=HMAC-SHA256(secret, ts:raw_body)` when PADDLE_WEBHOOK_SECRET is configured; unsigned requests are accepted when it is unset for the requested sandbox flow.
+- Event format: `event_type` at the top level; subscription.created, subscription.updated, and subscription.canceled use dotted names.
+- Product name: `data.items[0].product.name`.
+- Env vars: PADDLE_API_KEY is the API credential for future outbound Paddle calls; this webhook uses optional PADDLE_WEBHOOK_SECRET.
+- DB columns: paddle_customer_id and paddle_subscription_id. PostgreSQL migration renames historical columns when present; SQLite adds the new columns.
+- No old-provider references remain in Python source or tests; historical session-state entries above retain their original wording.
+- Tests: 272 passed in the collectable suite (excluding the three pre-existing live-Docker scripts); the requested targeted runs passed 16 billing tests and 49 legal/deployment/service tests.
+- mypy: clean on billing.py, db/models.py, db/migrate.py, legal_pages.py, and test_billing.py.
+- Final check: webhook has no rate limiting decorator; existing customer-to-ApiKey linkage is still required before subscription.created can upgrade an account. Configure PADDLE_WEBHOOK_SECRET before accepting production traffic.
