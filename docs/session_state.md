@@ -689,3 +689,25 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Frontend build: passed; frontend and Playwright typechecks: passed
 - PW tests: 107 passed, including all 3 previously failing tests
 - Docker image build: unavailable in this environment (Docker CLI absent in Windows and WSL)
+
+## DLJ-SWEEP3-BE — Backend Sweep Round 3
+
+- Date: 2026-11-24
+- Dimensions: 8
+- Files analyzed: 35
+- Findings: P1=20, P2=13, P3=2
+- Round 2 fix verification: 5 CLOSED, 5 PARTIAL, 0 OPEN, 0 REGRESSED
+- Remaining open P1s (all rounds): 20 in the backend ledger
+- Verification: 408 tests collected. The four fix modules returned 48 passed and 1 dialect-specific skip on each of SQLite and PostgreSQL, including all 19 round 2 cases.
+- Report: [docs/quality/dlj_sweep3_backend.md](quality/dlj_sweep3_backend.md)
+
+## DLJ-SWEEP3-FE — Frontend Sweep Round 3
+
+- Date: 2026-11-24
+- Dimensions: 8
+- Components analyzed: 27 (App, 8 screens, 18 child components)
+- Findings: P1=5, P2=21, P3=4
+- Round 2 fix verification: 5 CLOSED, 2 PARTIAL, 0 OPEN, 0 REGRESSED
+- Remaining open P1s (all rounds): 5 distinct frontend findings, including S1.3 outside the seven-fix denominator
+- Verification: frontend and E2E typechecks and frontend production build passed. Playwright: 107 passed, 0 failed across 10 specs. Docker image runtime unverified.
+- Report: docs/quality/dlj_sweep3_frontend.md
