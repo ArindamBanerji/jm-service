@@ -141,13 +141,13 @@ def test_bulk_explicit_true_on_approve(client):
     assert detail(client)["verified_outcome"] is True
 
 
-def test_bulk_implicit_compatibility_logs_warning(client, caplog):
+def test_bulk_implicit_compatibility_has_no_warning(client, caplog):
     assert ingest(client).status_code == 200
     response = client.post("/v1/labels/medical/bulk-verify", json={
         "label_ids": ["L1"], "action": "reject"})
     assert response.status_code == 200, response.text
     assert detail(client)["verified_outcome"] is False
-    assert "Implicit bulk verification outcome is deprecated" in caplog.text
+    assert "Implicit bulk verification outcome is deprecated" not in caplog.text
 
 
 def test_batch_conflict_log_redacts_source(client, caplog):
@@ -181,7 +181,7 @@ def test_verified_incorrect_same_category_conflicts(client):
     response = client.post("/v1/labels/medical/items/L1/relabel", json={
         "category": "A", "idempotency_token": revision})
     assert response.status_code == 409
-    assert response.json()["detail"] == "Correction must change the category."
+    assert response.json()["detail"] == "No change detected."
     assert detail(client)["revision_id"] == revision
 
 

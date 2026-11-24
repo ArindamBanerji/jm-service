@@ -20,6 +20,7 @@ export default function ReviewCard() {
   const currentRoute = useRef({ domainId, labelId })
   currentRoute.current = { domainId, labelId }
   const loadController = useRef<AbortController | null>(null)
+  const preserveTagInputFor = useRef<{ domainId: string; labelId: string } | null>(null)
   const navigate = useNavigate()
   const [item, setItem] = useState<LabelDetail | null>(null)
   const [loadedDomain, setLoadedDomain] = useState('')
@@ -28,6 +29,7 @@ export default function ReviewCard() {
   const [entityTypes, setEntityTypes] = useState<string[]>([])
   const [editedSpans, setEditedSpans] = useState<NerSpan[]>([])
   const [editedTags, setEditedTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
   const [outcome, setOutcome] = useState<'' | 'correct' | 'incorrect'>('')
   const [override, setOverride] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +46,11 @@ export default function ReviewCard() {
       .catch(() => { if (!controller.signal.aborted) setGuidelines(null) })
     return () => controller.abort()
   }, [domainId])
-  useEffect(() => { setOutcome(''); setOverride(''); setMessage(''); setItem(null); setEditedSpans([]); setEditedTags([]); setLoadedDomain(''); setPending([]); setTier(null) }, [domainId, labelId])
+  useEffect(() => {
+    if (preserveTagInputFor.current?.domainId === domainId && preserveTagInputFor.current.labelId === labelId) preserveTagInputFor.current = null
+    else setTagInput('')
+    setOutcome(''); setOverride(''); setMessage(''); setItem(null); setEditedSpans([]); setEditedTags([]); setLoadedDomain(''); setPending([]); setTier(null)
+  }, [domainId, labelId])
   const load = useCallback(async () => {
     loadController.current?.abort()
     const controller = new AbortController()
@@ -101,7 +107,7 @@ export default function ReviewCard() {
         category: item.category, idempotency_token: item.revision_id, tags: editedTags,
       })
       if (currentRoute.current.domainId !== domainId || currentRoute.current.labelId !== labelId) return
-      if (result.label_id !== labelId) navigate(`/review/${encodeURIComponent(result.label_id)}`, { replace: true })
+      if (result.label_id !== labelId) { preserveTagInputFor.current = { domainId, labelId: result.label_id }; navigate(`/review/${encodeURIComponent(result.label_id)}`, { replace: true }) }
       else { await load(); setMessage('Tags saved.') }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
@@ -150,7 +156,7 @@ export default function ReviewCard() {
   })
   const alternatives = ['approve', 'reject'].filter(action => action !== item?.recommended_action)
   const afterCategorySaved = async (newLabelId: string) => {
-    if (newLabelId !== labelId) navigate(`/review/${encodeURIComponent(newLabelId)}`, { replace: true })
+    if (newLabelId !== labelId) { preserveTagInputFor.current = { domainId, labelId: newLabelId }; navigate(`/review/${encodeURIComponent(newLabelId)}`, { replace: true }) }
     else await load()
   }
   return <div className="page"><div className="eyebrow">03 / Verification</div><h1>Review label</h1><p className="subtitle">Confirm or correct the recommended action using a known ground-truth outcome.</p>
@@ -161,8 +167,8 @@ export default function ReviewCard() {
       {item.content?.content_type === 'image_classification' && item.content.image_url && <ImageViewer imageUrl={item.content.image_url} category={item.category} readOnly />}
       {item.content?.content_type !== 'image_classification' && <TextViewer text={item.text} />}
       {item.text !== null && (item.content === null || item.content.content_type === 'text_ner') && <><NEREditor key={item.revision_id} text={item.text} spans={editedSpans} entityTypes={entityTypes} onSpansChange={setEditedSpans} disabled={isSaving} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{spansDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveSpans()} disabled={busy || !spansDirty || !item.category}>Save Spans</button>{!item.category && <span className="muted">Choose a category before saving spans.</span>}</div>}</>}
-      {item.content?.content_type === 'text_multilabel' && <><TagSelector key={item.revision_id} tags={editedTags} availableTags={[...entityTypes, ...item.content.tags]} onTagsChange={setEditedTags} disabled={isSaving} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{tagsDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveTags()} disabled={busy || !tagsDirty || !item.category}>Save Tags</button></div>}</>}
-      {(item.text !== null || item.content?.content_type === 'image_classification') && !hasUnsavedEdits && <CategorySelector domainId={domainId} labelId={labelId} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={afterCategorySaved} />}
+      {item.content?.content_type === 'text_multilabel' && <><TagSelector key={item.revision_id} tags={editedTags} availableTags={[...entityTypes, ...item.content.tags]} onTagsChange={setEditedTags} input={tagInput} onInputChange={setTagInput} disabled={isSaving} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{tagsDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveTags()} disabled={busy || !tagsDirty || !item.category}>Save Tags</button></div>}</>}
+      {(item.text !== null || item.content?.content_type === 'image_classification') && !hasUnsavedEdits && <CategorySelector domainId={domainId} labelId={labelId} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={afterCategorySaved} onSavingChange={setIsSaving} />}
       <hr style={{ border: 0, borderTop: '1px solid #e7ecf2', margin: '22px 0' }} /><h3 className="section-title">Factor signals</h3>{Object.entries(item.factors).map(([factor, value]) => <FactorBar key={factor} factor={factor} value={value} />)}</div>
       <div className="stack">{item.status === 'scored' && item.confidence !== null && <div className="card card-pad"><div className="eyebrow">JM recommendation</div><h2 style={{ textTransform: 'capitalize' }}>{item.recommended_action}</h2><ConfidenceIndicator value={item.confidence} /><div className="button-row" style={{ marginTop: 20 }}>{tier && <TierBadge tier={tier.tier} />}<span className="muted">Conservation: {tier?.conservation_reason ?? (tier?.conservation_gate_pass ? 'clear' : 'unknown')}</span></div></div>}
         {item.status !== 'scored' ? <div className="card card-pad"><h3 className="section-title">Pending classification</h3><p className="muted">Choose a category before verification.</p></div> : item.verified_at ? <div className="card card-pad"><h3 className="section-title">Already reviewed</h3><p className="muted">Verified outcome: {item.verified_outcome ? 'Correct' : 'Incorrect'} · Action: {item.actual_action ?? 'unknown'}</p></div> :

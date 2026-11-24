@@ -23,6 +23,11 @@ TIER_MONTHLY_CAPS: dict[str, int | None] = {
 }
 
 
+def _utc_timestamp(value: datetime) -> datetime:
+    """SQLite loads naive UTC timestamps; PostgreSQL preserves their zone."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def check_trial_expiry(api_key_record: ApiKey) -> None:
     if (api_key_record.tier or "trial") != "trial":
         return
@@ -80,9 +85,7 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         record.labels_this_month = 0
 
     cancelled = record.cancelled_at
-    cancellation_effective = (cancelled is not None and
-                              (cancelled.replace(tzinfo=timezone.utc) if cancelled.tzinfo is None
-                               else cancelled.astimezone(timezone.utc)) <= now)
+    cancellation_effective = cancelled is not None and _utc_timestamp(cancelled) <= now
     check_trial_expiry(record)
     if (record.tier or "trial") == "trial" or cancellation_effective:
         if record.labels_today >= DAILY_TRIAL_CAP:

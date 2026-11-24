@@ -326,6 +326,9 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
         raise HTTPException(422, detail="Unknown annotation action")
     if row.verified_at is None:
         engine = await repository.load_or_create_engine(session, config.domain_id, row.annotator_id)
+        if row.category not in domain.config_json["categories"]:
+            raise HTTPException(422, detail=f"Category not in domain schema: {row.category}")
+        repository.sync_engine_categories(engine, domain.config_json["categories"])
         await repository.verify_and_learn(session, engine, config.domain_id, row.label_id, actual, correct)
         return {"status": "processed"}
     await repository.verify_and_relearn(session, config.domain_id, row, actual, correct, reviewer)

@@ -207,7 +207,7 @@ export interface RegistrationResponse { api_key: string; tenant_id: string; tier
 export const registerAccount = (email: string, name?: string) => request<RegistrationResponse>('/auth/register', json({ email, name: name || undefined }))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
 export interface BulkVerifyResponse { processed: number; skipped: number; errors: { label_id: string; error: string }[] }
-export const bulkVerify = (domainId: string, body: { label_ids: string[]; action: 'approve' | 'reject'; reason?: string }) => request<BulkVerifyResponse>(`/labels/${id(domainId)}/bulk-verify`, json(body))
+export const bulkVerify = (domainId: string, body: { label_ids: string[]; action: 'approve' | 'reject'; reason?: string }) => request<BulkVerifyResponse>(`/labels/${id(domainId)}/bulk-verify`, json({ ...body, verified_outcome: body.action === 'approve' }))
 export type PendingSort = 'label_id' | 'category' | 'annotator_id' | 'confidence' | 'recommended_action'
 export interface PendingOptions extends Record<string, string | number | undefined> { category?: string; limit?: number; offset?: number; sort_by?: PendingSort; sort_order?: 'asc' | 'desc'; search?: string }
 export const getPending = (domainId: string, options: PendingOptions = {}, signal?: AbortSignal) => request<PendingResponse>(`/labels/${id(domainId)}/pending${params(options)}`, { signal })
@@ -246,7 +246,14 @@ export interface AccountSummary {
   usage: { labels_today: number; labels_this_month: number; daily_cap: number | null; monthly_cap: number | null; day_key: string; month_key: string }
 }
 export interface AccountDomain { id: string; public_domain_id: string | null; needs_name: boolean }
-export const getAccount = () => request<AccountSummary>('/account')
+const emptyUsage: AccountSummary['usage'] = {
+  labels_today: 0, labels_this_month: 0, daily_cap: null, monthly_cap: null, day_key: '—', month_key: '—',
+}
+export const getAccount = async (): Promise<AccountSummary> => {
+  const result = await request<Omit<AccountSummary, 'usage'> & { usage?: Partial<AccountSummary['usage']> }>('/account')
+  return { ...result, cancelled_at: result.cancelled_at ?? null, trial_expires_at: result.trial_expires_at ?? null,
+    trial_expired: result.trial_expired ?? false, usage: { ...emptyUsage, ...result.usage } }
+}
 export const getAccountDomains = () => request<AccountDomain[]>('/account/domains')
 export const resolveAccountDomain = (domainId: string) => request<{ public_domain_id: string }>('/account/domains/resolve', json({ domain_id: domainId }))
 export const getCheckoutUrl = (tier: string) => request<{ checkout_url: string; tier: string }>(`/billing/checkout-url${params({ tier })}`)

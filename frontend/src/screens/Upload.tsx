@@ -21,9 +21,24 @@ export default function Upload() {
   const [taskId, setTaskId] = useState('')
   const [taskText, setTaskText] = useState('')
   const [taskCategory, setTaskCategory] = useState('')
+  const [dropzoneVersion, setDropzoneVersion] = useState(0)
   const importController = useRef<AbortController | null>(null)
+  const importCounts = useRef({ committed: 0, total: 0 })
+  const analysisRun = useRef(0)
+  const clearUpload = () => {
+    ++analysisRun.current
+    setFile(null); setReport(null); setProgress(0); setSample(false)
+    setTaskId(''); setTaskText(''); setTaskCategory('')
+    setDropzoneVersion(value => value + 1)
+  }
   useEffect(() => {
-    const accountChanging = () => importController.current?.abort()
+    const accountChanging = () => {
+      const active = importController.current
+      active?.abort()
+      clearUpload()
+      if (active) setError(`Import stopped: account changed during upload. ${importCounts.current.committed} of ${importCounts.current.total} rows were committed to the original account.`)
+      importCounts.current = { committed: 0, total: 0 }
+    }
     window.addEventListener('dlj-account-changing', accountChanging)
     return () => {
       window.removeEventListener('dlj-account-changing', accountChanging)
@@ -39,8 +54,11 @@ export default function Upload() {
     } catch (cause) { setError(String(cause)) } finally { setBusy(false) }
   }
   const analyze = async (next: File, isSample = false) => {
+    const run = ++analysisRun.current
     setSample(isSample); setFile(next); setReport(null); setError(null); setBusy(true); setProgress(0)
-    try { setReport(await uploadForAnalysis(next)) } catch (cause) { setError(String(cause)) } finally { setBusy(false) }
+    try { const result = await uploadForAnalysis(next); if (run === analysisRun.current) setReport(result) }
+    catch (cause) { if (run === analysisRun.current) setError(String(cause)) }
+    finally { if (run === analysisRun.current) setBusy(false) }
   }
   const trySample = async () => {
     setBusy(true); setError(null)
@@ -78,28 +96,34 @@ export default function Upload() {
     sessionStorage.setItem('dlj-import-active', '1')
     let committed = 0
     let total = 0
+    importCounts.current = { committed, total }
     setBusy(true); setError(null)
     try {
       const rows = await parseIngestCsv(file)
       total = rows.length
+      importCounts.current.total = total
       for (let start = 0; start < rows.length; start += 100) {
         if (controller.signal.aborted || localStorage.getItem('rgi-api-key') !== capturedKey) {
+          clearUpload()
           setError(`Import stopped: account changed during upload. ${committed} of ${rows.length} rows were committed to the original account.`)
           return
         }
         await ingestBatch({ domain_id: domainId, items: rows.slice(start, start + 100) }, capturedKey, controller.signal)
         committed = Math.min(start + 100, rows.length)
+        importCounts.current.committed = committed
         setProgress(committed)
       }
       if (controller.signal.aborted || localStorage.getItem('rgi-api-key') !== capturedKey) {
+        clearUpload()
         setError(`Import stopped: account changed during upload. ${committed} of ${rows.length} rows were committed to the original account.`)
         return
       }
       navigate('/queue')
     } catch (cause) {
-      if (localStorage.getItem('rgi-api-key') !== capturedKey)
+      if (localStorage.getItem('rgi-api-key') !== capturedKey) {
+        clearUpload()
         setError(`Import stopped: account changed during upload. ${committed} of ${total} rows were committed to the original account.`)
-      else if (!controller.signal.aborted) setError(`${String(cause)}${committed ? ` (${committed} rows already ingested)` : ''}`)
+      } else if (!controller.signal.aborted) setError(`${String(cause)}${committed ? ` (${committed} rows already ingested)` : ''}`)
     } finally {
       if (importController.current === controller) importController.current = null
       sessionStorage.removeItem('dlj-import-active')
@@ -107,7 +131,7 @@ export default function Upload() {
     }
   }
   return <div className="page"><div className="eyebrow">01 / Onboarding</div><h1>Start with your labels.</h1><p className="subtitle">Upload an existing CSV. See its health first, then score labels into a review queue.</p><SignupBanner />
-    <div className="card card-pad"><CsvDropzone onFile={next => { void analyze(next) }} busy={busy} /><p className="muted">CSV requires at least 200 rows, label_id, category, verified outcome, and two numeric factor columns. The health report is free and does not save your data.</p>
+    <div className="card card-pad"><CsvDropzone key={dropzoneVersion} onFile={next => { void analyze(next) }} busy={busy} /><p className="muted">CSV requires at least 200 rows, label_id, category, verified outcome, and two numeric factor columns. The health report is free and does not save your data.</p>
       <button className="button secondary" onClick={trySample} disabled={busy}>Try with sample data</button><p className="muted">Explore 500 fictional medical labels without an API key.</p>
       {file && <p><strong>{file.name}</strong> <span className="muted">· {(file.size / 1024).toFixed(0)} KB</span></p>}
       {busy && <LoadingSpinner />}{progress > 0 && <p className="muted">Scored {progress} rows</p>}<ErrorBanner message={error} />

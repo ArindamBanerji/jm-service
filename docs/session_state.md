@@ -711,3 +711,40 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Remaining open P1s (all rounds): 5 distinct frontend findings, including S1.3 outside the seven-fix denominator
 - Verification: frontend and E2E typechecks and frontend production build passed. Playwright: 107 passed, 0 failed across 10 specs. Docker image runtime unverified.
 - Report: docs/quality/dlj_sweep3_frontend.md
+
+## DLJ-ARCH-REDESIGN — Structural Redesign Specification
+
+- Date: 2026-11-24
+- Sections: 7 (diagnosis, legacy disposition, billing FSM, frontend credential model, integration harness, execution plan, P1 closure map)
+- Open P1s addressed: 24 of 24 distinct open findings in the specification; implementation and closure gates remain outstanding.
+- Phases: 7 (P0–P6)
+- Total effort: 47 engineering days; estimated 24–30 working days with three engineers and reviewer/operations support.
+- Report: [docs/design/dlj_arch_redesign_v1.md](design/dlj_arch_redesign_v1.md)
+
+## DLJ-FIX-R3-FE — Round 3 Frontend Fixes
+
+- Date: 2026-11-24
+- Findings fixed: 5 FE P1s (bulk outcome, signup race, CSV residue, category/tag conflict, usage crash).
+- Files modified: `frontend/src/api.ts`, `frontend/src/screens/Signup.tsx`, `frontend/src/screens/Upload.tsx`, `frontend/src/screens/ReviewCard.tsx`, `frontend/src/screens/Settings.tsx`, `frontend/src/components/CategorySelector.tsx`, `frontend/src/components/TagSelector.tsx` (and generated `frontend/dist/index.html`).
+- Files created: `e2e/fix_round3.spec.ts`.
+- Frontend build: passed; frontend TypeScript check passed. The root `npx tsc` resolves TypeScript 4.9.5 and cannot parse the existing E2E config; the frontend TypeScript compiler checked `e2e/tsconfig.json` successfully.
+- PW tests: 5 passed in `fix_round3.spec.ts`; 112 tests listed across 11 files.
+
+## DLJ-ARCH-REDESIGN-V2 — Merged Execution Plan
+
+- Date: 2026-11-24
+- Replaces: dlj_arch_redesign_v1.md + dlj_post_track2_design_v2.md
+- P1s: 21 BLOCKS LAUNCH, 3 ACCEPTABLE RISK, 3 DEFERRED (v1.1; the same three accepted risks)
+- Merged prompts: 12 in 7 waves
+- Total effort: 28 days wall-clock with two engineering slots (38 engineer-days)
+- Integration scenarios: 27 (from v1's 32)
+- Report: [docs/design/dlj_arch_redesign_v2.md](design/dlj_arch_redesign_v2.md)
+
+## DLJ-FIX-R3-BE — Round 3 Backend Fixes
+
+- Date: 2026-11-24
+- Findings fixed: R14 (complete), R44 (complete), R13 (complete), R45 (complete), R18 (complete), R01, R03, R09
+- Files modified: `billing.py`, `scheduler.py`, `trial_guard.py`, `labeling_router.py`, `label_studio.py`, `db/repository.py`, `label_health/api.py`, `test_content.py`, `test_resweep_fixes.py`
+- Files created: `test_sweep3_fixes.py`
+- Tests: 15 passed (SQLite) / 15 passed (PostgreSQL); full suite 422 passed, 1 skipped
+- mypy: clean

@@ -91,6 +91,15 @@ async def load_or_create_engine(session: AsyncSession, domain_id: str,
     return JudgmentMemoryEngine(DomainConfig.from_dict(domain.config_json))
 
 
+def sync_engine_categories(engine: JudgmentMemoryEngine, categories: list[str]) -> None:
+    """Bring an older annotator snapshot up to the stored domain vocabulary."""
+    for category in categories:
+        if category not in engine.config.categories:
+            engine.config.categories.append(category)
+        for action in engine.config.actions:
+            engine.centroids.setdefault(f"{category}|{action}", [0.5] * engine.config.n_factors)
+
+
 async def record_score(session: AsyncSession, domain_id: str, label_id: str,
                        annotator_id: str | None, category: str, factors: dict[str, float],
                        recommended_action: str, confidence: float, text: str | None = None) -> LabelLog:
@@ -227,6 +236,10 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     label_id = f"revision:{uuid4().hex}"
     assert old_row.category is not None
     engine = await load_or_create_engine(session, domain_id, annotator_id)
+    domain = await get_domain(session, domain_id)
+    if domain is None or old_row.category not in domain.config_json["categories"]:
+        raise HTTPException(422, detail=f"Category not in domain schema: {old_row.category}")
+    sync_engine_categories(engine, domain.config_json["categories"])
     scored = await score_and_persist(session, engine, domain_id, label_id, annotator_id,
                                      old_row.category, old_row.factors_json)
     result = await verify_and_learn(session, engine, domain_id, label_id,
@@ -238,6 +251,7 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     successor.annotation_id = old_row.annotation_id
     successor.source_task_id = old_row.source_task_id
     successor.text = old_row.text
+    await copy_label_content(session, old_row.id, successor.id)
     old_row.superseded_by = label_id
     await session.flush()
     return result

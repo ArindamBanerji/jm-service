@@ -419,11 +419,7 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
     categories = DomainConfig.from_dict(domain.config_json).categories if domain is not None else []
     if row.category not in categories:
         raise HTTPException(status_code=422, detail=f"Category not in domain schema: {row.category}")
-    for category in categories:
-        if category not in engine.config.categories:
-            engine.config.categories.append(category)
-            for action in engine.config.actions:
-                engine.centroids[f"{category}|{action}"] = [0.5] * engine.config.n_factors
+    repository.sync_engine_categories(engine, categories)
     try:
         result = await repository.verify_and_learn(
             session, engine, domain_id, request.label_id,
@@ -441,8 +437,6 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
 @limiter.limit("10/minute")
 async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyRequest,
                       session: Session, tenant: Tenant) -> dict:
-    if payload.outcome is None:
-        logger.warning("Implicit bulk verification outcome is deprecated")
     scoped = scoped_domain_id(tenant, domain_id)
     domain = await repository.get_domain(session, scoped)
     if domain is None:
@@ -488,8 +482,8 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
                          "reject" if row.recommended_action == "approve" else "approve")
         await verify(VerifyRequest(domain_id=domain_id, label_id=label_id,
                                    actual_action=actual_action,
-                                   verified_outcome=(payload.outcome if payload.outcome is not None
-                                                     else payload.action == "approve"),
+                                   verified_outcome=(payload.action == "approve" if payload.outcome is None
+                                                     else payload.outcome),
                                    reason=payload.reason), session, tenant)
         processed += 1
     return {"processed": processed, "skipped": skipped, "errors": errors}
@@ -616,8 +610,6 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
         raise HTTPException(409, detail="Stale label revision")
     if original.verified_at is not None and original.verified_outcome is True:
         raise HTTPException(409, detail="Cannot relabel a verified label. Use verify to change the outcome.")
-    if original.verified_at is not None and original.verified_outcome is False and request.category == original.category:
-        raise HTTPException(409, detail="Correction must change the category.")
     if original.scored_at is not None:
         domain = await repository.get_domain(session, scoped)
         if domain is None or request.category not in DomainConfig.from_dict(domain.config_json).categories:
@@ -646,6 +638,13 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
         existing_content = await repository.get_label_content(session, original.id)
         if existing_content is not None and existing_content.content_type != "text_multilabel":
             raise HTTPException(422, detail="Only multilabel content supports tag edits")
+    current_content = await repository.get_label_content(session, original.id)
+    current_spans = current_content.spans_json if current_content is not None else []
+    current_tags = current_content.tags_json if current_content is not None else []
+    next_spans = edited_spans if edited_spans is not None else current_spans
+    next_tags = request.tags if request.tags is not None else current_tags
+    if request.category == original.category and next_spans == current_spans and next_tags == current_tags:
+        raise HTTPException(409, detail="No change detected.")
     prior_category = original.category
     successor_label_id = f"revision:{uuid4().hex}"
     now = datetime.now(timezone.utc)

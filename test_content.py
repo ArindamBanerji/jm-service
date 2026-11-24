@@ -33,7 +33,7 @@ def test_valid_ner_spans_use_unicode_code_points(client):
     assert post_content(client, spans=payload).status_code == 409
     token = client.get("/v1/labels/medical/items/item-1").json()["revision_id"]
     assert client.post("/v1/labels/medical/items/item-1/relabel", json={
-        "category": "MEDICATION", "idempotency_token": token}).status_code == 200
+        "category": "MEDICATION", "idempotency_token": token}).status_code == 409
     assert client.get("/v1/labels/medical/items/item-1").json()["content"]["spans"] == stored
 
 

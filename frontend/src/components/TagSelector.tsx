@@ -5,12 +5,13 @@ interface Props {
   tags: string[]
   availableTags: string[]
   onTagsChange: (tags: string[]) => void
+  input: string
+  onInputChange: (value: string) => void
   readOnly?: boolean
   disabled?: boolean
 }
 
-export default function TagSelector({ tags, availableTags, onTagsChange, readOnly = false, disabled = false }: Props) {
-  const [input, setInput] = useState('')
+export default function TagSelector({ tags, availableTags, onTagsChange, input, onInputChange, readOnly = false, disabled = false }: Props) {
   const [open, setOpen] = useState(false)
   const present = new Set(tags.map(tag => tag.toLocaleLowerCase()))
   const suggestions = [...new Set(availableTags)].filter(tag =>
@@ -19,7 +20,7 @@ export default function TagSelector({ tags, availableTags, onTagsChange, readOnl
     const tag = value.trim()
     if (disabled || !tag || tag.length > 50 || tags.length >= 20 || present.has(tag.toLocaleLowerCase())) return
     onTagsChange([...tags, tag])
-    setInput(''); setOpen(false)
+    onInputChange(''); setOpen(false)
   }
   const remove = (index: number) => { if (!disabled) onTagsChange(tags.filter((_, position) => position !== index)) }
   return <section aria-label="Multi-label tags" className="tag-selector">
@@ -30,7 +31,7 @@ export default function TagSelector({ tags, availableTags, onTagsChange, readOnl
       </span>)}
       {!readOnly && <div className="tag-input-wrap"><input aria-label="Add tag" role="combobox" disabled={disabled} aria-expanded={open && suggestions.length > 0}
         aria-controls="tag-suggestions" value={input} maxLength={50} placeholder="Add a tag…"
-        onFocus={() => setOpen(true)} onChange={event => { setInput(event.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)} onChange={event => { onInputChange(event.target.value); setOpen(true) }}
         onKeyDown={event => {
           if (event.key === 'Enter') { event.preventDefault(); add(input) }
           else if (event.key === 'Backspace' && !input && tags.length) remove(tags.length - 1)

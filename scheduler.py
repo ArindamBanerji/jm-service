@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from db.connection import AsyncSessionLocal
 from db.models import Annotator, ApiKey, Domain, Engine, LabelLog
@@ -55,15 +55,25 @@ async def cleanup_cancelled_tenants() -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
     cleaned = 0
     async with AsyncSessionLocal() as session:
-        candidates = (await session.execute(select(ApiKey.id, ApiKey.paddle_subscription_id).where(
+        candidates = (await session.execute(select(ApiKey.id, ApiKey.paddle_subscription_id, ApiKey.tenant_id).where(
             ApiKey.is_active.is_(True), ApiKey.cancelled_at.isnot(None),
             ApiKey.cancelled_at < cutoff))).all()
     cleaned_tenants: set[str] = set()
-    for candidate_id, subscription_id in candidates:
+    for candidate_id, subscription_id, tenant_id in candidates:
+        if tenant_id in cleaned_tenants:
+            continue
         async with AsyncSessionLocal.begin() as session:
-            key = await session.scalar(select(ApiKey).where(ApiKey.id == candidate_id)
-                                       .with_for_update().execution_options(populate_existing=True))
-            if key is None or key.tenant_id in cleaned_tenants:
+            # Block sibling-key inserts until this tenant's cleanup commits.
+            if session.get_bind().dialect.name == "postgresql":
+                await session.execute(text("LOCK TABLE api_keys IN SHARE ROW EXCLUSIVE MODE"))
+            elif session.get_bind().dialect.name == "sqlite":
+                await session.execute(text("BEGIN IMMEDIATE"))
+            # One ordered lock acquisition covers every key in this tenant.
+            siblings = (await session.scalars(select(ApiKey).where(
+                ApiKey.tenant_id == tenant_id).order_by(ApiKey.id)
+                .with_for_update().execution_options(populate_existing=True))).all()
+            key = next((sibling for sibling in siblings if sibling.id == candidate_id), None)
+            if key is None:
                 continue
             cancelled_at = key.cancelled_at
             if cancelled_at is not None and cancelled_at.tzinfo is None:
@@ -71,22 +81,30 @@ async def cleanup_cancelled_tenants() -> int:
             if (cancelled_at is None or not key.is_active or cancelled_at >= cutoff
                     or key.paddle_subscription_id != subscription_id):
                 continue
-            tenant_id = key.tenant_id
-            # A sibling key can still own live data, regardless of its subscription state.
-            other_active = await session.scalar(select(ApiKey.id).where(
-                ApiKey.tenant_id == tenant_id, ApiKey.is_active.is_(True),
-                ApiKey.id != key.id).limit(1))
-            if other_active is not None:
-                logger.info("Skipped cleanup for tenant %s with another active key", tenant_id)
+            expired = []
+            retained = False
+            for sibling in siblings:
+                stamp = sibling.cancelled_at
+                if stamp is not None and stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=timezone.utc)
+                if sibling.is_active and stamp is not None and stamp < cutoff:
+                    expired.append(sibling)
+                elif sibling.is_active:
+                    retained = True
+            if not expired:
+                continue
+            for sibling in expired:
+                sibling.is_active = False
+            cleaned += len(expired)
+            cleaned_tenants.add(tenant_id)
+            if retained:
+                logger.info("Expired %d cancelled keys for tenant %s; retained key keeps data", len(expired), tenant_id)
                 continue
             await session.execute(delete(LabelLog).where(LabelLog.tenant_id == tenant_id))
             await session.execute(delete(Engine).where(Engine.tenant_id == tenant_id))
             await session.execute(delete(Annotator).where(Annotator.tenant_id == tenant_id))
             await session.execute(delete(Domain).where(Domain.tenant_id == tenant_id))
-            key.is_active = False
-            cleaned_tenants.add(tenant_id)
-            cleaned += 1
-            logger.info("Cleaned up cancelled tenant %s", tenant_id)
+            logger.info("Cleaned up cancelled tenant %s and %d keys", tenant_id, len(expired))
     return cleaned
 
 

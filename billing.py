@@ -180,11 +180,18 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
     if event_type not in {"subscription.created", "subscription.updated", "subscription.canceled"}:
         return {"status": "ok"}
 
+    is_cancellation = (event_type == "subscription.canceled" or
+                       (event_type == "subscription.updated" and payload.get("status") == "canceled"))
+
     subscription_id = payload.get("id")
     if not isinstance(subscription_id, str) or not 0 < len(subscription_id) <= 200:
         raise HTTPException(422, "Missing subscription ID")
 
-    tier = None if event_type == "subscription.canceled" else _product_tier(payload, event_type)
+    # Cancellation is identified by subscription ID; line items are irrelevant.
+    if is_cancellation:
+        tier = None
+    else:
+        tier = _product_tier(payload, event_type)
     event_id = data.get("event_id")
     if not isinstance(event_id, str) or not event_id.strip() or len(event_id) > 200:
         raise HTTPException(422, "Invalid event_id")
@@ -213,11 +220,11 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
         for timestamp in (record.paddle_event_occurred_at, record.cancelled_at):
             if timestamp is not None:
                 stored = timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=timezone.utc)
-                if occurred_at < stored or (occurred_at == stored and event_type != "subscription.canceled"):
+                if occurred_at < stored or (occurred_at == stored and not is_cancellation):
                     return {"status": "ok"}
         record.paddle_event_id = event_id
         record.paddle_event_occurred_at = occurred_at
-        if event_type == "subscription.canceled":
+        if is_cancellation:
             record.cancelled_at = occurred_at
         else:
             if tier is not None:

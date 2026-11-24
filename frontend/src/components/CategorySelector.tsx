@@ -9,9 +9,10 @@ interface Props {
   category: string | null
   previousCategory: string | null
   onSaved: (labelId: string) => Promise<void>
+  onSavingChange: (saving: boolean) => void
 }
 
-export default function CategorySelector({ domainId, labelId, revisionId, category, previousCategory, onSaved }: Props) {
+export default function CategorySelector({ domainId, labelId, revisionId, category, previousCategory, onSaved, onSavingChange }: Props) {
   const [categories, setCategories] = useState<string[]>([])
   const [selected, setSelected] = useState(category ?? '')
   const [custom, setCustom] = useState('')
@@ -26,7 +27,7 @@ export default function CategorySelector({ domainId, labelId, revisionId, catego
   const submit = async () => {
     const next = selected === '__new__' ? custom.trim() : selected.trim()
     if (!next || busy) return
-    setBusy(true); setError(null)
+    setBusy(true); onSavingChange(true); setError(null)
     try {
       const result = await relabelItem(domainId, labelId, { category: next, idempotency_token: revisionId })
       setSaved(true)
@@ -34,7 +35,7 @@ export default function CategorySelector({ domainId, labelId, revisionId, catego
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) await onSaved(labelId)
       setError(String(cause))
-    } finally { setBusy(false) }
+    } finally { onSavingChange(false); setBusy(false) }
   }
   return <div className="stack" style={{ marginTop: 18 }}><h3 className="section-title">Category</h3>
     {previousCategory && <p className="muted"><s>{previousCategory}</s> → {category}</p>}
