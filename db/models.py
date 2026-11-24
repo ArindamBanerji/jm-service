@@ -58,15 +58,19 @@ class LabelLog(Base):
     annotation_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     source_task_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     annotator_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    category: Mapped[str] = mapped_column(String(200), index=True)
+    category: Mapped[str | None] = mapped_column(String(200), index=True, nullable=True)
     factors_json: Mapped[dict] = mapped_column(JSON)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommended_action: Mapped[str] = mapped_column(String(200))
+    recommended_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
     actual_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
     verified_outcome: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
-    confidence: Mapped[float] = mapped_column(Float)
-    scored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    prior_revision_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    revision_actor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    revision_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class Annotator(Base):

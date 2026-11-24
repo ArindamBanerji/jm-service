@@ -1,6 +1,7 @@
 """API tests for the persisted labeling loop."""
 import asyncio
 import hashlib
+import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -9,8 +10,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from fastapi import FastAPI
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from starlette.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -22,8 +24,22 @@ from labeling_router import autonomy_router, router as labeling_router
 
 
 @contextmanager
-def open_client(tmp_path):
-    db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'labels.db').as_posix()}")
+def open_client(tmp_path, keep_schema=False):
+    url = os.getenv("DATABASE_URL")
+    postgres = bool(url and url.startswith("postgresql"))
+    schema = f"labels_{hashlib.sha256(str(tmp_path).encode()).hexdigest()[:24]}"
+    if postgres:
+        assert url is not None
+        admin = create_async_engine(url, poolclass=NullPool)
+        async def make_schema():
+            async with admin.begin() as connection:
+                await connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
+        asyncio.run(make_schema())
+        db_engine = create_async_engine(url, poolclass=NullPool,
+                                        connect_args={"server_settings": {"search_path": schema}})
+    else:
+        admin = None
+        db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'labels.db').as_posix()}")
     async def create_schema():
         async with db_engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
@@ -53,6 +69,14 @@ def open_client(tmp_path):
     with TestClient(app, headers={"X-Api-Key": "test-key"}) as test_client:
         yield test_client
     asyncio.run(db_engine.dispose())
+    if admin is not None and not keep_schema:
+        async def drop_schema():
+            async with admin.begin() as connection:
+                await connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+            await admin.dispose()
+        asyncio.run(drop_schema())
+    elif admin is not None:
+        asyncio.run(admin.dispose())
 
 
 @pytest.fixture
@@ -219,7 +243,7 @@ def test_category_survives_restart(tmp_path):
         assert response.status_code == 200, response.text
         return {row["category"] for row in response.json()["categories"]}
 
-    with open_client(tmp_path) as first:
+    with open_client(tmp_path, keep_schema=True) as first:
         assert ingest(first, category="A", annotator_id="alex").status_code == 200
         assert ingest(first, label_id="L2", category="B", annotator_id="sam").status_code == 200
         assert categories(first) == {"A", "B"}

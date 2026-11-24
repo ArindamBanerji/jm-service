@@ -8,6 +8,7 @@ import FactorBar from '../components/FactorBar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import TierBadge from '../components/TierBadge'
 import TextViewer from '../components/TextViewer'
+import CategorySelector from '../components/CategorySelector'
 
 export default function ReviewCard() {
   const { domainId } = useDomain()
@@ -41,7 +42,7 @@ export default function ReviewCard() {
   }, [domainId, labelId])
   useEffect(() => { void load() }, [load])
   const submit = async (action: string) => {
-    if (!item || !domainId || item.verified_at) return
+    if (!item || !domainId || item.verified_at || item.status !== 'scored') return
     if (domainId !== loadedDomain) { setError('Domain changed. Please reload.'); return }
     if (busy) return
     if (!outcome) { setError('Select the verified ground-truth outcome before reviewing.'); return }
@@ -61,7 +62,7 @@ export default function ReviewCard() {
   }
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (item?.verified_at || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.metaKey || event.ctrlKey) return
+      if (item?.verified_at || item?.status !== 'scored' || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.metaKey || event.ctrlKey) return
       if (event.key.toLowerCase() === 'a') void submit(item?.recommended_action ?? '')
       if (event.key.toLowerCase() === 'o' && override) void submit(override)
       if (event.key.toLowerCase() === 'e') setMessage('Escalation needs a configured backend action. This label remains pending for analyst review.')
@@ -71,10 +72,10 @@ export default function ReviewCard() {
   const alternatives = ['approve', 'reject'].filter(action => action !== item?.recommended_action)
   return <div className="page"><div className="eyebrow">03 / Verification</div><h1>Review label</h1><p className="subtitle">Confirm or correct the recommended action using a known ground-truth outcome.</p>
     <ErrorBanner message={error} />{message && <div className="notice">{message}</div>}{busy && !item && <LoadingSpinner />}
-    {item && loadedDomain === domainId ? <div className="grid-2"><div className="card card-pad"><div className="eyebrow">Label</div><h2 style={{ margin: '10px 0 3px' }}>{item.label_id}</h2><p className="muted">{item.category} · Annotator {item.annotator_id ?? 'unknown'}</p><TextViewer text={item.text} /><hr style={{ border: 0, borderTop: '1px solid #e7ecf2', margin: '22px 0' }} /><h3 className="section-title">Factor signals</h3>{Object.entries(item.factors).map(([factor, value]) => <FactorBar key={factor} factor={factor} value={value} />)}</div>
-      <div className="stack"><div className="card card-pad"><div className="eyebrow">JM recommendation</div><h2 style={{ textTransform: 'capitalize' }}>{item.recommended_action}</h2><ConfidenceIndicator value={item.confidence} /><div className="button-row" style={{ marginTop: 20 }}>{tier && <TierBadge tier={tier.tier} />}<span className="muted">Conservation: {tier?.conservation_reason ?? (tier?.conservation_gate_pass ? 'clear' : 'unknown')}</span></div></div>
-        {item.verified_at ? <div className="card card-pad"><h3 className="section-title">Already reviewed</h3><p className="muted">Verified outcome: {item.verified_outcome ? 'Correct' : 'Incorrect'} · Action: {item.actual_action ?? 'unknown'}</p></div> :
-          <div className="card card-pad"><h3 className="section-title">Your verification</h3><p className="muted">Outcome means whether the label was correct against ground truth. Approval alone does not establish correctness.</p><label className="field">Known outcome<select value={outcome} onChange={event => setOutcome(event.target.value as typeof outcome)}><option value="">Select outcome…</option><option value="correct">Correct</option><option value="incorrect">Incorrect</option></select></label><div className="button-row" style={{ marginTop: 18 }}><button className="button" disabled={busy || !outcome} onClick={() => void submit(item.recommended_action)}>Approve recommendation (A)</button><select className="select" aria-label="Override action" value={override} onChange={event => setOverride(event.target.value)}><option value="">Choose override…</option>{alternatives.map(value => <option key={value}>{value}</option>)}</select><button className="button amber" disabled={busy || !outcome || !override} onClick={() => void submit(override)}>Override (O)</button><button className="button danger" onClick={() => setMessage('Escalation needs a configured backend action. This label remains pending for analyst review.')}>Escalate (E)</button></div></div>}
+    {item && loadedDomain === domainId ? <div className="grid-2"><div className="card card-pad"><div className="eyebrow">Label</div><h2 style={{ margin: '10px 0 3px' }}>{item.label_id}</h2><p className="muted">{item.category ?? 'Pending classification'} · Annotator {item.annotator_id ?? 'unknown'}</p><TextViewer text={item.text} />{item.text !== null && <CategorySelector domainId={domainId} labelId={item.label_id} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={load} />}<hr style={{ border: 0, borderTop: '1px solid #e7ecf2', margin: '22px 0' }} /><h3 className="section-title">Factor signals</h3>{Object.entries(item.factors).map(([factor, value]) => <FactorBar key={factor} factor={factor} value={value} />)}</div>
+      <div className="stack">{item.status === 'scored' && item.confidence !== null && <div className="card card-pad"><div className="eyebrow">JM recommendation</div><h2 style={{ textTransform: 'capitalize' }}>{item.recommended_action}</h2><ConfidenceIndicator value={item.confidence} /><div className="button-row" style={{ marginTop: 20 }}>{tier && <TierBadge tier={tier.tier} />}<span className="muted">Conservation: {tier?.conservation_reason ?? (tier?.conservation_gate_pass ? 'clear' : 'unknown')}</span></div></div>}
+        {item.status !== 'scored' ? <div className="card card-pad"><h3 className="section-title">Pending classification</h3><p className="muted">Choose a category before verification.</p></div> : item.verified_at ? <div className="card card-pad"><h3 className="section-title">Already reviewed</h3><p className="muted">Verified outcome: {item.verified_outcome ? 'Correct' : 'Incorrect'} · Action: {item.actual_action ?? 'unknown'}</p></div> :
+          <div className="card card-pad"><h3 className="section-title">Your verification</h3><p className="muted">Outcome means whether the label was correct against ground truth. Approval alone does not establish correctness.</p><label className="field">Known outcome<select value={outcome} onChange={event => setOutcome(event.target.value as typeof outcome)}><option value="">Select outcome…</option><option value="correct">Correct</option><option value="incorrect">Incorrect</option></select></label><div className="button-row" style={{ marginTop: 18 }}><button className="button" disabled={busy || !outcome || !item.recommended_action} onClick={() => void submit(item.recommended_action ?? '')}>Approve recommendation (A)</button><select className="select" aria-label="Override action" value={override} onChange={event => setOverride(event.target.value)}><option value="">Choose override…</option>{alternatives.map(value => <option key={value}>{value}</option>)}</select><button className="button amber" disabled={busy || !outcome || !override} onClick={() => void submit(override)}>Override (O)</button><button className="button danger" onClick={() => setMessage('Escalation needs a configured backend action. This label remains pending for analyst review.')}>Escalate (E)</button></div></div>}
       </div></div> : !busy && <div className="card card-pad">Label not found. <button className="button secondary" onClick={() => navigate('/queue')}>Back to queue</button></div>}
   </div>
 }

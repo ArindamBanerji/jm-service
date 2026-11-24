@@ -170,7 +170,8 @@ async def overview(request: Request, domain: DashboardDomain, session: Session) 
     total = await session.scalar(select(func.count()).select_from(LabelLog)
                                  .where(LabelLog.domain_id == domain.domain_id,
                                         LabelLog.tenant_id == session.info.get("tenant_id", ""),
-                                        LabelLog.superseded_by.is_(None)))
+                                        LabelLog.superseded_by.is_(None),
+                                        LabelLog.scored_at.is_not(None)))
     return Overview(domain_id=session.info.get("public_domain_id", domain.domain_id), overall_accuracy=curve[-1].accuracy if curve else None,
                     total_verified=curve[-1].verified_count if curve else 0, total_labels=total or 0,
                     categories=list(categories.values()), inversion=_inversion(engine),

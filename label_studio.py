@@ -183,7 +183,7 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
     if not isinstance(tasks, list):
         raise HTTPException(422, detail="tasks must be a list")
     await _ensure_domain(session, config)
-    predictions = []
+    predictions: list[dict[str, Any]] = []
     for task in tasks:
         label_id, category, factors = _task_values(task, config)
         annotator_id = str(task.get("annotator_id")) if task.get("annotator_id") is not None else None
@@ -191,6 +191,8 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
             LabelLog.label_id == label_id))
         if existing is not None:
+            if existing.scored_at is None or existing.confidence is None:
+                raise HTTPException(409, detail=f"Task {label_id} is awaiting classification")
             if existing.category != category or existing.factors_json != factors or (
                     annotator_id is not None and existing.annotator_id != annotator_id):
                 raise HTTPException(409, detail=f"Task {label_id} changed after scoring")

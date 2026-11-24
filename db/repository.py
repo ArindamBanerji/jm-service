@@ -202,6 +202,7 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     if old_row.tenant_id != _tenant(session) or old_row.domain_id != domain_id:
         raise HTTPException(status_code=404, detail="Label not found")
     label_id = f"revision:{uuid4().hex}"
+    assert old_row.category is not None
     engine = await load_or_create_engine(session, domain_id, annotator_id)
     scored = await score_and_persist(session, engine, domain_id, label_id, annotator_id,
                                      old_row.category, old_row.factors_json)

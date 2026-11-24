@@ -55,13 +55,21 @@ export interface PendingLabel extends IngestItem {
   confidence: number
   text_preview: string | null
 }
-export interface LabelDetail extends Omit<PendingLabel, 'text_preview'> {
+export interface LabelDetail extends Omit<PendingLabel, 'text_preview' | 'category' | 'confidence' | 'recommended_action'> {
   domain_id: string
+  category: string | null
+  confidence: number | null
+  recommended_action: string | null
   text: string | null
   actual_action: string | null
   verified_outcome: boolean | null
   verified_at: string | null
+  revision_id: string
+  previous_category: string | null
+  status: 'pending_classification' | 'scored'
 }
+export interface TextTaskResponse { label_id: string; status: 'pending_classification' | 'scored'; category: string | null }
+export interface RelabelResponse { label_id: string; category: string; revision_id: string; previous_category: string | null }
 export type PendingResponse = PendingLabel[]
 export interface Inversion { trusted_factor: string; actual_signal_factor: string; interpretation: string }
 export interface OverviewResponse {
@@ -192,6 +200,8 @@ export const getPendingPage = async (domainId: string, options: PendingOptions):
   return { rows, total }
 }
 export const getLabelDetail = (domainId: string, labelId: string) => request<LabelDetail>(`/labels/${id(domainId)}/${id(labelId)}`)
+export const createTextTask = (domainId: string, body: { label_id: string; text: string; category?: string }) => request<TextTaskResponse>(`/labels/${id(domainId)}/tasks`, json(body))
+export const relabelItem = (domainId: string, labelId: string, body: { category: string; idempotency_token: string }) => request<RelabelResponse>(`/labels/${id(domainId)}/items/${id(labelId)}/relabel`, json(body))
 export const getOverview = (domainId: string) => request<OverviewResponse>(`/dashboard/${id(domainId)}/overview`)
 export const getCorrections = (domainId: string) => request<CorrectionsResponse>(`/dashboard/${id(domainId)}/corrections`)
 export const getAnnotators = (domainId: string, limit = 50) => request<AnnotatorsResponse>(`/dashboard/${id(domainId)}/annotators${params({ limit })}`)

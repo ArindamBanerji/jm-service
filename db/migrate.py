@@ -37,6 +37,42 @@ async def migrate() -> None:
                                     f"ALTER TABLE label_log ADD COLUMN {column} VARCHAR(200)"))
                         if "text" not in names:
                             sync_connection.execute(text("ALTER TABLE label_log ADD COLUMN text TEXT"))
+                        for column, definition in {
+                            "prior_revision_id": "VARCHAR(200)", "revision_actor": "VARCHAR(200)",
+                            "revision_at": "TIMESTAMP", "idempotency_token": "VARCHAR(200)",
+                        }.items():
+                            if column not in names:
+                                sync_connection.execute(text(f"ALTER TABLE label_log ADD COLUMN {column} {definition}"))
+                        if sync_connection.dialect.name == "postgresql":
+                            for column in ("category", "recommended_action", "confidence", "scored_at"):
+                                sync_connection.execute(text(f"ALTER TABLE label_log ALTER COLUMN {column} DROP NOT NULL"))
+                        elif any(column["name"] in {"category", "recommended_action", "confidence", "scored_at"}
+                                 and not column["nullable"] for column in inspector.get_columns("label_log")):
+                            sync_connection.execute(text("""CREATE TABLE label_log_new (
+                                id CHAR(32) PRIMARY KEY, domain_id VARCHAR(200) NOT NULL REFERENCES domains(domain_id),
+                                tenant_id VARCHAR(200) NOT NULL DEFAULT '', superseded_by VARCHAR(200),
+                                label_id VARCHAR(200) NOT NULL, annotation_id VARCHAR(200), source_task_id VARCHAR(200),
+                                annotator_id VARCHAR(200), category VARCHAR(200), factors_json JSON NOT NULL,
+                                text TEXT, recommended_action VARCHAR(200), actual_action VARCHAR(200),
+                                verified_outcome BOOLEAN, confidence FLOAT, scored_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                verified_at DATETIME, prior_revision_id VARCHAR(200), revision_actor VARCHAR(200),
+                                revision_at DATETIME, idempotency_token VARCHAR(200),
+                                CONSTRAINT uq_label_log_domain_label UNIQUE (domain_id, label_id))"""))
+                            columns = ("id domain_id tenant_id superseded_by label_id annotation_id source_task_id "
+                                       "annotator_id category factors_json text recommended_action actual_action "
+                                       "verified_outcome confidence scored_at verified_at prior_revision_id "
+                                       "revision_actor revision_at idempotency_token").split()
+                            selected = ", ".join(columns)
+                            sync_connection.execute(text(
+                                f"INSERT INTO label_log_new ({selected}) SELECT {selected} FROM label_log"))
+                            sync_connection.execute(text("DROP TABLE label_log"))
+                            sync_connection.execute(text("ALTER TABLE label_log_new RENAME TO label_log"))
+                            for statement in (
+                                "CREATE INDEX ix_label_log_domain_id ON label_log (domain_id)",
+                                "CREATE INDEX ix_label_log_category ON label_log (category)",
+                                "CREATE INDEX ix_label_log_domain_category_verified ON label_log (domain_id, category, verified_at)",
+                            ):
+                                sync_connection.execute(text(statement))
                     sync_connection.execute(text(
                         f"CREATE INDEX IF NOT EXISTS ix_{table}_tenant_id ON {table} (tenant_id)"))
                 if inspector.has_table("api_keys"):

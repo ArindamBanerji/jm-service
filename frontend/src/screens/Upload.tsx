@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
-import { hasApiKey, ingestBatch, seedSample, uploadForAnalysis, type HealthReport } from '../api'
+import { createTextTask, hasApiKey, ingestBatch, seedSample, uploadForAnalysis, type HealthReport } from '../api'
 import { parseIngestCsv } from '../csv'
 import { useDomain } from '../domain'
 import CsvDropzone from '../components/CsvDropzone'
@@ -18,6 +18,17 @@ export default function Upload() {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState(0)
   const [sample, setSample] = useState(false)
+  const [taskId, setTaskId] = useState('')
+  const [taskText, setTaskText] = useState('')
+  const [taskCategory, setTaskCategory] = useState('')
+  const createTask = async () => {
+    if (!domainId || !taskId.trim() || !taskText) { setError('Enter a domain, label ID and source text.'); return }
+    setBusy(true); setError(null)
+    try {
+      await createTextTask(domainId, { label_id: taskId.trim(), text: taskText, category: taskCategory.trim() || undefined })
+      navigate(`/review/${encodeURIComponent(taskId.trim())}`)
+    } catch (cause) { setError(String(cause)) } finally { setBusy(false) }
+  }
   const analyze = async (next: File, isSample = false) => {
     setSample(isSample); setFile(next); setReport(null); setError(null); setBusy(true); setProgress(0)
     try { setReport(await uploadForAnalysis(next)) } catch (cause) { setError(String(cause)) } finally { setBusy(false) }
@@ -72,5 +83,11 @@ export default function Upload() {
         <p className="muted">{sample ? 'Scoring uses 12 labels of your plan quota and requires a labeling API key. The report shows synthetic historical outcomes; live labels remain pending until you verify them.' : 'Scoring creates pending review items in batches of 100. Verification outcomes in this CSV are used for the report; they are not imported into live training.'}</p>
       </div>}
     </div>
+    <section className="card card-pad" style={{ marginTop: 18 }}><h2 className="section-title">Create a text task</h2><p className="muted">Add source text for the active domain. Leave category blank to classify it in review, or enter a category to score it now.</p>
+      <label className="field">Label ID<input value={taskId} onChange={event => setTaskId(event.target.value)} /></label>
+      <label className="field">Source text<textarea value={taskText} onChange={event => setTaskText(event.target.value)} rows={5} /></label>
+      <label className="field">Category (optional)<input value={taskCategory} onChange={event => setTaskCategory(event.target.value)} /></label>
+      <button className="button" onClick={() => void createTask()} disabled={busy || !hasApiKey()}>Create text task</button>
+    </section>
   </div>
 }

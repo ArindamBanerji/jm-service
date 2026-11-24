@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 import json
 from math import isfinite
 from pathlib import Path
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select, text
+from sqlalchemy import func, null, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
@@ -107,6 +109,42 @@ class IngestBatchRequest(BaseModel):
 class IngestBatchResponse(BaseModel):
     results: list[IngestResponse]
     batch_size: int
+
+
+class TextTaskRequest(BaseModel):
+    label_id: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1)
+    category: str | None = None
+
+    @field_validator("text")
+    @classmethod
+    def bounded_text(cls, value: str) -> str:
+        try:
+            size = len(value.encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise ValueError("text must be valid UTF-8") from exc
+        if size > 32 * 1024:
+            raise ValueError("text must be at most 32 KiB UTF-8")
+        return value
+
+    @field_validator("label_id", "category")
+    @classmethod
+    def valid_name(cls, value: str | None) -> str | None:
+        if value is not None and (not value.strip() or "|" in value):
+            raise ValueError("Identifiers must be nonempty and cannot contain |")
+        return value
+
+
+class RelabelRequest(BaseModel):
+    category: str = Field(min_length=1, max_length=200)
+    idempotency_token: str = Field(min_length=1, max_length=200)
+
+    @field_validator("category")
+    @classmethod
+    def valid_category(cls, value: str) -> str:
+        if not value.strip() or "|" in value:
+            raise ValueError("Invalid category")
+        return value
 
 
 SAMPLE_DOMAIN = "medical-ner-demo-v1"
@@ -245,6 +283,10 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
                                                      LabelLog.label_id == request.label_id).with_for_update())
     if row is None:
         raise HTTPException(status_code=404, detail="Label not found")
+    if row.scored_at is None:
+        raise HTTPException(status_code=409, detail="Task needs a category before verification")
+    if row.superseded_by is not None:
+        raise HTTPException(status_code=409, detail="Label revision is stale")
     if row.verified_at is not None:
         raise HTTPException(status_code=409, detail="Label already verified")
     if request.annotator_id is not None:
@@ -256,6 +298,7 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
         engine = await repository.load_or_create_engine(session, domain_id, row.annotator_id)
     if request.actual_action not in engine.config.actions:
         raise HTTPException(status_code=422, detail="Unknown actual_action")
+    assert row.category is not None
     try:
         result = await repository.verify_and_learn(
             session, engine, domain_id, request.label_id,
@@ -331,6 +374,93 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
             "existing": len(existing_ids), "pending": len(pending_ids)}
 
 
+@router.post("/{domain_id}/tasks", status_code=201)
+async def create_text_task(domain_id: str, request: TextTaskRequest,
+                           session: Session, tenant: Tenant) -> dict[str, str | None]:
+    scoped = scoped_domain_id(tenant, domain_id)
+    if await session.scalar(select(LabelLog.id).where(
+            LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+            LabelLog.label_id == request.label_id)) is not None:
+        raise HTTPException(409, detail="Label already exists")
+    if request.category is not None:
+        domain = await repository.get_domain(session, scoped)
+        config = DomainConfig.from_dict(domain.config_json) if domain else None
+        factors = {name: 0.5 for name in (config.factors if config else
+                   ["model_confidence", "item_difficulty"])}
+        item = IngestItem(label_id=request.label_id, category=request.category,
+                          factors=factors, text=request.text)
+        try:
+            await _ingest(session, scoped, item, domain_id)
+        except IntegrityError as exc:
+            raise HTTPException(409, detail="Label already exists") from exc
+        return {"label_id": request.label_id, "status": "scored", "category": request.category}
+    domain = await repository.get_domain(session, scoped)
+    if domain is None:
+        config = DomainConfig(scoped, scoped, ["model_confidence", "item_difficulty"],
+                              [], ["approve", "reject"])
+        await repository.create_domain(session, scoped, scoped, config, public_domain_id=domain_id)
+    elif domain.public_domain_id is None:
+        domain.public_domain_id = domain_id
+    session.add(LabelLog(domain_id=scoped, tenant_id=tenant, label_id=request.label_id,
+                         category=None, factors_json={}, text=request.text,
+                         recommended_action=None, confidence=None, scored_at=null()))
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(409, detail="Label already exists") from exc
+    return {"label_id": request.label_id, "status": "pending_classification", "category": None}
+
+
+@router.post("/{domain_id}/items/{label_id}/relabel")
+async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
+                       session: Session, tenant: Tenant) -> dict[str, str | None]:
+    scoped = scoped_domain_id(tenant, domain_id)
+    original = await session.scalar(select(LabelLog).where(
+        LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+        LabelLog.label_id == label_id).with_for_update())
+    if original is None:
+        raise HTTPException(404, detail="Label not found")
+    if original.superseded_by is not None or request.idempotency_token != str(original.id):
+        raise HTTPException(409, detail="Stale label revision")
+    prior_category = original.category
+    successor_label_id = f"revision:{uuid4().hex}"
+    now = datetime.now(timezone.utc)
+    if original.scored_at is None:
+        domain = await repository.get_domain(session, scoped)
+        assert domain is not None
+        config = DomainConfig.from_dict(domain.config_json)
+        factors = {name: 0.5 for name in config.factors}
+        item = IngestItem(label_id=successor_label_id, category=request.category,
+                          factors=factors, text=original.text)
+        try:
+            await _ingest(session, scoped, item, domain_id)
+        except StaleDataError as exc:
+            raise HTTPException(409, detail="Engine state changed; retry") from exc
+        successor = await session.scalar(select(LabelLog).where(
+            LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
+            LabelLog.label_id == successor_label_id))
+        assert successor is not None
+    else:
+        successor = LabelLog(
+            domain_id=scoped, tenant_id=tenant, label_id=successor_label_id,
+            category=request.category, factors_json=original.factors_json,
+            text=original.text, annotator_id=original.annotator_id,
+            recommended_action=original.recommended_action, confidence=original.confidence,
+            scored_at=original.scored_at, actual_action=original.actual_action,
+            verified_outcome=original.verified_outcome, verified_at=original.verified_at,
+            annotation_id=original.annotation_id)
+        session.add(successor)
+    successor.source_task_id = original.source_task_id or original.label_id
+    successor.prior_revision_id = str(original.id)
+    successor.revision_actor = tenant
+    successor.revision_at = now
+    successor.idempotency_token = request.idempotency_token
+    original.superseded_by = successor_label_id
+    await session.flush()
+    return {"label_id": label_id, "category": request.category,
+            "revision_id": str(successor.id), "previous_category": prior_category}
+
+
 @router.get("/{domain_id}/pending")
 @limiter.limit("60/minute")
 async def pending(request: Request, domain_id: str, response: Response, session: Session, tenant: Tenant,
@@ -342,7 +472,8 @@ async def pending(request: Request, domain_id: str, response: Response, session:
     if await repository.get_domain(session, domain_id) is None:
         raise HTTPException(status_code=404, detail="Domain not found")
     filters = [LabelLog.domain_id == domain_id, LabelLog.tenant_id == tenant,
-               LabelLog.verified_at.is_(None)]
+               LabelLog.verified_at.is_(None), LabelLog.scored_at.is_not(None),
+               LabelLog.superseded_by.is_(None)]
     if category is not None:
         filters.append(LabelLog.category == category)
     total = await session.scalar(select(func.count()).select_from(LabelLog).where(*filters))
@@ -372,12 +503,23 @@ async def label_detail(request: Request, domain_id: str, label_id: str,
         LabelLog.tenant_id == tenant, LabelLog.label_id == label_id))
     if row is None:
         raise HTTPException(404, detail="Label not found")
+    previous_category = None
+    while row.superseded_by is not None:
+        previous_category = row.category
+        successor = await session.scalar(select(LabelLog).where(
+            LabelLog.domain_id == scoped_domain_id(tenant, domain_id),
+            LabelLog.tenant_id == tenant, LabelLog.label_id == row.superseded_by))
+        if successor is None:
+            break
+        row = successor
     return {"domain_id": domain_id, "label_id": row.label_id, "category": row.category,
             "annotator_id": row.annotator_id, "factors": row.factors_json,
             "recommended_action": row.recommended_action, "confidence": row.confidence,
             "text": row.text, "actual_action": row.actual_action,
             "verified_outcome": row.verified_outcome,
-            "verified_at": row.verified_at.isoformat() if row.verified_at else None}
+            "verified_at": row.verified_at.isoformat() if row.verified_at else None,
+            "revision_id": str(row.id), "previous_category": previous_category,
+            "status": "pending_classification" if row.scored_at is None else "scored"}
 
 
 @autonomy_router.get("/{domain_id}/autonomy")
@@ -397,6 +539,7 @@ async def domain_autonomy(request: Request, domain_id: str, session: Session, te
     statuses = evaluate_domain(engine, stats)
     rank = {AutonomyTier.RED: 0, AutonomyTier.AMBER: 1,
             AutonomyTier.GREEN: 2, AutonomyTier.AUTONOMOUS: 3}
-    overall = min((status.tier for status in statuses.values()), key=rank.__getitem__)
+    overall = min((status.tier for status in statuses.values()), key=rank.__getitem__,
+                  default=AutonomyTier.RED)
     return {"domain_id": public_domain_id, "categories": [asdict(status) for status in statuses.values()],
             "overall_tier": overall.value}

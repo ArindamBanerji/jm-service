@@ -23,16 +23,35 @@ async def test_old_schema_migration_repeats(tmp_path, monkeypatch):
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(sql_text("ALTER TABLE label_log DROP COLUMN text"))
+        await connection.execute(sql_text("DROP TABLE label_log"))
+        await connection.execute(sql_text("""CREATE TABLE label_log (
+            id CHAR(32) PRIMARY KEY, domain_id VARCHAR(200) NOT NULL,
+            tenant_id VARCHAR(200) NOT NULL DEFAULT '', superseded_by VARCHAR(200),
+            label_id VARCHAR(200) NOT NULL, annotation_id VARCHAR(200), source_task_id VARCHAR(200),
+            annotator_id VARCHAR(200), category VARCHAR(200) NOT NULL, factors_json JSON NOT NULL,
+            recommended_action VARCHAR(200) NOT NULL, actual_action VARCHAR(200),
+            verified_outcome BOOLEAN, confidence FLOAT NOT NULL,
+            scored_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, verified_at DATETIME,
+            UNIQUE(domain_id, label_id))"""))
+        await connection.execute(sql_text("""INSERT INTO domains
+            (id, domain_id, tenant_id, domain_name, config_json)
+            VALUES ('00000000000000000000000000000001', 'old', '', 'old', '{}')"""))
+        await connection.execute(sql_text("""INSERT INTO label_log
+            (id, domain_id, label_id, category, factors_json, recommended_action, confidence)
+            VALUES ('00000000000000000000000000000002', 'old', 'legacy', 'NER', '{}', 'approve', 0.5)"""))
     await engine.dispose()
     for _ in range(2):
         monkeypatch.setattr(migration, "engine", create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}"))
         await migration.migrate()
     check = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")
     async with check.begin() as connection:
-        columns = await connection.run_sync(lambda sync: [c["name"] for c in inspect(sync).get_columns("label_log")])
+        columns = await connection.run_sync(lambda sync: inspect(sync).get_columns("label_log"))
+        legacy = (await connection.execute(sql_text("SELECT category, confidence FROM label_log WHERE label_id = 'legacy'"))).one()
     await check.dispose()
-    assert columns.count("text") == 1
+    assert [column["name"] for column in columns].count("text") == 1
+    assert all(column["nullable"] for column in columns if column["name"] in
+               {"category", "recommended_action", "confidence", "scored_at"})
+    assert legacy == ("NER", 0.5)
 
 
 def test_legacy_ingest_has_null_text(client):
