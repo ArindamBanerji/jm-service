@@ -447,3 +447,16 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Tests: 277 passed in the collectable suite. Literal repo-wide pytest still exits during collection from three pre-existing live-Docker scripts without a running HTTP server; those scripts were excluded for the passing run.
 - mypy: clean on billing.py, scheduler.py, db/models.py, db/migrate.py, jm_service.py, test_billing.py, and test_scheduler.py.
 - Final check: StaticFiles remains the last mount; checkout-url has require_tenant; webhook has no rate limiting decorator; frozen jm_core.py SHA-256 remains 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
+
+## DLJ Annotation UI Design v2 (DLJ-DESIGN-V2)
+- Date: 2026-11-24
+- Files created: docs/design/dlj_annotation_ui_design_v2.md. The v1 input was located in the sibling copilot-sdk repository.
+- Files unchanged: all source code (design-only prompt).
+- Current test count: 277 collected with the three standalone live-Docker clients excluded. Unfiltered collection exits after a partial 72. Collection and mypy were run; no new test-pass claim.
+- Current-state corrections: confirmed six screens/239 LOC and hash routes; distinguished a disabled status filter, informational escalation, first-200 review lookup, limited profile expansion, local key storage, report PDF and engine-state export.
+- Added verified component inventory, package ranges, all 32 application operations with auth/rates, and complete column lists for the five ORM models. Distinguished legacy SQLite registration/domains from authenticated DLJ labeling and billing.
+- Qualified competitive comparisons using primary sources and separated cumulative verified correctness from measured model improvement.
+- Filled design gaps: anonymous vs persistent CSV parsing, text storage/detail/retrieval, tenant scope, additive migrations and rollback, versioned edits, Unicode NER offsets and React peer compatibility, 500-row synthetic report and quota-aware 12-label sample, settings/key usage, public domain-name recovery and Paddle confirmation.
+- Updated four phases, scope boundaries, effort and test budgets. Added §10 with executable Phase A specs, Phase B outlines, dependencies, risk mitigations, integration checks and verification commands.
+- Execution plan: 4 Phase A prompts (DLJ-A1 through DLJ-A4); sequential pytest targets 282, 290, 296 and 300. Mandatory check matched documented operations to OpenAPI plus hidden legal routes and every model column to SQLAlchemy metadata. Mypy clean on jm_service.py and db/models.py.
+- Next: DLJ-A1 (Sample Data + Demo Mode).
