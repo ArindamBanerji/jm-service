@@ -41,6 +41,7 @@ export default function App() {
       activeKey.current = next
       window.dispatchEvent(new Event('dlj-account-changing'))
       sessionStorage.removeItem('dlj-checkout-pending')
+      sessionStorage.removeItem('dlj-deferred-registration')
       if (location.pathname === '/signup') {
         setApiKey(next); updateDomain(''); localStorage.removeItem('rgi-domain')
         return

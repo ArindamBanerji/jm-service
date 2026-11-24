@@ -8,11 +8,12 @@ interface Props {
   revisionId: string
   category: string | null
   previousCategory: string | null
+  disabled?: boolean
   onSaved: (labelId: string) => Promise<void>
-  onSavingChange: (saving: boolean) => void
+  onSavingChange: (saving: boolean) => boolean | void
 }
 
-export default function CategorySelector({ domainId, labelId, revisionId, category, previousCategory, onSaved, onSavingChange }: Props) {
+export default function CategorySelector({ domainId, labelId, revisionId, category, previousCategory, disabled = false, onSaved, onSavingChange }: Props) {
   const [categories, setCategories] = useState<string[]>([])
   const [selected, setSelected] = useState(category ?? '')
   const [custom, setCustom] = useState('')
@@ -26,8 +27,9 @@ export default function CategorySelector({ domainId, labelId, revisionId, catego
   }, [domainId, labelId, revisionId, category])
   const submit = async () => {
     const next = selected === '__new__' ? custom.trim() : selected.trim()
-    if (!next || busy) return
-    setBusy(true); onSavingChange(true); setError(null)
+    if (!next || busy || disabled) return
+    if (onSavingChange(true) === false) return
+    setBusy(true); setError(null)
     try {
       const result = await relabelItem(domainId, labelId, { category: next, idempotency_token: revisionId })
       setSaved(true)
@@ -39,12 +41,12 @@ export default function CategorySelector({ domainId, labelId, revisionId, catego
   }
   return <div className="stack" style={{ marginTop: 18 }}><h3 className="section-title">Category</h3>
     {previousCategory && <p className="muted"><s>{previousCategory}</s> → {category}</p>}
-    <label className="field">Choose category<select value={selected} onChange={event => setSelected(event.target.value)} disabled={busy || saved}>
+    <label className="field">Choose category<select value={selected} onChange={event => setSelected(event.target.value)} disabled={busy || saved || disabled}>
       <option value="">Select a category…</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}
       <option value="__new__">New category…</option>
     </select></label>
-    {selected === '__new__' && <label className="field">New category name<input value={custom} onChange={event => setCustom(event.target.value)} disabled={busy || saved} /></label>}
-    <button className="button secondary" onClick={() => void submit()} disabled={busy || saved || !selected || (selected === '__new__' && !custom.trim()) || (selected === category)}>{category ? 'Relabel' : 'Classify and score'}</button>
+    {selected === '__new__' && <label className="field">New category name<input value={custom} onChange={event => setCustom(event.target.value)} disabled={busy || saved || disabled} /></label>}
+    <button className="button secondary" onClick={() => void submit()} disabled={busy || saved || disabled || !selected || (selected === '__new__' && !custom.trim()) || (selected === category)}>{category ? 'Relabel' : 'Classify and score'}</button>
     {saved && <p className="success">Category saved.</p>}<ErrorBanner message={error} />
   </div>
 }

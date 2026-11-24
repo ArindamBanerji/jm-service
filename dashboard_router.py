@@ -34,7 +34,7 @@ async def require_domain(domain_id: str, session: Session, tenant: Tenant) -> Do
 
 DashboardDomain = Annotated[Domain, Depends(require_domain)]
 verified = and_(LabelLog.verified_at.is_not(None), LabelLog.verified_outcome.is_not(None),
-                LabelLog.superseded_by.is_(None))
+                repository.active_verified_evidence())
 
 
 class Inversion(BaseModel):

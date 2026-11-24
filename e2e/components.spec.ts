@@ -236,8 +236,9 @@ test('bulk page selection and approval send exact IDs', async ({ page }) => {
   await page.getByRole('checkbox', { name: 'Select all on this page' }).check()
   await expect(page.getByRole('region', { name: 'Bulk review actions' })).toContainText('3 selected')
   const response = page.waitForResponse(r => r.url().endsWith('/v1/labels/alpha/bulk-verify'))
+  await page.getByRole('combobox', { name: 'Bulk known outcome' }).selectOption('correct')
   await page.getByRole('button', { name: 'Approve All' }).click(); await response
-  expect(state.posts.at(-1)?.body).toEqual({ label_ids: ['L001', 'L002', 'L003'], action: 'approve' })
+  expect(state.posts.at(-1)?.body).toEqual({ label_ids: ['L001', 'L002', 'L003'], action: 'approve', outcome: true })
   await expect(page.getByRole('region', { name: 'Bulk review actions' })).toHaveCount(0)
   expect(state.errors).toEqual([])
 })

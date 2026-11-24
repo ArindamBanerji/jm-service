@@ -779,3 +779,15 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Changes: (1) Wave 4 includes a joint 04+05 integration day, bringing the schedule to 29 working days. (2) Pre-existing fix credit covers 19 launch-blocking P1s and 2 previously closed P1 regressions (R44 and R18), 21 IDs in total.
 - Effort adjustment: 38 → 37 engineer-days (3 saved through test reuse, 2 added for both engineers on integration day).
 - File modified: docs/design/dlj_arch_redesign_v2.md
+
+## DLJ-FIX-R4 — Round 4 Combined Fixes
+
+- Date: 2026-11-24
+- FE fixes: bulk outcome field and explicit selection, signup request identity, shared review mutation lock, null usage counters, deferred credential cleanup
+- BE fixes: R13, R45, R03, R09 partials completed; stalled upload timeout and admission release
+- Files modified: frontend/src/api.ts, App.tsx, screens/Signup.tsx, ReviewCard.tsx, Settings.tsx, ScoredQueue.tsx, components/CategorySelector.tsx; labeling_router.py, dashboard_router.py, db/repository.py, label_health/api.py; existing Playwright expectations and test_sweep3_fixes.py
+- Files created: test_round4_fixes.py, e2e/fix_round4.spec.ts, docs/quality/dlj_fix_round4_code_audit.md
+- PW: 118 passed, 0 failures (including both previously failing bulk payload assertions)
+- pytest: 432 passed, 1 skipped; round 4 tests 10 passed on SQLite and 10 on PostgreSQL
+- mypy: clean
+- Frontend build and TypeScript checks: passed

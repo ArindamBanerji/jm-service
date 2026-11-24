@@ -4,7 +4,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import csv
-from typing import Any
+from typing import Any, MutableMapping
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -15,6 +15,8 @@ from label_health.render import render_html_report, render_pdf
 
 router = APIRouter(prefix="/v1/label-health", tags=["Label Health Report"])
 _MAX_BYTES = 10 * 1024 * 1024
+_MAX_REQUEST_BYTES = _MAX_BYTES + 64 * 1024
+_UPLOAD_TIMEOUT = 30
 _executor = ThreadPoolExecutor(max_workers=2)
 _slots = asyncio.Semaphore(2)
 _TIMEOUT = 60
@@ -43,7 +45,8 @@ def _run_sync(data: bytes, output: str) -> Any:
     return render_pdf(html) if output == "pdf" else html
 
 
-async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False) -> Any:
+async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False,
+                   intake_deadline: float | None = None) -> Any:
     if not slot_acquired:
         if _slots.locked():
             raise HTTPException(status_code=503, detail="Report workers are busy")
@@ -51,7 +54,16 @@ async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False
     try:
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=422, detail=["Upload a CSV file"])
-        data = await file.read(_MAX_BYTES + 1)
+        if intake_deadline is None:
+            data = await file.read(_MAX_BYTES + 1)
+        else:
+            remaining = intake_deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise HTTPException(status_code=408, detail="Upload timed out")
+            try:
+                data = await asyncio.wait_for(file.read(_MAX_BYTES + 1), timeout=remaining)
+            except TimeoutError as exc:
+                raise HTTPException(status_code=408, detail="Upload timed out") from exc
         if len(data) > _MAX_BYTES:
             raise HTTPException(status_code=413, detail="CSV exceeds 10 MiB")
         loop = asyncio.get_running_loop()
@@ -71,11 +83,34 @@ async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False
 
 async def _analyze_request(request: Request, output: str) -> Any:
     """Reserve a worker slot before Starlette parses the multipart body."""
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _MAX_REQUEST_BYTES:
+                raise HTTPException(status_code=413, detail="Upload exceeds 10 MiB")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid Content-Length") from exc
     if _slots.locked():
         raise HTTPException(status_code=503, detail="Report workers are busy")
     await _slots.acquire()
+    deadline = asyncio.get_running_loop().time() + _UPLOAD_TIMEOUT
+    received = 0
+
+    async def limited_receive() -> MutableMapping[str, Any]:
+        nonlocal received
+        message = await request.receive()
+        if message["type"] == "http.request":
+            received += len(message.get("body", b""))
+            if received > _MAX_REQUEST_BYTES:
+                raise HTTPException(status_code=413, detail="Upload exceeds 10 MiB")
+        return message
+
+    bounded_request: Request = Request(request.scope, receive=limited_receive)
     try:
-        form = await request.form()
+        try:
+            form = await asyncio.wait_for(bounded_request.form(), timeout=max(0, deadline - asyncio.get_running_loop().time()))
+        except TimeoutError as exc:
+            raise HTTPException(status_code=408, detail="Upload timed out") from exc
         file = form.get("file")
         if not isinstance(file, UploadFile):
             raise HTTPException(status_code=422, detail=["Upload a CSV file"])
@@ -83,7 +118,7 @@ async def _analyze_request(request: Request, output: str) -> Any:
         _slots.release()
         raise
     try:
-        return await _analyze(file, output, slot_acquired=True)
+        return await _analyze(file, output, slot_acquired=True, intake_deadline=deadline)
     finally:
         await form.close()
 

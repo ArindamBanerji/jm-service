@@ -293,7 +293,7 @@ async def _category_stats(session: AsyncSession, domain_id: str,
     rows = (await session.scalars(
         select(LabelLog).where(LabelLog.domain_id == domain_id,
                                LabelLog.tenant_id == session.info.get("tenant_id", ""),
-                               LabelLog.superseded_by.is_(None),
+                               repository.active_verified_evidence(),
                                LabelLog.verified_at.is_not(None),
                                LabelLog.verified_outcome.is_not(None))
         .order_by(LabelLog.verified_at, LabelLog.scored_at, LabelLog.id)
@@ -643,7 +643,12 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
     current_tags = current_content.tags_json if current_content is not None else []
     next_spans = edited_spans if edited_spans is not None else current_spans
     next_tags = request.tags if request.tags is not None else current_tags
-    if request.category == original.category and next_spans == current_spans and next_tags == current_tags:
+    content_type_changed = ((request.spans is not None and
+                             (current_content is None or current_content.content_type != "text_ner")) or
+                            (request.tags is not None and
+                             (current_content is None or current_content.content_type != "text_multilabel")))
+    if (not content_type_changed and request.category == original.category and next_spans == current_spans
+            and set(next_tags) == set(current_tags)):
         raise HTTPException(409, detail="No change detected.")
     prior_category = original.category
     successor_label_id = f"revision:{uuid4().hex}"

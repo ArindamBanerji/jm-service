@@ -153,7 +153,7 @@ def test_connector_verify_syncs_missing_category_centroid(client, monkeypatch, r
     assert "NER|approve" in asyncio.run(read_centroids())
 
 
-def correction_with_content(client, monkeypatch, content_type, spans, tags):
+def correction_with_content(client, monkeypatch, content_type, spans, tags, image_url=None):
     monkeypatch.setenv("LABEL_STUDIO_DOMAIN_ID", "ls-demo")
     first = client.post("/v1/label-studio/webhook", headers={"X-LS-Token": "test-token"},
                         json=connector_event())
@@ -163,7 +163,7 @@ def correction_with_content(client, monkeypatch, content_type, spans, tags):
             original = await session.scalar(select(LabelLog).where(LabelLog.source_task_id == "1"))
             assert original is not None
             original.text = "John Smith"
-            await repository.record_label_content(session, original.id, content_type, spans, tags, None)
+            await repository.record_label_content(session, original.id, content_type, spans, tags, image_url)
     asyncio.run(attach())
     changed = connector_event(action="ANNOTATION_UPDATED", actual="reject", truth="reject")
     response = client.post("/v1/label-studio/webhook", headers={"X-LS-Token": "test-token"}, json=changed)

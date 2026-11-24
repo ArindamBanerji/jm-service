@@ -5,13 +5,22 @@ import ErrorBanner from '../components/ErrorBanner'
 
 const deferredKey = 'dlj-deferred-registration'
 const readDeferred = (): RegistrationResponse | null => {
-  try { return JSON.parse(sessionStorage.getItem(deferredKey) ?? 'null') as RegistrationResponse | null }
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(deferredKey) ?? 'null') as
+      { result?: RegistrationResponse; startingKey?: string | null } | null
+    if (!stored?.result || stored.startingKey !== localStorage.getItem('rgi-api-key')) {
+      sessionStorage.removeItem(deferredKey)
+      return null
+    }
+    return stored.result
+  }
   catch { return null }
 }
 
 export default function Signup() {
   const navigate = useNavigate()
   const mounted = useRef(false)
+  const registrationEpoch = useRef(0)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [key, setKey] = useState(() => readDeferred()?.api_key ?? '')
@@ -25,8 +34,22 @@ export default function Signup() {
       const result = readDeferred()
       if (result) { setKey(result.api_key); setDeferred(true) }
     }
+    const onKeyChange = () => {
+      registrationEpoch.current += 1
+      sessionStorage.removeItem(deferredKey)
+      setDeferred(false)
+      setCopied(false)
+      setKey('')
+      setBusy(false)
+    }
     window.addEventListener('dlj-registration-deferred', showDeferred)
-    return () => { mounted.current = false; window.removeEventListener('dlj-registration-deferred', showDeferred) }
+    window.addEventListener('dlj-account-changing', onKeyChange)
+    return () => {
+      mounted.current = false
+      registrationEpoch.current += 1
+      window.removeEventListener('dlj-registration-deferred', showDeferred)
+      window.removeEventListener('dlj-account-changing', onKeyChange)
+    }
   }, [])
   useEffect(() => {
     const clearOldReceipt = () => {
@@ -38,13 +61,17 @@ export default function Signup() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (busy) return
+    registrationEpoch.current += 1
+    const myEpoch = registrationEpoch.current
     setBusy(true); setError(null)
     const startingKey = localStorage.getItem('rgi-api-key')
     try {
       const result = await registerAccount(email, name)
+      if (myEpoch !== registrationEpoch.current) return
       if (!mounted.current || !window.location.hash.startsWith('#/signup') ||
           localStorage.getItem('rgi-api-key') !== startingKey) {
-        sessionStorage.setItem(deferredKey, JSON.stringify(result))
+        if (localStorage.getItem('rgi-api-key') !== startingKey) return
+        sessionStorage.setItem(deferredKey, JSON.stringify({ result, startingKey }))
         window.dispatchEvent(new Event('dlj-registration-deferred'))
         return
       }
@@ -56,11 +83,11 @@ export default function Signup() {
       setKey(result.api_key)
       setDeferred(false)
     } catch (cause) {
-      if (!mounted.current) return
+      if (!mounted.current || myEpoch !== registrationEpoch.current) return
       if (cause instanceof ApiError && cause.status === 409) setError('An account with this email already exists. Contact support to recover your key.')
       else if (cause instanceof ApiError && cause.status === 429) setError('Too many attempts. Please try again in a minute.')
       else setError(cause instanceof Error ? cause.message : String(cause))
-    } finally { if (mounted.current) setBusy(false) }
+    } finally { if (mounted.current && myEpoch === registrationEpoch.current) setBusy(false) }
   }
   const useDeferredKey = () => {
     if (!key) return

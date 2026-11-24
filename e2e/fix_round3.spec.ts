@@ -32,9 +32,10 @@ test('bulk approval sends an explicit verified outcome', async ({ page }) => {
   })
   await page.goto('/#/queue')
   await page.getByRole('checkbox', { name: 'Select bulk-one' }).check()
+  await page.getByRole('combobox', { name: 'Bulk known outcome' }).selectOption('correct')
   await page.getByRole('button', { name: 'Approve All' }).click()
   await expect.poll(() => requestBody).not.toBeNull()
-  expect(requestBody).toMatchObject({ label_ids: ['bulk-one'], action: 'approve', verified_outcome: true })
+  expect(requestBody).toMatchObject({ label_ids: ['bulk-one'], action: 'approve', outcome: true })
 })
 
 test('late signup response keeps the credential chosen after navigation', async ({ page }) => {
@@ -60,8 +61,8 @@ test('late signup response keeps the credential chosen after navigation', async 
   await done
   await expect.poll(() => page.evaluate(() => localStorage.getItem('rgi-api-key'))).toBe('chosen-key')
   await page.goto('/#/signup')
-  await expect(page.getByRole('textbox', { name: 'Your API key' })).toHaveValue('late-signup-key')
-  await expect(page.getByText('This key is not active on this browser.')).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Your API key' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Start Free Trial' })).toBeVisible()
 })
 
 test('credential abort clears the selected CSV and upload form', async ({ page }) => {

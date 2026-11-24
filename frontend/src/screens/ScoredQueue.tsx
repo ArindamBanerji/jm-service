@@ -35,6 +35,7 @@ export default function ScoredQueue() {
   const [busy, setBusy] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkOutcome, setBulkOutcome] = useState<'' | 'correct' | 'incorrect'>('')
   const [toast, setToast] = useState('')
   const requestId = useRef(0)
   const currentDomain = useRef(domainId)
@@ -45,11 +46,11 @@ export default function ScoredQueue() {
 
   useEffect(() => {
     ++requestId.current
-    setItems([]); setTotal(0); setSelected(new Set()); setLoadedDomain(''); setLoadedQuery('')
+    setItems([]); setTotal(0); setSelected(new Set()); setBulkOutcome(''); setLoadedDomain(''); setLoadedQuery('')
     setError(null); setToast(''); setFocusedRow(0); setPageSize(50)
     setCategory(''); setSortBy(undefined); setSortOrder('asc'); setSearchInput(''); setSearch(''); setOffset(0)
   }, [domainId])
-  useEffect(() => { setSelected(new Set()) }, [domainId, category, searchInput, search, sortBy, sortOrder, pageSize, offset])
+  useEffect(() => { setSelected(new Set()); setBulkOutcome('') }, [domainId, category, searchInput, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => { setFocusedRow(0) }, [domainId, category, search, sortBy, sortOrder, pageSize, offset])
   useEffect(() => {
     const timer = setTimeout(() => { setSearch(searchInput.trim()); setOffset(0) }, 300)
@@ -145,14 +146,15 @@ export default function ScoredQueue() {
   const allSelected = items.length > 0 && items.every(item => selected.has(item.label_id))
   const submitBulk = async (action: 'approve' | 'reject') => {
     if (!domainId || loadedDomain !== domainId || loadedQuery !== queryKey || busy || bulkBusy || selected.size === 0) return
+    if (!bulkOutcome) { setError('Select a known outcome before bulk review.'); return }
     const ids = items.filter(item => selected.has(item.label_id)).map(item => item.label_id)
     if (!ids.length) { setSelected(new Set()); setError('Selection expired. Please re-select.'); return }
     setBulkBusy(true); setError(null); setToast('')
     try {
-      const result = await bulkVerify(domainId, { label_ids: ids, action })
+      const result = await bulkVerify(domainId, { label_ids: ids, action, outcome: bulkOutcome === 'correct' })
       if (currentDomain.current !== domainId) return
       setToast(`${action === 'approve' ? 'Approved' : 'Rejected'} ${result.processed}, skipped ${result.skipped}`)
-      setSelected(new Set())
+      setSelected(new Set()); setBulkOutcome('')
       await refreshRef.current()
     } catch (cause) { setError(String(cause)) } finally { setBulkBusy(false) }
   }
@@ -181,6 +183,6 @@ export default function ScoredQueue() {
       {!items.length && !busy && <div className="loading">{domainId ? 'No pending labels in this view.' : 'Enter a domain ID to see its queue.'}</div>}
     </div><div className="toolbar queue-pages"><span className="muted">Showing {first}–{last} of {total} · Page {Math.floor(offset / pageSize) + 1} of {pages}</span><button className="button secondary" onClick={() => setOffset(Math.max(0, offset - pageSize))} disabled={busy || offset === 0}>Previous</button><button className="button secondary" onClick={() => setOffset(offset + pageSize)} disabled={busy || offset + pageSize >= total}>Next</button></div>
     <p className="muted">Export this page downloads only the displayed pending labels in their current order. Bulk review uses one plan quota unit per processed label.</p>
-    {loadedDomain === domainId && selected.size > 0 && <div className="bulk-action-bar" role="region" aria-label="Bulk review actions"><strong>{selected.size} selected</strong><button className="button bulk-approve" onClick={() => void submitBulk('approve')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Approve All</button><button className="button danger" onClick={() => void submitBulk('reject')} disabled={bulkBusy}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Reject All</button><button className="button secondary" onClick={() => setSelected(new Set())} disabled={bulkBusy}>Clear Selection</button></div>}
+    {loadedDomain === domainId && selected.size > 0 && <div className="bulk-action-bar" role="region" aria-label="Bulk review actions"><strong>{selected.size} selected</strong><label className="field">Known outcome for all selected labels<select aria-label="Bulk known outcome" value={bulkOutcome} onChange={event => setBulkOutcome(event.target.value as typeof bulkOutcome)} disabled={bulkBusy}><option value="">Select outcome…</option><option value="correct">Correct</option><option value="incorrect">Incorrect</option></select></label><button className="button bulk-approve" onClick={() => void submitBulk('approve')} disabled={bulkBusy || !bulkOutcome}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Approve All</button><button className="button danger" onClick={() => void submitBulk('reject')} disabled={bulkBusy || !bulkOutcome}>{bulkBusy && <span className="spinner spinner-small" aria-hidden="true" />}Reject All</button><button className="button secondary" onClick={() => { setSelected(new Set()); setBulkOutcome('') }} disabled={bulkBusy}>Clear Selection</button></div>}
   </div>
 }

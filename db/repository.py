@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import case, func, select, update
+from sqlalchemy import and_, case, exists, func, or_, select, update
+from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -150,6 +151,31 @@ async def record_verification(session: AsyncSession, domain_id: str, label_id: s
     return row
 
 
+def active_verified_evidence():
+    """Keep the latest verified observation along each revision chain."""
+    lineage = select(
+        LabelLog.id.label("root_id"), LabelLog.superseded_by.label("next_id"),
+        LabelLog.tenant_id.label("tenant_id"), LabelLog.domain_id.label("domain_id"),
+    ).where(LabelLog.verified_at.is_not(None), LabelLog.superseded_by.is_not(None)).cte(
+        "verified_lineage", recursive=True)
+    descendant = aliased(LabelLog)
+    lineage = lineage.union_all(select(
+        lineage.c.root_id, descendant.superseded_by, lineage.c.tenant_id, lineage.c.domain_id,
+    ).select_from(lineage).join(descendant, and_(
+        descendant.tenant_id == lineage.c.tenant_id,
+        descendant.domain_id == lineage.c.domain_id,
+        descendant.label_id == lineage.c.next_id,
+    )).where(descendant.superseded_by.is_not(None)))
+    replacement = aliased(LabelLog)
+    replacement_verified = exists(select(replacement.id).select_from(lineage).join(replacement, and_(
+        replacement.tenant_id == lineage.c.tenant_id,
+        replacement.domain_id == lineage.c.domain_id,
+        replacement.label_id == lineage.c.next_id,
+        replacement.verified_at.is_not(None),
+    )).where(lineage.c.root_id == LabelLog.id))
+    return or_(LabelLog.superseded_by.is_(None), ~replacement_verified)
+
+
 async def verified_accuracy(session: AsyncSession, domain_id: str, category: str,
                             annotator_id: str | None = None) -> tuple[int, float | None]:
     """Return the verified count and fraction correct for this category and scope."""
@@ -158,7 +184,7 @@ async def verified_accuracy(session: AsyncSession, domain_id: str, category: str
     ).where(LabelLog.domain_id == domain_id, LabelLog.tenant_id == _tenant(session),
             LabelLog.category == category,
             LabelLog.verified_at.is_not(None), LabelLog.verified_outcome.is_not(None),
-            LabelLog.superseded_by.is_(None))
+            active_verified_evidence())
     if annotator_id is not None:
         query = query.where(LabelLog.annotator_id == annotator_id)
     count, accuracy = (await session.execute(query)).one()
@@ -251,6 +277,9 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     successor.annotation_id = old_row.annotation_id
     successor.source_task_id = old_row.source_task_id
     successor.text = old_row.text
+    successor.prior_revision_id = str(old_row.id)
+    successor.revision_actor = _tenant(session)
+    successor.revision_at = datetime.now(timezone.utc)
     await copy_label_content(session, old_row.id, successor.id)
     old_row.superseded_by = label_id
     await session.flush()
