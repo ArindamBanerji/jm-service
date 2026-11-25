@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import AsyncIterator
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import event
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 def normalize_database_url(url: str) -> tuple[str, dict[str, bool]]:
@@ -33,10 +36,64 @@ def normalize_database_url(url: str) -> tuple[str, dict[str, bool]]:
     return clean_url, {}
 
 
+def sanitize_url(url: str) -> str:
+    """Hide URL userinfo and credential-like query parameters in diagnostics."""
+    parsed = urlsplit(url)
+    netloc = parsed.netloc
+    if "@" in netloc:
+        userinfo, host = netloc.rsplit("@", 1)
+        if ":" in userinfo:
+            netloc = f"{userinfo.split(':', 1)[0]}:***@{host}"
+    query = urlencode([(key, "***" if key.lower() in {"password", "token", "api_key"} else value)
+                       for key, value in parse_qsl(parsed.query, keep_blank_values=True)])
+    return urlunsplit(parsed._replace(netloc=netloc, query=query))
+
+
+def sanitize_database_error(exc: Exception) -> str:
+    """Return only approved diagnostic fields, never statement values or driver detail."""
+    try:
+        parts = [type(exc).__name__]
+        statement = getattr(exc, "statement", None)
+        if isinstance(statement, str):
+            operation = re.match(r"\s*(INSERT\s+INTO|UPDATE|DELETE\s+FROM|SELECT\s+FROM|ALTER\s+TABLE)\s+([A-Za-z_][\w.]*)", statement, re.I)
+            if operation:
+                parts.append(f"{operation.group(1).upper()} {operation.group(2)}")
+        source = getattr(exc, "orig", exc)
+        message = str(source)
+        state = getattr(source, "sqlstate", None) or getattr(source, "pgcode", None)
+        if isinstance(state, str) and re.fullmatch(r"[A-Z0-9]{5}", state, re.I):
+            parts.append(f"SQLSTATE {state}")
+        for candidate in re.findall(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s'\"<>]+", message):
+            parsed = urlsplit(candidate.rstrip(".,;"))
+            if parsed.hostname:
+                parts.append(f"host {parsed.hostname}")
+        unreachable = re.search(r"\b([A-Za-z0-9.-]+)\s+unreachable\b", message)
+        if unreachable:
+            parts.append(f"host {unreachable.group(1)}")
+        return "; ".join(parts)
+    except Exception:
+        return "Database operation failed (diagnostics withheld)"
+
+
+async def commit_write(session: AsyncSession) -> None:
+    """Make a database write durable before an HTTP success is returned."""
+    try:
+        await session.commit()
+    except Exception as exc:
+        try:
+            await session.rollback()
+        except Exception:
+            pass
+        raise HTTPException(500, detail=f"Database commit failed: {sanitize_database_error(exc)}") from None
+
+
 DATABASE_URL, CONNECT_ARGS = normalize_database_url(
     os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/jm_labeling"))
-engine = create_async_engine(DATABASE_URL, connect_args=CONNECT_ARGS,
-                             **({"pool_size": 5, "max_overflow": 10} if DATABASE_URL.startswith("postgresql") else {}))
+try:
+    engine = create_async_engine(DATABASE_URL, connect_args=CONNECT_ARGS,
+                                 **({"pool_size": 5, "max_overflow": 10} if DATABASE_URL.startswith("postgresql") else {}))
+except Exception as exc:
+    raise RuntimeError(f"Database engine setup failed: {sanitize_database_error(exc)}") from None
 
 
 def enable_sqlite_foreign_keys(db_engine: AsyncEngine) -> None:
@@ -56,7 +113,15 @@ async def get_db() -> AsyncIterator[AsyncSession]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+        except SQLAlchemyError as exc:
+            try:
+                await session.rollback()
+            except Exception:
+                pass
+            raise RuntimeError(f"Database operation failed: {sanitize_database_error(exc)}") from None
         except BaseException:
-            await session.rollback()
+            try:
+                await session.rollback()
+            except Exception:
+                pass
             raise
