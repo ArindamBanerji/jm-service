@@ -162,7 +162,7 @@ function explain(detail: unknown): string {
 
 async function request<T>(path: string, init?: RequestInit, onResponse?: (response: Response) => void,
   credential?: string, expectedFormat: 'json' | 'html' | 'pdf' = 'json'): Promise<T> {
-  const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register'
+  const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register' && path !== '/auth/confirm'
   const apiKey = credential ?? (localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : ''))
   const headers = new Headers(init?.headers)
   if (authenticated && apiKey) headers.set('X-Api-Key', apiKey)
@@ -204,7 +204,9 @@ export const ingestBatch = (body: IngestBatchRequest, credential?: string, signa
 export const seedSample = (domainId: string) => request<SampleSeedResponse>(`/labels/${id(domainId)}/sample`, { method: 'POST' })
 export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (import.meta.env.DEV && import.meta.env.VITE_API_KEY))
 export interface RegistrationResponse { api_key: string; tenant_id: string; tier: 'trial'; message: string }
-export const registerAccount = (email: string, name?: string) => request<RegistrationResponse>('/auth/register', json({ email, name: name || undefined }))
+export interface RegistrationStart { message: string }
+export const registerAccount = (email: string, name?: string) => request<RegistrationStart>('/auth/register', json({ email, name: name || undefined }))
+export const confirmAccount = (token: string) => request<RegistrationResponse>('/auth/confirm', json({ token }))
 export const verifyLabel = (body: VerifyRequest) => request<VerifyResponse>('/labels/verify', json(body))
 export interface BulkVerifyResponse { processed: number; skipped: number; errors: { label_id: string; error: string }[] }
 export const bulkVerify = (domainId: string, body: { label_ids: string[]; action: 'approve' | 'reject'; outcome: boolean; reason?: string }) => request<BulkVerifyResponse>(`/labels/${id(domainId)}/bulk-verify`, json(body))

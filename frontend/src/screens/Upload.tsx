@@ -8,6 +8,7 @@ import CsvDropzone from '../components/CsvDropzone'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
 import SignupBanner from '../components/SignupBanner'
+import { storeReportFile } from '../reportHandoff'
 
 export default function Upload() {
   const { domainId, setDomainId } = useDomain()
@@ -137,7 +138,7 @@ export default function Upload() {
       {busy && <LoadingSpinner />}{progress > 0 && <p className="muted">Scored {progress} rows</p>}<ErrorBanner message={error} />
       {report && <div className="stack"><div className="success">Analysis ready · {report.metadata.row_count} labels · {report.metadata.verified_count} verified · {report.metadata.factor_count} factors</div>
         {report.warnings?.map((warning, index) => <div className="notice" key={index}>{warning}</div>)}
-        <div className="button-row">{sample ? (hasApiKey() && <button className="button" onClick={scoreSample} disabled={busy}>Score 12 sample labels</button>) : <button className="button" onClick={startScoring} disabled={busy || !domainId}>Start scoring these labels</button>}<button className="button secondary" onClick={() => navigate('/health', { state: { file } })}>View full report</button></div>
+        <div className="button-row">{sample ? (hasApiKey() && <button className="button" onClick={scoreSample} disabled={busy}>Score 12 sample labels</button>) : <button className="button" onClick={startScoring} disabled={busy || !domainId}>Start scoring these labels</button>}<button className="button secondary" onClick={() => { if (file) navigate('/health', { state: { reportRef: storeReportFile(file) } }) }}>View full report</button></div>
         <p className="muted">{sample ? 'Scoring uses 12 labels of your plan quota and requires a labeling API key. The report shows synthetic historical outcomes; live labels remain pending until you verify them.' : 'Scoring creates pending review items in batches of 100. Verification outcomes in this CSV are used for the report; they are not imported into live training.'}</p>
       </div>}
     </div>

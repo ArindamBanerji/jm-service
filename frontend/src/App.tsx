@@ -9,6 +9,7 @@ import HealthReport from './screens/HealthReport'
 import LoadingSpinner from './components/LoadingSpinner'
 import Signup from './screens/Signup'
 import Settings from './screens/Settings'
+import Pricing from './screens/Pricing'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
 
 const Dashboard = lazy(() => import('./screens/Dashboard'))
@@ -34,10 +35,7 @@ export default function App() {
     localStorage.setItem('dlj-theme', theme)
   }, [theme])
   useEffect(() => {
-    const refreshKey = (event: Event) => {
-      if (event instanceof StorageEvent && event.key !== 'rgi-api-key' && event.key !== null) return
-      const next = localStorage.getItem('rgi-api-key') ?? ''
-      if (next === activeKey.current) return
+    const applyKeyChange = (next: string) => {
       activeKey.current = next
       window.dispatchEvent(new Event('dlj-account-changing'))
       sessionStorage.removeItem('dlj-checkout-pending')
@@ -54,9 +52,17 @@ export default function App() {
       window.location.hash = '#/upload'
       window.location.reload()
     }
-    window.addEventListener('dlj-key-updated', refreshKey)
-    window.addEventListener('storage', refreshKey)
-    return () => { window.removeEventListener('dlj-key-updated', refreshKey); window.removeEventListener('storage', refreshKey) }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'rgi-api-key') applyKeyChange(localStorage.getItem('rgi-api-key') ?? '')
+      else if (event.key === null) applyKeyChange('')
+    }
+    const onLocalKeyUpdate = () => {
+      const next = localStorage.getItem('rgi-api-key') ?? ''
+      if (next !== activeKey.current) applyKeyChange(next)
+    }
+    window.addEventListener('dlj-key-updated', onLocalKeyUpdate)
+    window.addEventListener('storage', onStorage)
+    return () => { window.removeEventListener('dlj-key-updated', onLocalKeyUpdate); window.removeEventListener('storage', onStorage) }
   }, [location.pathname])
   const setDomainId = (value: string) => { updateDomain(value); localStorage.setItem('rgi-domain', value) }
   const commitKey = () => {
@@ -78,7 +84,16 @@ export default function App() {
         <datalist id="recent-domains">{domainId && <option value={domainId} />}</datalist>
         <nav aria-label="Main navigation">{links.map(([path, label, icon]) => <NavLink key={path} to={`/${path}`} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span aria-hidden>{icon}</span>{label}</NavLink>)}</nav>
         <NavLink to="/signup" onClick={() => setMobileOpen(false)} className="button signup-link">Sign Up</NavLink>
-        <div className="sidebar-foot"><button className="theme-toggle" aria-label="Toggle dark mode" onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}</button><br />Review what matters.<br />Learn from every verified label.</div>
+        <footer className="sidebar-foot">
+          <button className="theme-toggle" aria-label="Toggle dark mode" onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀ Light mode' : '☾ Dark mode'}</button><br />Review what matters.<br />Learn from every verified label.
+          <p>Contact: <a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a></p>
+          <nav aria-label="Pricing and policies">
+            <NavLink to="/pricing" onClick={() => setMobileOpen(false)}>Pricing</NavLink>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/refund">Refund Policy</a>
+          </nav>
+        </footer>
       </aside>
       <main className="main"><Suspense fallback={<LoadingSpinner />}><Routes>
         <Route path="/" element={<Navigate to="/upload" replace />} />
@@ -89,6 +104,7 @@ export default function App() {
         <Route path="/annotators" element={<AnnotatorProfiles />} />
         <Route path="/health" element={<HealthReport />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/upload" replace />} />
       </Routes></Suspense></main>

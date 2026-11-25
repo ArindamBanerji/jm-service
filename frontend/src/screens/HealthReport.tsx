@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { downloadReportPdf, uploadForReport } from '../api'
 import CsvDropzone from '../components/CsvDropzone'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { takeReportFile } from '../reportHandoff'
 
 export default function HealthReport() {
   const location = useLocation()
@@ -11,8 +12,23 @@ export default function HealthReport() {
   const [html, setHtml] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const analyze = async (next: File) => { setFile(next); setError(null); setBusy(true); setHtml(''); try { setHtml(await uploadForReport(next)) } catch (cause) { setError(String(cause)) } finally { setBusy(false) } }
-  useEffect(() => { const incoming = (location.state as { file?: File } | null)?.file; if (incoming) void analyze(incoming) }, [location.state])
+  const generation = useRef(0)
+  const analyze = async (next: File) => {
+    const run = ++generation.current
+    setFile(next); setError(null); setBusy(true); setHtml('')
+    try { const result = await uploadForReport(next); if (run === generation.current) setHtml(result) }
+    catch (cause) { if (run === generation.current) setError(String(cause)) }
+    finally { if (run === generation.current) setBusy(false) }
+  }
+  useEffect(() => {
+    const incoming = takeReportFile((location.state as { reportRef?: string } | null)?.reportRef)
+    if (incoming) void analyze(incoming)
+  }, [location.state])
+  useEffect(() => {
+    const clear = () => { ++generation.current; setFile(null); setHtml(''); setBusy(false); setError(null) }
+    window.addEventListener('dlj-account-changing', clear)
+    return () => { window.removeEventListener('dlj-account-changing', clear); ++generation.current }
+  }, [])
   const download = async () => {
     if (!file) return
     setError(null); setBusy(true)

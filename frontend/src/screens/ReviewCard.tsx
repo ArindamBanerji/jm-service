@@ -21,6 +21,10 @@ export default function ReviewCard() {
   currentRoute.current = { domainId, labelId }
   const loadController = useRef<AbortController | null>(null)
   const preserveTagInputFor = useRef<{ domainId: string; labelId: string } | null>(null)
+  const preserveDraft = useRef(false)
+  const draftToPreserve = useRef<{ domainId: string; sourceLabelId: string; expectedLabelId?: string;
+    tagInput: string; tags: string[]; spans: NerSpan[];
+    tagsDirty: boolean; spansDirty: boolean } | null>(null)
   const navigate = useNavigate()
   const [item, setItem] = useState<LabelDetail | null>(null)
   const [loadedDomain, setLoadedDomain] = useState('')
@@ -56,9 +60,17 @@ export default function ReviewCard() {
     return () => controller.abort()
   }, [domainId])
   useEffect(() => {
-    if (preserveTagInputFor.current?.domainId === domainId && preserveTagInputFor.current.labelId === labelId) preserveTagInputFor.current = null
-    else setTagInput('')
-    setOutcome(''); setOverride(''); setMessage(''); setItem(null); setEditedSpans([]); setEditedTags([]); setLoadedDomain(''); setPending([]); setTier(null)
+    const draft = draftToPreserve.current
+    const keepingDraft = preserveDraft.current && draft?.domainId === domainId &&
+      (draft.sourceLabelId === labelId || draft.expectedLabelId === labelId)
+    if (!keepingDraft) {
+      preserveDraft.current = false
+      draftToPreserve.current = null
+      if (preserveTagInputFor.current?.domainId === domainId && preserveTagInputFor.current.labelId === labelId) preserveTagInputFor.current = null
+      else setTagInput('')
+      setEditedSpans([]); setEditedTags([])
+    }
+    setOutcome(''); setOverride(''); setMessage(''); setItem(null); setLoadedDomain(''); setPending([]); setTier(null)
   }, [domainId, labelId])
   const load = useCallback(async () => {
     loadController.current?.abort()
@@ -72,13 +84,26 @@ export default function ReviewCard() {
       ])
       if (controller.signal.aborted || currentRoute.current.domainId !== domainId || currentRoute.current.labelId !== labelId) return
       if (detail.label_id !== currentRoute.current.labelId) {
+        if (preserveDraft.current && draftToPreserve.current?.domainId === domainId &&
+            draftToPreserve.current.sourceLabelId === labelId)
+          draftToPreserve.current.expectedLabelId = detail.label_id
         navigate(`/review/${encodeURIComponent(detail.label_id)}`, { replace: true })
         return
       }
       setPending(rows)
       setItem(detail)
-      setEditedSpans(detail.content?.content_type === 'text_ner' ? detail.content.spans : [])
-      setEditedTags(detail.content?.content_type === 'text_multilabel' ? detail.content.tags : [])
+      const savedDraft = preserveDraft.current && draftToPreserve.current?.domainId === domainId &&
+        (draftToPreserve.current.sourceLabelId === labelId || draftToPreserve.current.expectedLabelId === labelId)
+        ? draftToPreserve.current : null
+      setEditedSpans(savedDraft?.spansDirty ? savedDraft.spans :
+        detail.content?.content_type === 'text_ner' ? detail.content.spans : [])
+      setEditedTags(savedDraft?.tagsDirty ? savedDraft.tags :
+        detail.content?.content_type === 'text_multilabel' ? detail.content.tags : [])
+      if (savedDraft) {
+        setTagInput(savedDraft.tagInput)
+        preserveDraft.current = false
+        draftToPreserve.current = null
+      }
       setEntityTypes(autonomy.categories.map(status => status.category))
       setLoadedDomain(domainId)
       setTier(autonomy.categories.find(status => status.category === detail.category) ?? null)
@@ -90,7 +115,7 @@ export default function ReviewCard() {
     JSON.stringify(item.content?.content_type === 'text_ner' ? item.content.spans : [])
   const tagsDirty = item !== null && JSON.stringify(editedTags) !==
     JSON.stringify(item.content?.content_type === 'text_multilabel' ? item.content.tags : [])
-  const hasUnsavedEdits = spansDirty || tagsDirty
+  const hasUnsavedEdits = spansDirty || tagsDirty || Boolean(tagInput.trim())
   const saveSpans = async () => {
     if (!item || !domainId || item.label_id !== labelId || !item.category || item.verified_at || !spansDirty || busy || !startMutation()) return
     setBusy(true); setError(null); setMessage('')
@@ -116,6 +141,10 @@ export default function ReviewCard() {
         category: item.category, idempotency_token: item.revision_id, tags: editedTags,
       })
       if (currentRoute.current.domainId !== domainId || currentRoute.current.labelId !== labelId) return
+      preserveDraft.current = true
+      draftToPreserve.current = { domainId, sourceLabelId: labelId,
+        expectedLabelId: result.label_id !== labelId ? result.label_id : undefined,
+        tagInput, tags: editedTags, spans: editedSpans, tagsDirty: false, spansDirty: false }
       if (result.label_id !== labelId) { preserveTagInputFor.current = { domainId, labelId: result.label_id }; navigate(`/review/${encodeURIComponent(result.label_id)}`, { replace: true }) }
       else { await load(); setMessage('Tags saved.') }
     } catch (cause) {
@@ -166,6 +195,11 @@ export default function ReviewCard() {
   })
   const alternatives = ['approve', 'reject'].filter(action => action !== item?.recommended_action)
   const afterCategorySaved = async (newLabelId: string) => {
+    if (currentRoute.current.domainId !== domainId || currentRoute.current.labelId !== labelId) return
+    preserveDraft.current = true
+    draftToPreserve.current = { domainId, sourceLabelId: labelId ?? '',
+      expectedLabelId: newLabelId !== labelId ? newLabelId : undefined,
+      tagInput, tags: editedTags, spans: editedSpans, tagsDirty, spansDirty }
     if (newLabelId !== labelId) { preserveTagInputFor.current = { domainId, labelId: newLabelId }; navigate(`/review/${encodeURIComponent(newLabelId)}`, { replace: true }) }
     else await load()
   }
@@ -178,7 +212,7 @@ export default function ReviewCard() {
       {item.content?.content_type !== 'image_classification' && <TextViewer text={item.text} />}
        {item.text !== null && (item.content === null || item.content.content_type === 'text_ner') && <><NEREditor key={item.revision_id} text={item.text} spans={editedSpans} entityTypes={entityTypes} onSpansChange={setEditedSpans} disabled={isMutating} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{spansDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveSpans()} disabled={busy || isMutating || !spansDirty || !item.category}>Save Spans</button>{!item.category && <span className="muted">Choose a category before saving spans.</span>}</div>}</>}
        {item.content?.content_type === 'text_multilabel' && <><TagSelector key={item.revision_id} tags={editedTags} availableTags={[...entityTypes, ...item.content.tags]} onTagsChange={setEditedTags} input={tagInput} onInputChange={setTagInput} disabled={isMutating} readOnly={Boolean(item.verified_at)} />{!item.verified_at && <div className="button-row" style={{ marginTop: 12 }}>{tagsDirty && <span className="muted" role="status">Unsaved changes</span>}<button className="button secondary" onClick={() => void saveTags()} disabled={busy || isMutating || !tagsDirty || !item.category}>Save Tags</button></div>}</>}
-       {(item.text !== null || item.content?.content_type === 'image_classification') && !hasUnsavedEdits && <CategorySelector domainId={domainId} labelId={labelId} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={afterCategorySaved} disabled={isMutating || busy} onSavingChange={saving => saving ? startMutation() : endMutation()} />}
+       {(item.text !== null || item.content?.content_type === 'image_classification') && !spansDirty && !tagsDirty && <CategorySelector domainId={domainId} labelId={labelId} revisionId={item.revision_id} category={item.category} previousCategory={item.previous_category} onSaved={afterCategorySaved} disabled={isMutating || busy} onSavingChange={saving => saving ? startMutation() : endMutation()} />}
       <hr style={{ border: 0, borderTop: '1px solid #e7ecf2', margin: '22px 0' }} /><h3 className="section-title">Factor signals</h3>{Object.entries(item.factors).map(([factor, value]) => <FactorBar key={factor} factor={factor} value={value} />)}</div>
       <div className="stack">{item.status === 'scored' && item.confidence !== null && <div className="card card-pad"><div className="eyebrow">JM recommendation</div><h2 style={{ textTransform: 'capitalize' }}>{item.recommended_action}</h2><ConfidenceIndicator value={item.confidence} /><div className="button-row" style={{ marginTop: 20 }}>{tier && <TierBadge tier={tier.tier} />}<span className="muted">Conservation: {tier?.conservation_reason ?? (tier?.conservation_gate_pass ? 'clear' : 'unknown')}</span></div></div>}
         {item.status !== 'scored' ? <div className="card card-pad"><h3 className="section-title">Pending classification</h3><p className="muted">Choose a category before verification.</p></div> : item.verified_at ? <div className="card card-pad"><h3 className="section-title">Already reviewed</h3><p className="muted">Verified outcome: {item.verified_outcome ? 'Correct' : 'Incorrect'} · Action: {item.actual_action ?? 'unknown'}</p></div> :

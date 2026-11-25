@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ApiError, registerAccount, type RegistrationResponse } from '../api'
+import { ApiError, confirmAccount, registerAccount, type RegistrationResponse } from '../api'
 import ErrorBanner from '../components/ErrorBanner'
 
 const deferredKey = 'dlj-deferred-registration'
-const readDeferred = (): RegistrationResponse | null => {
+type StoredReceipt = { result: RegistrationResponse; startingKey: string | null; active?: boolean }
+const readDeferred = (): StoredReceipt | null => {
   try {
-    const stored = JSON.parse(sessionStorage.getItem(deferredKey) ?? 'null') as
-      { result?: RegistrationResponse; startingKey?: string | null } | null
+    const stored = JSON.parse(sessionStorage.getItem(deferredKey) ?? 'null') as StoredReceipt | null
     if (!stored?.result || stored.startingKey !== localStorage.getItem('rgi-api-key')) {
       sessionStorage.removeItem(deferredKey)
       return null
     }
-    return stored.result
+    return stored
   }
   catch { return null }
 }
@@ -23,16 +23,18 @@ export default function Signup() {
   const registrationEpoch = useRef(0)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
-  const [key, setKey] = useState(() => readDeferred()?.api_key ?? '')
-  const [deferred, setDeferred] = useState(() => readDeferred() !== null)
+  const [key, setKey] = useState(() => readDeferred()?.result.api_key ?? '')
+  const [deferred, setDeferred] = useState(() => readDeferred()?.active !== true && readDeferred() !== null)
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirmationPending, setConfirmationPending] = useState(false)
+  const [token, setToken] = useState('')
   useEffect(() => {
     mounted.current = true
     const showDeferred = () => {
       const result = readDeferred()
-      if (result) { setKey(result.api_key); setDeferred(true) }
+      if (result) { setKey(result.result.api_key); setDeferred(result.active !== true) }
     }
     const onKeyChange = () => {
       registrationEpoch.current += 1
@@ -41,6 +43,8 @@ export default function Signup() {
       setCopied(false)
       setKey('')
       setBusy(false)
+      setConfirmationPending(false)
+      setToken('')
     }
     window.addEventListener('dlj-registration-deferred', showDeferred)
     window.addEventListener('dlj-account-changing', onKeyChange)
@@ -64,14 +68,31 @@ export default function Signup() {
     registrationEpoch.current += 1
     const myEpoch = registrationEpoch.current
     setBusy(true); setError(null)
+    try {
+      await registerAccount(email, name)
+      if (myEpoch !== registrationEpoch.current) return
+      if (mounted.current && window.location.hash.startsWith('#/signup')) setConfirmationPending(true)
+    } catch (cause) {
+      if (!mounted.current || myEpoch !== registrationEpoch.current) return
+      if (cause instanceof ApiError && cause.status === 409) setError('An account with this email already exists. Contact support to recover your key.')
+      else if (cause instanceof ApiError && cause.status === 429) setError('Too many attempts. Please try again in a minute.')
+      else setError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (mounted.current && myEpoch === registrationEpoch.current) setBusy(false) }
+  }
+  const confirm = async (event: FormEvent) => {
+    event.preventDefault()
+    if (busy) return
+    registrationEpoch.current += 1
+    const myEpoch = registrationEpoch.current
+    setBusy(true); setError(null)
     const startingKey = localStorage.getItem('rgi-api-key')
     try {
-      const result = await registerAccount(email, name)
+      const result = await confirmAccount(token.trim())
       if (myEpoch !== registrationEpoch.current) return
       if (!mounted.current || !window.location.hash.startsWith('#/signup') ||
           localStorage.getItem('rgi-api-key') !== startingKey) {
         if (localStorage.getItem('rgi-api-key') !== startingKey) return
-        sessionStorage.setItem(deferredKey, JSON.stringify({ result, startingKey }))
+        sessionStorage.setItem(deferredKey, JSON.stringify({ result, startingKey, active: false }))
         window.dispatchEvent(new Event('dlj-registration-deferred'))
         return
       }
@@ -80,13 +101,13 @@ export default function Signup() {
       sessionStorage.removeItem('dlj-checkout-pending')
       localStorage.setItem('rgi-api-key', result.api_key)
       window.dispatchEvent(new Event('dlj-key-updated'))
+      sessionStorage.setItem(deferredKey, JSON.stringify({ result, startingKey: result.api_key, active: true }))
       setKey(result.api_key)
       setDeferred(false)
+      setConfirmationPending(false)
     } catch (cause) {
       if (!mounted.current || myEpoch !== registrationEpoch.current) return
-      if (cause instanceof ApiError && cause.status === 409) setError('An account with this email already exists. Contact support to recover your key.')
-      else if (cause instanceof ApiError && cause.status === 429) setError('Too many attempts. Please try again in a minute.')
-      else setError(cause instanceof Error ? cause.message : String(cause))
+      setError(cause instanceof Error ? cause.message : String(cause))
     } finally { if (mounted.current && myEpoch === registrationEpoch.current) setBusy(false) }
   }
   const useDeferredKey = () => {
@@ -114,7 +135,8 @@ export default function Signup() {
     <div className="card card-pad signup-card">
       {key ? <div className="stack"><div className="success">{deferred ? 'Registration completed. This key is not active on this browser.' : 'Your trial is ready.'}</div><label className="field">Your API key<input aria-label="Your API key" value={key} readOnly onFocus={event => event.currentTarget.select()} /></label>
         <strong>Save this key — it cannot be recovered.</strong><div className="button-row"><button className="button" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy key'}</button>{deferred && <button className="button" onClick={useDeferredKey}>Use this key</button>}<button className="button secondary" onClick={() => navigate('/upload')}>Continue to Upload</button></div></div>
-        : <form onSubmit={event => void submit(event)} className="stack"><label className="field">Email<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="field">Name (optional)<input autoComplete="name" maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label><button className="button" type="submit" disabled={busy}>{busy ? 'Creating account…' : 'Start Free Trial'}</button></form>}
+        : confirmationPending ? <form onSubmit={event => void confirm(event)} className="stack"><p>Check your email for a confirmation code.</p><label className="field">Confirmation code<input autoComplete="one-time-code" required minLength={64} maxLength={64} value={token} onChange={event => setToken(event.target.value)} /></label><button className="button" type="submit" disabled={busy}>{busy ? 'Confirming…' : 'Confirm email'}</button></form>
+        : <div className="stack"><form onSubmit={event => void submit(event)} className="stack"><label className="field">Email<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="field">Name (optional)<input autoComplete="name" maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label><button className="button" type="submit" disabled={busy}>{busy ? 'Sending email…' : 'Start Free Trial'}</button></form><button className="button secondary" type="button" onClick={() => setConfirmationPending(true)}>I already have a code</button></div>}
       <ErrorBanner message={error} />
     </div>
   </div>

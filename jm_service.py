@@ -46,6 +46,7 @@ from labeling_router import router as labeling_router
 from labeling_router import autonomy_router
 from legal_pages import router as legal_router
 from billing import router as billing_router
+from projects_router import router as projects_router
 from scheduler import scheduler_loop
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -296,6 +297,7 @@ app.include_router(admin_router)
 app.include_router(signup_router)
 app.include_router(account_router)
 app.include_router(billing_router)
+app.include_router(projects_router)
 app.include_router(legal_router)
 
 app.add_middleware(  # type: ignore[call-arg]

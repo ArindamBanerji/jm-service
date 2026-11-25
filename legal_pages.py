@@ -100,6 +100,29 @@ Data Processing Addendum available on request for Enterprise tier.</p>
 <p>Privacy questions: <a href="mailto:arindam.banerji@gmail.com">arindam.banerji@gmail.com</a></p>
 </body></html>"""
 
+REFUND_HTML = """<!doctype html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Refund Policy — RGI Data Label Judgment</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.7;color:#1f2937}
+h1{font-size:1.8rem}h2{font-size:1.3rem;margin-top:2rem}a{color:#2563eb}</style></head><body>
+<h1>Refund Policy</h1>
+<p>Effective: November 2026</p>
+<h2>Subscription cancellation</h2>
+<p>You may cancel your DLJ subscription at any time from your Settings
+page. Cancellation takes effect at the end of your current billing
+period. You retain access to paid features until then.</p>
+<h2>Refunds</h2>
+<p>We offer a full refund within 14 days of your first paid subscription
+if you are not satisfied. After 14 days, or for renewal charges, refunds
+are evaluated on a case-by-case basis. Contact us at
+<a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a>
+to request a refund.</p>
+<h2>Free trial</h2>
+<p>The free trial does not require payment information and incurs no
+charges. No refund is applicable.</p>
+<p><a href="/">← Back to DLJ</a></p>
+</body></html>"""
+
 ATTRIBUTION_HTML = """<!doctype html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Open-Source Attribution — RGI Data Label Judgment</title>
@@ -133,6 +156,11 @@ async def terms_of_service() -> str:
 @router.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
 async def privacy_policy() -> str:
     return PRIVACY_HTML
+
+
+@router.get("/refund", response_class=HTMLResponse, include_in_schema=False)
+async def refund_policy() -> str:
+    return REFUND_HTML
 
 
 @router.get("/attribution", response_class=HTMLResponse, include_in_schema=False)
