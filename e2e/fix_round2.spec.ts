@@ -43,11 +43,16 @@ test('registration clears previous account domain and checkout state', async ({ 
   await account(page)
   await page.addInitScript(() => sessionStorage.setItem('dlj-checkout-pending', 'starter'))
   await page.route('**/v1/auth/register', route => route.fulfill({
+    status: 202, json: { message: 'Check your email' },
+  }))
+  await page.route('**/v1/auth/confirm', route => route.fulfill({
     status: 201, json: { api_key: 'new-key', tenant_id: 'new', tier: 'trial', message: 'Ready' },
   }))
   await page.goto('/#/signup')
   await page.getByRole('textbox', { name: 'Email' }).fill('new@example.com')
   await page.getByRole('button', { name: 'Start Free Trial' }).click()
+  await page.getByRole('textbox', { name: 'Confirmation code' }).fill('a'.repeat(64))
+  await page.getByRole('button', { name: 'Confirm email' }).click()
   await expect(page.getByLabel('Your API key')).toHaveValue('new-key')
   expect(await page.evaluate(() => [
     localStorage.getItem('rgi-domain'),

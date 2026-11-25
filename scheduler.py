@@ -3,17 +3,49 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import hashlib
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 
-from db.connection import AsyncSessionLocal
-from db.models import Annotator, ApiKey, Domain, Engine, LabelLog
+from db.connection import AsyncSessionLocal, sanitize_database_error
+from db.models import Annotator, ApiKey, Domain, Engine, LabelLog, TransitionLog
+from db.tenant_lock import lock_tenant
 from email_service import send_email, trial_expired_email, trial_expiring_email
 
 logger = logging.getLogger("dlj.scheduler")
 TRIAL_DAYS = 14
 RETENTION_DAYS = 30
+
+
+async def expire_trial_keys() -> int:
+    """Record clock-driven trial expiry under the tenant billing lock."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=TRIAL_DAYS)
+    async with AsyncSessionLocal() as session:
+        candidates = (await session.execute(select(ApiKey.id, ApiKey.tenant_id).where(
+            ApiKey.is_active.is_(True), ApiKey.subscription_state == "trial",
+            ApiKey.created_at < cutoff))).all()
+    expired = 0
+    for key_id, tenant_id in candidates:
+        async with AsyncSessionLocal.begin() as session:
+            await lock_tenant(session, tenant_id)
+            record = await session.get(ApiKey, key_id, with_for_update=True)
+            if record is None or not record.is_active or record.subscription_state != "trial":
+                continue
+            created = record.created_at
+            created = created.replace(tzinfo=timezone.utc) if created.tzinfo is None else created
+            if created + timedelta(days=TRIAL_DAYS) > now:
+                continue
+            record.subscription_state = "trial_expired"
+            record.state_version += 1
+            session.add(TransitionLog(
+                event_id=f"trial-expired:{record.id}", key_id=record.id,
+                subscription_id=None, source="scheduler", occurred_at=now,
+                old_state="trial", new_state="trial_expired", disposition="applied",
+                key_version=record.state_version))
+            expired += 1
+    return expired
 
 
 async def send_trial_expiry_emails() -> int:
@@ -22,7 +54,8 @@ async def send_trial_expiry_emails() -> int:
     now = datetime.now(timezone.utc)
     async with AsyncSessionLocal() as session:
         records = (await session.scalars(select(ApiKey).where(
-            ApiKey.tier == "trial", ApiKey.is_active.is_(True)))).all()
+            ApiKey.tier == "trial", ApiKey.is_active.is_(True),
+            ApiKey.subscription_state.in_(("trial", "trial_expired"))))).all()
         for record in records:
             if not record.created_at:
                 continue
@@ -63,11 +96,7 @@ async def cleanup_cancelled_tenants() -> int:
         if tenant_id in cleaned_tenants:
             continue
         async with AsyncSessionLocal.begin() as session:
-            # Block sibling-key inserts until this tenant's cleanup commits.
-            if session.get_bind().dialect.name == "postgresql":
-                await session.execute(text("LOCK TABLE api_keys IN SHARE ROW EXCLUSIVE MODE"))
-            elif session.get_bind().dialect.name == "sqlite":
-                await session.execute(text("BEGIN IMMEDIATE"))
+            await lock_tenant(session, tenant_id)
             # One ordered lock acquisition covers every key in this tenant.
             siblings = (await session.scalars(select(ApiKey).where(
                 ApiKey.tenant_id == tenant_id).order_by(ApiKey.id)
@@ -87,7 +116,9 @@ async def cleanup_cancelled_tenants() -> int:
                 stamp = sibling.cancelled_at
                 if stamp is not None and stamp.tzinfo is None:
                     stamp = stamp.replace(tzinfo=timezone.utc)
-                if sibling.is_active and stamp is not None and stamp < cutoff:
+                if sibling.is_active and sibling.subscription_state in {"active", "past_due", "paused"}:
+                    retained = True
+                elif sibling.is_active and stamp is not None and stamp < cutoff:
                     expired.append(sibling)
                 elif sibling.is_active:
                     retained = True
@@ -95,6 +126,13 @@ async def cleanup_cancelled_tenants() -> int:
                 continue
             for sibling in expired:
                 sibling.is_active = False
+                sibling.subscription_state = "cleaned_up"
+                sibling.state_version += 1
+            session.add(TransitionLog(
+                event_id=f"retention:{hashlib.sha256(tenant_id.encode()).hexdigest()}:{key.id}", key_id=key.id,
+                subscription_id=subscription_id, source="scheduler", occurred_at=datetime.now(timezone.utc),
+                old_state="cancelled", new_state="cleaned_up", disposition="applied",
+                key_version=key.state_version))
             cleaned += len(expired)
             cleaned_tenants.add(tenant_id)
             if retained:
@@ -111,12 +149,16 @@ async def cleanup_cancelled_tenants() -> int:
 async def run_scheduled_tasks() -> None:
     """Run scheduled jobs while keeping the next hourly attempt alive on error."""
     try:
+        await expire_trial_keys()
         emails = await send_trial_expiry_emails()
         cleaned = await cleanup_cancelled_tenants()
         if emails or cleaned:
             logger.info("Scheduler: %d trial emails, %d tenants cleaned", emails, cleaned)
-    except Exception:
-        logger.exception("Scheduler error")
+    except Exception as exc:
+        try:
+            logger.error("Scheduler error: %s", sanitize_database_error(exc))
+        except Exception:
+            logger.error("Scheduler error: %s (details withheld)", type(exc).__name__)
 
 
 async def scheduler_loop() -> None:

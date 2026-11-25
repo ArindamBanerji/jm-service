@@ -39,13 +39,13 @@ def signup_client(tmp_path, monkeypatch):
 
     app = FastAPI()
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.include_router(auth.signup_router)
     app.include_router(labeling_router)
     app.dependency_overrides[get_db] = test_db
     limiter._storage.reset()
     delivery = AsyncMock(return_value=True)
-    monkeypatch.setattr(auth, "send_api_key_email", delivery)
+    monkeypatch.setattr(auth, "send_signup_challenge_email", delivery)
     with TestClient(app) as client:
         yield client, delivery
     asyncio.run(db_engine.dispose())
@@ -57,11 +57,19 @@ def client(tmp_path, monkeypatch):
         yield result
 
 
+def confirm_latest(http, delivery):
+    token = delivery.await_args.args[1]
+    return http.post("/v1/auth/confirm", json={"token": token})
+
+
 def test_registration_returns_key_and_tenant(client):
-    http, _ = client
+    http, delivery = client
     response = http.post("/v1/auth/register", json={"email": " Test@Example.com ", "name": "Test Team"})
-    assert response.status_code == 201, response.text
-    body = response.json()
+    assert response.status_code == 202, response.text
+    assert "api_key" not in response.json()
+    confirmed = confirm_latest(http, delivery)
+    assert confirmed.status_code == 201, confirmed.text
+    body = confirmed.json()
     assert len(body["api_key"]) == 64
     assert body["tenant_id"]
     assert body["tier"] == "trial"
@@ -69,8 +77,9 @@ def test_registration_returns_key_and_tenant(client):
 
 
 def test_duplicate_email_is_conflict(client):
-    http, _ = client
-    assert http.post("/v1/auth/register", json={"email": "first@example.com"}).status_code == 201
+    http, delivery = client
+    assert http.post("/v1/auth/register", json={"email": "first@example.com"}).status_code == 202
+    assert confirm_latest(http, delivery).status_code == 201
     assert http.post("/v1/auth/register", json={"email": "FIRST@example.com"}).status_code == 409
 
 
@@ -83,12 +92,13 @@ def test_rate_limit_five_per_minute(client):
     http, _ = client
     statuses = [http.post("/v1/auth/register", json={"email": f"rate{i}@example.com"}).status_code
                 for i in range(6)]
-    assert statuses == [201] * 5 + [429]
+    assert statuses == [202] * 5 + [429]
 
 
 def test_registered_key_can_score(client):
-    http, _ = client
-    key = http.post("/v1/auth/register", json={"email": "score@example.com"}).json()["api_key"]
+    http, delivery = client
+    assert http.post("/v1/auth/register", json={"email": "score@example.com"}).status_code == 202
+    key = confirm_latest(http, delivery).json()["api_key"]
     response = http.post("/v1/labels/ingest", headers={"X-Api-Key": key}, json={
         "domain_id": "signup-demo", "label_id": "one", "category": "TEST",
         "factors": {"confidence": 0.8, "difficulty": 0.2}})
@@ -98,5 +108,7 @@ def test_registered_key_can_score(client):
 def test_key_delivery_called(client):
     http, delivery = client
     response = http.post("/v1/auth/register", json={"email": "mail@example.com"})
-    assert response.status_code == 201
-    delivery.assert_awaited_once_with("mail@example.com", response.json()["api_key"])
+    assert response.status_code == 202
+    delivery.assert_awaited_once()
+    assert delivery.await_args.args[0] == "mail@example.com"
+    assert len(delivery.await_args.args[1]) == 64

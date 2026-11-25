@@ -42,9 +42,7 @@ test('pending registration cannot replace key after A to B to A switch', async (
   await page.route('**/v1/auth/register', async route => {
     requested = true
     await gate
-    try { await route.fulfill({ status: 201, json: {
-      api_key: 'late-key', tenant_id: 'new', tier: 'trial', message: 'Ready',
-    } }) } catch { /* aborted on navigation */ }
+    try { await route.fulfill({ status: 202, json: { message: 'Check your email' } }) } catch { /* aborted on navigation */ }
   })
   await page.goto('/#/signup')
   await page.getByRole('textbox', { name: 'Email' }).fill('late@example.com')
@@ -62,12 +60,15 @@ test('pending registration cannot replace key after A to B to A switch', async (
 
 test('old deferred signup receipt is cleared when account changes', async ({ page }) => {
   await workspace(page)
-  await page.route('**/v1/auth/register', route => route.fulfill({ status: 201, json: {
+  await page.route('**/v1/auth/register', route => route.fulfill({ status: 202, json: { message: 'Check your email' } }))
+  await page.route('**/v1/auth/confirm', route => route.fulfill({ status: 201, json: {
     api_key: 'receipt-key', tenant_id: 'new', tier: 'trial', message: 'Ready',
   } }))
   await page.goto('/#/signup')
   await page.getByRole('textbox', { name: 'Email' }).fill('receipt@example.com')
   await page.getByRole('button', { name: 'Start Free Trial' }).click()
+  await page.getByRole('textbox', { name: 'Confirmation code' }).fill('a'.repeat(64))
+  await page.getByRole('button', { name: 'Confirm email' }).click()
   await expect(page.getByRole('textbox', { name: 'Your API key' })).toHaveValue('receipt-key')
   await page.goto('/#/upload')
   await page.evaluate(() => { localStorage.setItem('rgi-api-key', 'key-B'); window.dispatchEvent(new Event('dlj-key-updated')) })

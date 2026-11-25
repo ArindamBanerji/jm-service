@@ -48,7 +48,7 @@ test('late signup response keeps the credential chosen after navigation', async 
   await page.route('**/v1/auth/register', async route => {
     requested = true
     await gate
-    try { await route.fulfill({ json: { api_key: 'late-signup-key', tenant_id: 'new-tenant', tier: 'trial', message: 'Ready' } }) }
+    try { await route.fulfill({ status: 202, json: { message: 'Check your email' } }) }
     finally { finished() }
   })
   await page.goto('/#/signup')

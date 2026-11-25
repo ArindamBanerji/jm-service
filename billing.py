@@ -6,10 +6,11 @@ import hmac
 import json
 import logging
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import datetime, timezone, timedelta
+from uuid import UUID, uuid4
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
@@ -18,12 +19,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import Session, Tenant
-from db.connection import AsyncSessionLocal, sanitize_database_error
-from db.models import ApiKey, PaddleWebhookEvent
+from db.connection import AsyncSessionLocal, commit_write, sanitize_database_error
+from db.models import ApiKey, CheckoutIntent, PaddleWebhookEvent, ProjectBillingOwner, SubscriptionBinding, TransitionLog
+from db.tenant_lock import lock_tenant
 
 router = APIRouter(prefix="/v1/billing", tags=["Billing"])
 logger = logging.getLogger(__name__)
 MAX_WEBHOOK_BYTES = 64 * 1024
+MAX_BILLING_READERS = 4
+BILLING_READ_TIMEOUT_SECONDS = 30
+_billing_reader_slots = asyncio.BoundedSemaphore(MAX_BILLING_READERS)
 
 TIER_VOLUME_CAPS: dict[str, int | None] = {
     "trial": 50,  # per day
@@ -40,6 +45,39 @@ PADDLE_TIER_MAP = {
     "DLJ Business": "business",
     "DLJ Scale": "scale",
 }
+
+ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "trial": {"active", "trial_expired"},
+    "trial_expired": {"active"},
+    "active": {"past_due", "paused", "cancelled"},
+    "past_due": {"active", "paused", "cancelled"},
+    "paused": {"active", "past_due", "cancelled"},
+    "cancelled": {"active", "cleaned_up"},
+    "cleaned_up": set(),
+}
+
+
+def _current_state(record: ApiKey) -> str:
+    if record.subscription_state:
+        return record.subscription_state
+    if record.cancelled_at is not None:
+        return "cancelled"
+    return "active" if record.tier != "trial" else "trial"
+
+
+def _next_state(event_type: str, payload: dict, old: str) -> str:
+    if event_type == "subscription.canceled" or payload.get("status") == "canceled":
+        return "cancelled"
+    if event_type == "subscription.created":
+        return "active"
+    status = payload.get("status")
+    if status is not None and not isinstance(status, str):
+        raise HTTPException(422, "Invalid subscription status")
+    if status in {"active", "past_due", "paused"}:
+        return status
+    if status is None:
+        return old  # Product-only historical updates retain their entitlement state.
+    raise HTTPException(422, "Unsupported subscription status")
 
 
 def verify_paddle_signature(raw_body: bytes, header: str, secret: str) -> bool:
@@ -76,6 +114,25 @@ async def get_checkout_url(tenant: Tenant, session: Session, tier: str = "starte
         ApiKey.is_active.is_(True)))
     if key_id is None:
         raise HTTPException(401, "Invalid API key")
+    await lock_tenant(session, tenant)
+    owner = await session.get(ProjectBillingOwner, tenant)
+    if owner is None:
+        siblings = (await session.scalars(select(ApiKey.id).where(
+            ApiKey.tenant_id == tenant, ApiKey.is_active.is_(True)).limit(2))).all()
+        if len(siblings) != 1:
+            raise HTTPException(400, "Billing payer is ambiguous; establish an owner first")
+        payer_id = siblings[0]
+        payer = await session.get(ApiKey, payer_id)
+        assert payer is not None
+        session.add(ProjectBillingOwner(owner_tenant_id=tenant, billing_key_id=payer_id,
+                                        trial_started_at=payer.created_at))
+    else:
+        payer_id = owner.billing_key_id
+    intent = CheckoutIntent(id=uuid4(), tenant_id=tenant, purchaser=key_id,
+                            payer=payer_id, tier=tier,
+                            expires_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+    session.add(intent)
+    await commit_write(session)
     sandbox = os.environ.get("PADDLE_SANDBOX", "true").lower() == "true"
     api_url = ("https://sandbox-api.paddle.com" if sandbox else
                "https://api.paddle.com") + "/transactions"
@@ -86,15 +143,21 @@ async def get_checkout_url(tenant: Tenant, session: Session, tier: str = "starte
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={"items": [{"price_id": price_id, "quantity": 1}],
                       "collection_mode": "automatic",
-                      "custom_data": {"tenant_id": tenant, "key_id": str(key_id)}},
+                      "custom_data": {"tenant_id": tenant, "key_id": str(key_id),
+                                      "checkout_intent_id": str(intent.id)}},
             )
             response.raise_for_status()
+            transaction_id = response.json().get("data", {}).get("id")
             checkout_url = response.json().get("data", {}).get("checkout", {}).get("url")
     except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
-        logger.error("Paddle checkout failed: %s", exc)
-        raise HTTPException(502, "Could not create Paddle checkout") from exc
+        logger.error("Paddle checkout failed: %s", sanitize_database_error(exc))
+        raise HTTPException(502, "Could not create Paddle checkout") from None
     if not isinstance(checkout_url, str) or not checkout_url.startswith("https://"):
         raise HTTPException(502, "Paddle did not return a checkout URL")
+    if not isinstance(transaction_id, str) or not transaction_id.startswith("txn_"):
+        raise HTTPException(502, "Paddle did not return a transaction ID")
+    intent.transaction_id = transaction_id
+    await commit_write(session)
     return {"checkout_url": checkout_url, "tier": tier}
 
 
@@ -106,7 +169,7 @@ def _product_tier(payload: dict, event_type: str) -> str | None:
     product = first.get("product") if isinstance(first, dict) else None
     name = product.get("name") if isinstance(product, dict) else None
     if not isinstance(name, str) or name not in PADDLE_TIER_MAP:
-        logger.warning("Unrecognized Paddle product: %r", name[:200] if isinstance(name, str) else type(name).__name__)
+        logger.warning("Unrecognized Paddle product type: %s", type(name).__name__)
         raise HTTPException(400, "Unknown product")
     return PADDLE_TIER_MAP[name]
 
@@ -124,6 +187,22 @@ def _occurred_at(value: object) -> datetime:
 
 async def _checkout_key(session: AsyncSession, customer_id: str, custom: dict) -> ApiKey:
     active = select(ApiKey).where(ApiKey.is_active.is_(True)).with_for_update()
+    intent_id = custom.get("checkout_intent_id")
+    if intent_id is not None:
+        try:
+            intent = await session.get(CheckoutIntent, UUID(str(intent_id)), with_for_update=True)
+        except (TypeError, ValueError):
+            raise HTTPException(409, "Invalid checkout intent") from None
+        if intent is None or intent.consumed_at is not None or intent.tenant_id != custom.get("tenant_id"):
+            raise HTTPException(409, "Checkout intent is unavailable")
+        expires = intent.expires_at if intent.expires_at.tzinfo else intent.expires_at.replace(tzinfo=timezone.utc)
+        if expires <= datetime.now(timezone.utc):
+            raise HTTPException(409, "Checkout intent expired")
+        record = await session.scalar(active.where(ApiKey.id == intent.payer, ApiKey.tenant_id == intent.tenant_id))
+        if record is None:
+            raise HTTPException(409, "Billing payer is unavailable")
+        intent.consumed_at = datetime.now(timezone.utc)
+        return record
     record = await session.scalar(active.where(ApiKey.paddle_customer_id == customer_id))
     tenant = custom.get("tenant_id")
     if record is not None:
@@ -140,7 +219,10 @@ async def _checkout_key(session: AsyncSession, customer_id: str, custom: dict) -
         except ValueError as exc:
             raise HTTPException(409, "Invalid checkout key ID") from exc
         candidates = candidates.where(ApiKey.id == key_id)
-    record = await session.scalar(candidates.order_by(ApiKey.created_at, ApiKey.id).limit(1))
+    records = (await session.scalars(candidates.order_by(ApiKey.created_at, ApiKey.id).limit(2))).all()
+    if len(records) > 1:
+        raise HTTPException(409, "Billing payer is ambiguous")
+    record = records[0] if records else None
     if record is None:
         raise HTTPException(409, "No API key linked to this checkout")
     return record
@@ -175,6 +257,20 @@ async def _billing_session() -> AsyncIterator[AsyncSession]:
 
 @router.post("/webhook")
 async def paddle_webhook(request: Request) -> dict[str, str]:
+    try:
+        await asyncio.wait_for(_billing_reader_slots.acquire(), timeout=0.01)
+    except TimeoutError:
+        raise HTTPException(503, "Billing intake is busy") from None
+    try:
+        async with asyncio.timeout(BILLING_READ_TIMEOUT_SECONDS):
+            return await _process_paddle_webhook(request)
+    except TimeoutError:
+        raise HTTPException(408, "Billing request timed out") from None
+    finally:
+        _billing_reader_slots.release()
+
+
+async def _process_paddle_webhook(request: Request) -> dict[str, str]:
     length = request.headers.get("content-length")
     if length is not None:
         try:
@@ -228,11 +324,12 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
         raise HTTPException(422, "Invalid event_id")
     occurred_at = _occurred_at(data.get("occurred_at"))
     async with _billing_session() as session:
-        session.add(PaddleWebhookEvent(event_id=event_id))
         try:
-            await session.flush()
-        except IntegrityError as exc:
-            raise HTTPException(409, "Webhook event already processed") from exc
+            async with session.begin_nested():
+                session.add(PaddleWebhookEvent(event_id=event_id))
+                await session.flush()
+        except IntegrityError:
+            return {"status": "ok"}
 
         record: ApiKey | None
         if event_type == "subscription.created":
@@ -240,8 +337,16 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
             if not isinstance(customer_id, str) or not 0 < len(customer_id) <= 200:
                 raise HTTPException(422, "Missing customer ID")
             custom = payload.get("custom_data")
+            if not isinstance(custom, dict) or not isinstance(custom.get("tenant_id"), str):
+                raise HTTPException(409, "Checkout tenant is unavailable")
+            await lock_tenant(session, custom["tenant_id"])
             record = await _checkout_key(session, customer_id, custom if isinstance(custom, dict) else {})
         else:
+            tenant_id = await session.scalar(select(ApiKey.tenant_id).where(
+                ApiKey.paddle_subscription_id == subscription_id))
+            if tenant_id is None:
+                raise HTTPException(409, "Unknown subscription ID")
+            await lock_tenant(session, tenant_id)
             record = await session.scalar(select(ApiKey).where(
                 ApiKey.paddle_subscription_id == subscription_id).with_for_update())
             if record is None:
@@ -253,6 +358,18 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
                 stored = timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=timezone.utc)
                 if occurred_at < stored or (occurred_at == stored and not is_cancellation):
                     return {"status": "ok"}
+        old_state = _current_state(record)
+        next_state = _next_state(event_type, payload, old_state)
+        if next_state != old_state and next_state not in ALLOWED_TRANSITIONS[old_state]:
+            raise HTTPException(409, "Invalid subscription transition")
+        if next_state != old_state:
+            record.subscription_state = next_state
+            record.state_version += 1
+        session.add(TransitionLog(
+            event_id=event_id, key_id=record.id, subscription_id=subscription_id,
+            source="paddle", actor_ref=customer_id if event_type == "subscription.created" else None,
+            occurred_at=occurred_at, old_state=old_state, new_state=next_state,
+            disposition="applied", key_version=record.state_version))
         record.paddle_event_id = event_id
         record.paddle_event_occurred_at = occurred_at
         if is_cancellation:
@@ -263,6 +380,15 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
             if event_type == "subscription.created" or payload.get("status") == "active":
                 record.cancelled_at = None
             if event_type == "subscription.created":
+                current_binding = await session.scalar(select(SubscriptionBinding).where(
+                    SubscriptionBinding.payer == record.id,
+                    SubscriptionBinding.retired_at.is_(None)).with_for_update())
+                if current_binding is not None and current_binding.subscription_id != subscription_id:
+                    current_binding.retired_at = occurred_at
+                    await session.flush()
+                if current_binding is None or current_binding.subscription_id != subscription_id:
+                    session.add(SubscriptionBinding(subscription_id=subscription_id,
+                                                    payer=record.id, customer_id=customer_id))
                 record.paddle_customer_id = customer_id
                 record.paddle_subscription_id = subscription_id
                 try:

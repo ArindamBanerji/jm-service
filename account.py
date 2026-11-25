@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import Tenant, scoped_domain_id
-from db.connection import get_db
+from db.connection import commit_write, get_db
 from db.models import ApiKey, Domain
 from trial_guard import DAILY_TRIAL_CAP, TIER_MONTHLY_CAPS, TRIAL_DAYS
 
@@ -32,20 +32,22 @@ async def account(session: Session, tenant: Tenant) -> dict:
         raise HTTPException(401, detail="Invalid API key")
     now = datetime.now(timezone.utc)
     tier = record.tier or "trial"
+    state = record.subscription_state or ("cancelled" if record.cancelled_at else "active" if tier != "trial" else "trial")
     created = utc(record.created_at)
     day = now.strftime("%Y-%m-%d")
     month = now.strftime("%Y-%m")
     return {
         "tenant_id": record.tenant_id, "tenant_name": record.tenant_name,
         "tier": tier, "created_at": created.isoformat(), "is_active": record.is_active,
+        "subscription_state": state,
         "cancelled_at": utc(record.cancelled_at).isoformat() if record.cancelled_at else None,
         "trial_expires_at": (created + timedelta(days=TRIAL_DAYS)).isoformat() if tier == "trial" else None,
         "trial_expired": tier == "trial" and now > created + timedelta(days=TRIAL_DAYS),
         "usage": {
             "labels_today": record.labels_today if record.labels_day_key == day else 0,
             "labels_this_month": record.labels_this_month if record.labels_month_key == month else 0,
-            "daily_cap": DAILY_TRIAL_CAP if tier == "trial" else None,
-            "monthly_cap": TIER_MONTHLY_CAPS.get(tier),
+            "daily_cap": 0 if state == "trial_expired" else DAILY_TRIAL_CAP if state == "cancelled" or tier == "trial" else None,
+            "monthly_cap": 0 if state in {"past_due", "paused", "cleaned_up", "trial_expired"} else TIER_MONTHLY_CAPS.get(tier),
             "day_key": day, "month_key": month,
         },
     }
@@ -80,4 +82,5 @@ async def resolve_domain(payload: ResolveDomain, session: Session, tenant: Tenan
     if row.public_domain_id is not None and row.public_domain_id != payload.domain_id:
         raise HTTPException(409, detail="Domain name already recorded")
     row.public_domain_id = payload.domain_id
+    await commit_write(session)
     return {"public_domain_id": row.public_domain_id}

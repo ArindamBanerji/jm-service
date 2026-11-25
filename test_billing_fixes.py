@@ -91,31 +91,36 @@ def test_valid_signature_live(client, monkeypatch):
 
 
 def test_checkout_upgrades_specific_key(client, monkeypatch):
-    purchaser = add_key(client, "tasks-tenant")
+    purchaser = "tasks-key"
     monkeypatch.setenv("PADDLE_API_KEY", "test-provider-key")
     monkeypatch.setenv("PADDLE_PRICE_MAP", "professional=pri_1")
     reply = httpx.Response(201, request=httpx.Request("POST", "https://example.test"),
-                           json={"data": {"checkout": {"url": "https://example.test/pay"}}})
+                           json={"data": {"id": "txn_test123", "checkout": {"url": "https://example.test/checkout?_ptxn=txn_test123"}}})
     post = AsyncMock(return_value=reply)
     monkeypatch.setattr(httpx.AsyncClient, "post", post)
     checkout = client.get("/v1/billing/checkout-url?tier=professional", headers={"X-Api-Key": purchaser})
     assert checkout.status_code == 200
+    assert checkout.json()["checkout_url"] == "https://example.test/checkout?_ptxn=txn_test123"
+    assert post.await_args is not None
     custom = post.await_args.kwargs["json"]["custom_data"]
-    assert custom == {"tenant_id": "tasks-tenant", "key_id": str(key(client, purchaser).id)}
+    assert custom["tenant_id"] == "tasks-tenant"
+    assert custom["key_id"] == str(key(client, purchaser).id)
+    assert custom["checkout_intent_id"]
+    other_key = add_key(client, "tasks-tenant")
     assert deliver(client, event(custom_data=custom)).status_code == 200
     assert key(client, purchaser).tier == "professional"
-    assert key(client).tier == "trial"
+    assert key(client, other_key).tier == "trial"
     # Once linked, the customer's original key wins over a later same-tenant hint.
-    other = {"tenant_id": "tasks-tenant", "key_id": str(key(client).id)}
+    other = {"tenant_id": "tasks-tenant", "key_id": str(key(client, other_key).id)}
     assert deliver(client, event(sequence=2, product="DLJ Business", custom_data=other)).status_code == 200
     assert key(client, purchaser).tier == "business"
-    assert key(client).paddle_customer_id is None
+    assert key(client, other_key).paddle_customer_id is None
 
 
 def test_duplicate_event_rejected_after_intervening_update(client):
     assert deliver(client, event()).status_code == 200
     assert deliver(client, event("updated", 2, "DLJ Scale")).status_code == 200
-    assert deliver(client, event()).status_code == 409
+    assert deliver(client, event()).status_code == 200
     assert key(client).tier == "scale" and key(client).paddle_event_id == "evt-2"
 
 
@@ -127,7 +132,7 @@ def test_older_activation_preserves_cancellation(client):
     assert saved.tier == "professional" and saved.paddle_event_id == "evt-3"
     assert saved.cancelled_at == saved.paddle_event_occurred_at
     assert saved.cancelled_at.replace(tzinfo=timezone.utc) == datetime(2026, 1, 3, 12, tzinfo=timezone.utc)
-    assert deliver(client, event(sequence=2)).status_code == 409
+    assert deliver(client, event(sequence=2)).status_code == 200
     assert deliver(client, event("updated", 4, status="active")).status_code == 200
     assert key(client).cancelled_at is None
 
@@ -139,7 +144,7 @@ def test_email_conflict_preserves_entitlement(client, caplog):
     assert key(client).tier == "professional" and key(client).contact_email is None
     assert key(client, owner).contact_email == "owner@example.test"
     assert "contact email conflicts" in caplog.text
-    assert deliver(client, payload).status_code == 409
+    assert deliver(client, payload).status_code == 200
 
 
 def test_non_string_product_rejected(client):

@@ -49,6 +49,13 @@ async def send_api_key_email(to: str, api_key: str) -> bool:
     return await send_email(to, subject, html)
 
 
+async def send_signup_challenge_email(to: str, token: str) -> bool:
+    """Deliver proof of mailbox control without issuing an account credential."""
+    html = ("<p>Enter this one-time code in the DLJ signup form within 30 minutes:</p>"
+            f"<pre>{escape(token)}</pre>")
+    return await send_email(to, "Confirm your DLJ email", html)
+
+
 def trial_expiring_email() -> tuple[str, str]:
     subject = "Your DLJ trial expires in 2 days"
     html = """<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto">

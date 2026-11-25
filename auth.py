@@ -6,18 +6,20 @@ import logging
 import os
 import re
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.connection import get_db
-from db.models import ApiKey
-from email_service import send_api_key_email
+from db.connection import commit_write, get_db
+from db.models import ApiKey, SignupChallenge
+from db.tenant_lock import lock_tenant
+from email_service import send_signup_challenge_email
 from rate_limit import limiter
 
 Session = Annotated[AsyncSession, Depends(get_db)]
@@ -44,24 +46,54 @@ class RegisterRequest(BaseModel):
         return (value.strip() or None) if value is not None else None
 
 
-@signup_router.post("/register", status_code=201)
+@signup_router.post("/register", status_code=202)
 @limiter.limit("5/minute")
 async def register(request: Request, payload: RegisterRequest, session: Session) -> dict[str, str]:
     existing = await session.scalar(select(ApiKey.id).where(func.lower(ApiKey.contact_email) == payload.email))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email already registered")
+    token = secrets.token_hex(32)
+    session.add(SignupChallenge(
+        token_digest=hashlib.sha256(token.encode()).hexdigest(), email=payload.email,
+        requested_name=payload.name,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=30)))
+    await commit_write(session)
+    if not await send_signup_challenge_email(payload.email, token):
+        logger.warning("Signup challenge email delivery failed")
+        raise HTTPException(503, detail="Could not send confirmation email; please try again")
+    return {"message": "Check your email for a confirmation code."}
+
+
+class ConfirmRequest(BaseModel):
+    token: str = Field(min_length=64, max_length=64)
+
+
+@signup_router.post("/confirm", status_code=201)
+@limiter.limit("10/minute")
+async def confirm(request: Request, payload: ConfirmRequest, session: Session) -> dict[str, str]:
+    now = datetime.now(timezone.utc)
+    digest = hashlib.sha256(payload.token.encode()).hexdigest()
+    claimed = await session.execute(
+        update(SignupChallenge).where(
+            SignupChallenge.token_digest == digest,
+            SignupChallenge.consumed_at.is_(None), SignupChallenge.expires_at > now,
+        ).values(consumed_at=now).returning(
+            SignupChallenge.email, SignupChallenge.requested_name))
+    proof = claimed.one_or_none()
+    if proof is None:
+        raise HTTPException(400, detail="Invalid or expired confirmation code")
+    email, name = proof
     tenant_id = str(uuid4())
-    plain, record = generate_api_key(tenant_id, payload.name or payload.email.split("@", 1)[0])
-    record.tier = "trial"
-    record.contact_email = payload.email
+    plain, record = generate_api_key(tenant_id, name or email.split("@", 1)[0])
+    record.contact_email = email
+    await lock_tenant(session, tenant_id)
     session.add(record)
     try:
         await session.flush()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPException(status_code=409, detail="Email already registered") from exc
-    if not await send_api_key_email(payload.email, plain):
-        logger.warning("API key email delivery failed for tenant %s", tenant_id)
+        raise HTTPException(409, detail="Email already registered") from exc
+    await commit_write(session)
     return {"api_key": plain, "tenant_id": tenant_id, "tier": "trial",
             "message": "Save this key — it cannot be recovered."}
 
@@ -75,7 +107,8 @@ def scoped_domain_id(tenant_id: str, domain_id: str) -> str:
 def generate_api_key(tenant_id: str, tenant_name: str) -> tuple[str, ApiKey]:
     plain = secrets.token_hex(32)
     return plain, ApiKey(key_hash=hashlib.sha256(plain.encode()).hexdigest(),
-                         tenant_id=tenant_id, tenant_name=tenant_name)
+                         tenant_id=tenant_id, tenant_name=tenant_name,
+                         subscription_state="trial")
 
 
 async def verify_api_key(key: str, session: AsyncSession) -> str | None:
@@ -110,7 +143,14 @@ async def create_key(request: Request, payload: CreateKey, session: Session,
     expected = os.getenv("ADMIN_API_KEY")
     if not expected or not x_admin_key or not secrets.compare_digest(x_admin_key, expected):
         raise HTTPException(status_code=401, detail="Invalid admin key")
+    await lock_tenant(session, payload.tenant_id)
+    tombstone = await session.scalar(select(ApiKey.id).where(
+        ApiKey.tenant_id == payload.tenant_id,
+        ApiKey.subscription_state == "cleaned_up").limit(1))
+    if tombstone is not None:
+        raise HTTPException(409, detail="Tenant has been cleaned up")
     plain, record = generate_api_key(payload.tenant_id, payload.tenant_name)
     session.add(record)
     await session.flush()
+    await commit_write(session)
     return {"api_key": plain, "tenant_id": payload.tenant_id}

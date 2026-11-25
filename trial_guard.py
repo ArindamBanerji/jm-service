@@ -29,6 +29,10 @@ def _utc_timestamp(value: datetime) -> datetime:
 
 
 def check_trial_expiry(api_key_record: ApiKey) -> None:
+    if api_key_record.subscription_state == "trial_expired":
+        raise HTTPException(402, detail={"error": "trial_expired",
+                                         "message": "Your 14-day free trial has ended. Upgrade to continue scoring.",
+                                         "upgrade_url": UPGRADE_URL})
     if (api_key_record.tier or "trial") != "trial":
         return
     created = api_key_record.created_at
@@ -73,6 +77,11 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         ApiKey.key_hash == key_hash, ApiKey.is_active.is_(True)).with_for_update())
     if record is None:
         raise HTTPException(401, detail="Invalid API key")
+    state = record.subscription_state
+    if state in {"past_due", "paused"}:
+        raise HTTPException(402, detail={"error": state, "message": "Subscription is not active"})
+    if state == "cleaned_up":
+        raise HTTPException(403, detail="Subscription was cleaned up")
 
     now = datetime.now(timezone.utc)
     day_key = now.strftime("%Y-%m-%d")
@@ -85,7 +94,7 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         record.labels_this_month = 0
 
     cancelled = record.cancelled_at
-    cancellation_effective = cancelled is not None and _utc_timestamp(cancelled) <= now
+    cancellation_effective = state == "cancelled" or (cancelled is not None and _utc_timestamp(cancelled) <= now)
     check_trial_expiry(record)
     if (record.tier or "trial") == "trial" or cancellation_effective:
         if record.labels_today >= DAILY_TRIAL_CAP:

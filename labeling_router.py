@@ -18,7 +18,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
-from db.connection import get_db
+from db.connection import commit_write, get_db
 from db.models import Domain, LabelLog
 from db import repository
 from auth import Tenant, scoped_domain_id
@@ -31,6 +31,11 @@ router = APIRouter(prefix="/v1/labels", tags=["Labeling"])
 logger = logging.getLogger(__name__)
 autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
 Session = Annotated[AsyncSession, Depends(get_db)]
+
+
+def require_active_project(domain: Domain) -> None:
+    if domain.status != "active":
+        raise HTTPException(409, detail="Project is read-only")
 
 
 class GuidelinesPayload(BaseModel):
@@ -61,7 +66,9 @@ async def get_guidelines(domain_id: str, tenant: Tenant, session: Session) -> Gu
 async def put_guidelines(domain_id: str, payload: GuidelinesPayload, tenant: Tenant,
                          session: Session) -> GuidelinesPayload:
     domain = await guidelines_domain(domain_id, tenant, session)
+    require_active_project(domain)
     domain.guidelines = payload.guidelines
+    await commit_write(session)
     return payload
 
 
@@ -327,6 +334,7 @@ async def _prepare_engine(session: AsyncSession, domain_id: str,
         await repository.create_domain(session, domain_id, domain_id, config,
                                        public_domain_id=public_domain_id)
     else:
+        require_active_project(domain)
         if domain.public_domain_id is None and public_domain_id is not None:
             domain.public_domain_id = public_domain_id
         config = DomainConfig.from_dict(domain.config_json)
@@ -384,6 +392,7 @@ async def ingest(request: IngestRequest, response: Response, session: Session, t
                                request.domain_id)
         if warning := session.info.get("volume_warning"):
             response.headers["X-Volume-Warning"] = warning
+        await commit_write(session)
         return result
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="Domain or label already exists") from exc
@@ -416,6 +425,8 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
         raise HTTPException(status_code=422, detail="Unknown actual_action")
     assert row.category is not None
     domain = await repository.get_domain(session, domain_id)
+    if domain is not None:
+        require_active_project(domain)
     categories = DomainConfig.from_dict(domain.config_json).categories if domain is not None else []
     if row.category not in categories:
         raise HTTPException(status_code=422, detail=f"Category not in domain schema: {row.category}")
@@ -428,6 +439,8 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
     except StaleDataError as exc:
         raise HTTPException(status_code=409, detail="Engine state changed; retry") from exc
     _, accuracy = await repository.verified_accuracy(session, domain_id, row.category)
+    if not session.info.get("bulk_verify_active"):
+        await commit_write(session)
     return VerifyResponse(label_id=request.label_id, action_taken=request.actual_action,
                           was_correct=request.verified_outcome,
                           engine_updated=result.centroid_moved, new_accuracy=accuracy)
@@ -441,6 +454,7 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
     domain = await repository.get_domain(session, scoped)
     if domain is None:
         raise HTTPException(404, detail="Domain not found")
+    require_active_project(domain)
     categories = set(DomainConfig.from_dict(domain.config_json).categories)
     rows = (await session.scalars(select(LabelLog).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
@@ -452,6 +466,7 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
     skipped = 0
     errors: list[dict[str, str]] = []
     capacity_error: str | None = None
+    session.info["bulk_verify_active"] = True
     for label_id in payload.label_ids:
         row = by_id[label_id]
         if row.verified_at is not None:
@@ -486,6 +501,8 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
                                                      else payload.outcome),
                                    reason=payload.reason), session, tenant)
         processed += 1
+    session.info.pop("bulk_verify_active", None)
+    await commit_write(session)
     return {"processed": processed, "skipped": skipped, "errors": errors}
 
 
@@ -514,6 +531,7 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
             raise HTTPException(status_code=422, detail={"item_index": index, "error": detail}) from exc
     if warning := session.info.get("volume_warning"):
         response.headers["X-Volume-Warning"] = warning
+    await commit_write(session)
     return IngestBatchResponse(results=results, batch_size=len(results))
 
 
@@ -528,6 +546,8 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
     domain = await repository.get_domain(session, scoped)
     if domain is not None and domain.domain_name != SAMPLE_MARKER:
         raise HTTPException(409, detail="Domain name is already in use")
+    if domain is not None:
+        require_active_project(domain)
     ids = [item.label_id for item in items]
     existing_ids = set((await session.scalars(select(LabelLog.label_id).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
@@ -557,6 +577,7 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
         LabelLog.label_id.in_(ids), LabelLog.verified_at.is_(None)))).all()
     if warning := session.info.get("volume_warning"):
         response.headers["X-Volume-Warning"] = warning
+    await commit_write(session)
     return {"domain_id": domain_id, "created": created,
             "existing": len(existing_ids), "pending": len(pending_ids)}
 
@@ -571,6 +592,8 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
         raise HTTPException(409, detail="Label already exists")
     if request.category is not None:
         domain = await repository.get_domain(session, scoped)
+        if domain is not None:
+            require_active_project(domain)
         config = DomainConfig.from_dict(domain.config_json) if domain else None
         factors = {name: 0.5 for name in (config.factors if config else
                    ["model_confidence", "item_difficulty"])}
@@ -580,6 +603,7 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
             await _ingest(session, scoped, item, domain_id)
         except (IntegrityError, StaleDataError) as exc:
             raise HTTPException(409, detail="Label already exists") from exc
+        await commit_write(session)
         return {"label_id": request.label_id, "status": "scored", "category": request.category}
     domain = await repository.get_domain(session, scoped)
     if domain is None:
@@ -591,6 +615,8 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
             raise HTTPException(409, detail="Domain already exists") from exc
     elif domain.public_domain_id is None:
         domain.public_domain_id = domain_id
+    if domain is not None:
+        require_active_project(domain)
     session.add(LabelLog(domain_id=scoped, tenant_id=tenant, label_id=request.label_id,
                          category=None, factors_json={}, text=request.text,
                          recommended_action=None, confidence=None, scored_at=null()))
@@ -598,6 +624,7 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
         await session.flush()
     except IntegrityError as exc:
         raise HTTPException(409, detail="Label already exists") from exc
+    await commit_write(session)
     return {"label_id": request.label_id, "status": "pending_classification", "category": None}
 
 
@@ -605,6 +632,9 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
 async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
                        session: Session, tenant: Tenant) -> dict[str, str | None]:
     scoped = scoped_domain_id(tenant, domain_id)
+    project = await repository.get_domain(session, scoped)
+    if project is not None:
+        require_active_project(project)
     original = await _current_label(session, domain_id, label_id, tenant, lock=True)
     if request.idempotency_token != str(original.id):
         raise HTTPException(409, detail="Stale label revision")
@@ -690,6 +720,7 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
         await repository.record_label_content(session, successor.id, "text_multilabel", [], request.tags, None)
     else:
         await repository.copy_label_content(session, original.id, successor.id)
+    await commit_write(session)
     return {"label_id": label_id, "category": request.category,
             "revision_id": str(successor.id), "previous_category": prior_category}
 
@@ -763,6 +794,7 @@ async def create_label_content(domain_id: str, label_id: str, payload: LabelCont
         raise HTTPException(409, detail="Content already exists for this revision")
     domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
     assert domain is not None
+    require_active_project(domain)
     categories = set(DomainConfig.from_dict(domain.config_json).categories)
     if payload.content_type == "text_ner":
         if row.text is None:
@@ -794,6 +826,7 @@ async def create_label_content(domain_id: str, label_id: str, payload: LabelCont
     except IntegrityError as exc:
         raise HTTPException(409, detail="Content already exists for this revision") from exc
     count_key = "spans_count" if payload.content_type == "text_ner" else "tags_count"
+    await commit_write(session)
     return {"label_id": row.label_id, "content_type": payload.content_type,
             count_key: len(spans) if count_key == "spans_count" else len(payload.tags)}
 

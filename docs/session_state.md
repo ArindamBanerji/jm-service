@@ -791,3 +791,135 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - pytest: 432 passed, 1 skipped; round 4 tests 10 passed on SQLite and 10 on PostgreSQL
 - mypy: clean
 - Frontend build and TypeScript checks: passed
+
+## DLJ-SWEEP5 — Convergence Sweep (Round 5, Combined BE+FE)
+
+- Date: 2026-11-24
+- Dimensions: 5
+- Round 4 fixes: 6 CLOSED of 10, 4 PARTIAL
+- FE P1: 2
+- BE P1: 2 patchable remaining + 10 structural launch blockers + 3 accepted risks = 15
+- Tests: 432 pytest passed, 1 skipped + 118 Playwright passed; focused PostgreSQL run 10 passed
+- Execution plan: NOT READY
+- Report: docs/quality/dlj_sweep5_convergence.md
+
+## DLJ-FIX-R5 — Round 5 Combined Fixes (Red-Green Verified)
+
+- Date: 2026-11-24
+- Methodology: RED-GREEN-RED — each test failed before its fix and passed afterward; assertions depend on the changed code paths
+- FE fixes: cross-tab epoch invalidation (R3-01+R4-01), draft preservation on canonical navigation (R3-03), persisted receipt cleanup
+- BE fixes: annotator projection (R45), exception sanitization (N02), webhook action type guard (N03)
+- Files modified: frontend/src/App.tsx, frontend/src/screens/Signup.tsx, frontend/src/screens/ReviewCard.tsx, dashboard_router.py, db/connection.py, scheduler.py, label_studio.py
+- Files created: test_round5_fixes.py, e2e/fix_round5.spec.ts, scripts/check_round5.py
+- Red-green evidence: 6/6 fixes verified by red-green; executable post-checks passed
+- PW: 121 passed (0 failures)
+- pytest: 436 passed, 1 skipped; focused PostgreSQL tests 4 passed
+- mypy: clean
+- Frontend build and TypeScript checks: passed
+- Partials closed: R3-01, R4-01, R3-03, R45
+- Patchable P1s closed: N02, N03
+
+## DLJ-SWEEP6 — Convergence Sweep (Round 6, Full Broad Audit)
+
+- Date: 2026-11-24
+- Dimensions: 6 (fix verification + broad BE + broad FE + tests + P1 scorecard + gate)
+- Round 5 fixes: 5 CLOSED of 6; N02 PARTIAL
+- New findings: P1=5, P2=3, P3=0
+- Definitive P1: patchable=7 (4 BE, 3 FE), structural=9, accepted=3; total=19
+- FE P1: 3
+- Tests: 436 pytest passed, 1 skipped + 121 Playwright passed; round 5 module 4 passed on each database
+- Execution plan: NOT READY
+- Report: docs/quality/dlj_sweep6_convergence.md
+
+## DLJ-FIX-R6 — Round 6 Combined Fixes (Red-Green Verified)
+
+- Date: 2026-11-25
+- Methodology: RED-GREEN-RED; all seven regression tests failed on their original paths before the application changes and passed afterward
+- BE fixes: commit before response (B6-01), complete diagnostic sanitization (N02), connector delivery ordering (B6-02), billing webhook body limit (B6-03)
+- FE fixes: Save Tags draft preservation (R3-03), whole-store clear (F6-01), removal of source File from browser history (F6-02)
+- Files modified: db/connection.py, db/models.py, db/migrate.py, labeling_router.py, auth.py, account.py, label_studio.py, billing.py, scheduler.py, frontend/src/App.tsx, frontend/src/screens/ReviewCard.tsx, frontend/src/screens/Upload.tsx, frontend/src/screens/HealthReport.tsx, test_round5_fixes.py
+- Files created: test_round6_fixes.py, e2e/fix_round6.spec.ts, frontend/src/reportHandoff.ts, scripts/check_round6.py, docs/quality/dlj_fix_round6_code_audit.md
+- Red-green evidence: 7/7 verified; 15 shared-session write endpoints enumerated, 15 explicit commits, 0 missing
+- PW: 124 passed (0 failures)
+- pytest: 443 passed, 1 skipped; focused PostgreSQL round 6 tests 7 passed
+- mypy: clean; frontend build and TypeScript checks passed
+- Patchable P1s closed: B6-01, N02, B6-02, B6-03, R3-03, F6-01, F6-02
+
+## DLJ-SWEEP7 — Convergence Sweep (Round 7, Full Broad Audit)
+
+- Date: 2026-11-25
+- Dimensions: 7 (fix verification + broad BE + broad FE + tests + P1 scorecard + gate + self-check)
+- Round 6 fixes: 3 CLOSED of 7, 4 PARTIAL
+- New findings: P1=2, P2=7, P3=0
+- Definitive P1: patchable=6, structural=9, accepted=3 (18 total)
+- FE P1: 2
+- Tests: configured pytest 443 passed, 0 failed, 1 skipped; SQLite pytest 442 passed, 1 failed, 1 skipped; Playwright 124 passed of 124
+- Execution plan: NOT READY
+- Self-check: 76/76 files, 46/46 application endpoints (22 write-capable)
+- Report: docs/quality/dlj_sweep7_convergence.md
+
+## DLJ-DESIGN-V3 + PROMPT-00 — Plan Update and Harness
+
+- Date: 2026-11-25
+- Part A: Updated `docs/design/dlj_arch_redesign_v2.md` to v3. The former 12-prompt schedule becomes Prompt 00 followed by seven delivery prompts (A–F and 12) in six waves, with five mandatory independent Astra reviews.
+- Estimate: 29 → 27 working days, including 2.5 review days. Effort: 37 → 33 engineer-days.
+- PostgreSQL is primary. SQLite is advisory. R24 moves to ACCEPTABLE RISK. The release ledger contains 24 launch obligations, four accepted risks and one closed commit-ordering contract.
+- Sweep 5–7 findings assigned: A owns B6-03 and expanded N02, B owns expanded R3-03 and F7-01, C owns B6-02 and B7-01.
+- Part B: Built `tests/harness/` with isolated PostgreSQL schemas, real application routes, data factories, browser contracts, scenario shells and a separate advisory SQLite CI job.
+- Endpoints covered: 46 of 46. All 22 write contracts observe durable state by HTTP response start using a separate reader or a test provider ledger.
+- Scenarios shelled: 27 of 27, all skipped with an owning prompt and acceptance criteria. Known-failure tests: 6 of 6, all strict xfails.
+- Harness results: 55 passed (46 HTTP and nine browser contracts), 27 skipped, six xfailed on each of PostgreSQL and SQLite.
+- Existing tests: 443 pytest passed, one skipped. All 124 Playwright tests passed against an isolated service with a fresh SPA build.
+- mypy: clean across 26 harness source files. Post-check: `tests/harness/README.md`. Next gate: independent R1 review before Prompt A.
+
+## DLJ-R1 — Harness Review (Post-Wave 1)
+
+- Date: 2026-11-25
+- Contracts: 46/46. Write durability: 22/22 serial paths verified at response start. Overlapping calls can suppress a required observer.
+- Scenarios: 27/27 correctly owned. Known failures: 6/6 reproduced as strict expected failures.
+- Existing: 443 pytest passed, one skipped. Playwright: 124 passed with two workers; the two default eight-worker runs passed 100/124 and 105/124.
+- Prompt A: NOT READY. Correct root pytest discovery, request-scoped durability observations, identity/billing and DTO contract gaps, and the browser gate configuration.
+- Report: docs/quality/dlj_r1_harness_review.md
+
+| 2026-11-25 | Paddle checkout URL fix | PASS | Option A: construct hosted checkout URL from txn_id instead of using checkout.url field. Added error logging. |
+
+## DLJ-PADDLE-JS — Paddle.js Overlay + Checkout URL Revert
+
+- Date: 2026-11-25
+- Reverted billing.py to return original checkout.url from Paddle API
+- Added Paddle.js to frontend/index.html with sandbox environment
+- Updated test assertions to match original checkout.url format
+- Tests: 60 passed, 27 skipped, 6 expected failures
+- mypy: clean
+- Frontend build: passed
+- Live verification: pending (need to redeploy and test button click)
+
+## DLJ-R1-FIXER — R1 Harness Blocker Fixes
+
+- Date: 2026-11-25
+- Harness blockers addressed: 5/5 (pytest discovery, request-owned durability, identity/billing entry contracts, DTO freeze, repeatable browser worker count).
+- Files modified: `tests/harness/conftest.py`, `tests/harness/fixtures/factory.py`, `tests/harness/contracts/test_auth.py`, `test_billing.py`, `test_labels.py`, `test_dashboard.py`, `test_revisions.py`, `playwright.config.ts`.
+- File created: `tests/harness/test_observers.py` (overlapping observed writes and missing-observation failure).
+- Combined root discovery: 537 collected, exit 0 with the live/ops and untracked live Paddle script excluded. Combined execution before the final observer test: 500 passed, two failed, 28 skipped, six xfailed. The two failures are existing checkout tests expecting the earlier Paddle response shape.
+- Harness on PostgreSQL: 60 passed, 27 skipped, six xfailed. SQLite advisory run before the final observer test: 59 passed, 27 skipped, six xfailed. The added observer test passed separately.
+- Existing offline suite: 441 passed, two failed, one skipped. The checkout failures reproduce in isolation. The untracked `scripts/test_paddle.py` fails on a live SSL request during unconstrained root collection.
+- Playwright: 124 passed with two configured workers against an isolated service.
+- mypy: clean for harness conftest and factory.
+- Next gate: Prompt A remains pending until the two existing checkout tests are reconciled with the current billing response contract and the offline root suite passes.
+
+## DLJ-PROMPT-A-WIP — Incomplete delivery
+
+- Date: 2026-11-25
+- Added both A schema blocks to ORM models and additive migration columns; historical backfill and upgraded-schema constraint validation remain open.
+- Tightened Label Studio project, task, category, annotation and annotator ID boundaries; added focused PostgreSQL/SQLite harness regressions in `tests/harness/test_prompt_a_boundaries.py`.
+- S1–S14 remain skipped: focused boundary checks do not satisfy the complete scenario oracles.
+- Verification: `tests/` 62 passed, 27 skipped, six xfailed; `test_jm_service.py` 29 passed; focused migration tests five passed and one skipped; changed-source mypy clean.
+- Prompt A is **NOT COMPLETE**. Billing FSM, signup challenge and frontend, project CRUD/access, admission, historical provider repair, safe diagnostics, and full S1–S14 activation are outstanding. Do not advance to R2.
+
+## DLJ-PADDLE-SITE — Go-Live Site Requirements
+
+- Date: 2026-11-25
+- Added /refund, a support email and legal links in the SPA footer, and a public pricing table at /#/pricing.
+- Tests: 70 passed, 22 skipped, 4 xfailed on local PostgreSQL port 5433. Both runs collected 96 tests. The initial run on the default port 5432 had 68 fixture errors because PostgreSQL rejected the harness password, so an unchanged pass count could not be established.
+- Frontend build: passed. Chromium verified the contact link, the three public HTML policies and all four pricing rows on localhost:8080.
+- mypy: clean (jm_service.py and legal_pages.py).

@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import Float, and_, case, cast, func, select, true
+from sqlalchemy import Float, and_, case, cast, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import repository
@@ -270,7 +270,8 @@ async def annotators(request: Request, domain: DashboardDomain, session: Session
                     func.sum(case((and_(verified, LabelLog.verified_outcome.is_(True)), 1), else_=0)),
                     func.max(activity))
              .join(top, top.c.annotator_id == annotator).where(LabelLog.domain_id == domain.domain_id,
-                 LabelLog.tenant_id == session.info.get("tenant_id", ""), LabelLog.superseded_by.is_(None))
+                 LabelLog.tenant_id == session.info.get("tenant_id", ""),
+                 or_(LabelLog.superseded_by.is_(None), verified))
              .group_by(annotator, top.c.total, LabelLog.category)
              .order_by(top.c.total.desc(), annotator, LabelLog.category))
     profiles: list[AnnotatorProfile] = []

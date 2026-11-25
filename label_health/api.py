@@ -19,6 +19,7 @@ _MAX_REQUEST_BYTES = _MAX_BYTES + 64 * 1024
 _UPLOAD_TIMEOUT = 30
 _executor = ThreadPoolExecutor(max_workers=2)
 _slots = asyncio.Semaphore(2)
+_ADMISSION_WAIT = 0.01
 _TIMEOUT = 60
 
 
@@ -50,7 +51,10 @@ async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False
     if not slot_acquired:
         if _slots.locked():
             raise HTTPException(status_code=503, detail="Report workers are busy")
-        await _slots.acquire()
+        try:
+            await asyncio.wait_for(_slots.acquire(), timeout=_ADMISSION_WAIT)
+        except TimeoutError:
+            raise HTTPException(status_code=503, detail="Report workers are busy") from None
     try:
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=422, detail=["Upload a CSV file"])
@@ -92,7 +96,10 @@ async def _analyze_request(request: Request, output: str) -> Any:
             raise HTTPException(status_code=400, detail="Invalid Content-Length") from exc
     if _slots.locked():
         raise HTTPException(status_code=503, detail="Report workers are busy")
-    await _slots.acquire()
+    try:
+        await asyncio.wait_for(_slots.acquire(), timeout=_ADMISSION_WAIT)
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail="Report workers are busy") from None
     deadline = asyncio.get_running_loop().time() + _UPLOAD_TIMEOUT
     received = 0
 

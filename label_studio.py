@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import repository
 from auth import Tenant, scoped_domain_id
-from db.connection import get_db
+from db.connection import commit_write, get_db
 from db.models import LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
 from labeling_router import IngestItem, _category_stats, _ingest
@@ -47,9 +47,9 @@ Authorized = Annotated[None, Depends(_authorize)]
 
 class ConnectorConfig(BaseModel):
     tenant_id: str | None = None
-    domain_id: str = Field(min_length=1)
+    domain_id: str = Field(min_length=1, max_length=200)
     public_domain_id: str | None = None
-    project_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1, max_length=200)
     factor_map: dict[str, str] = Field(min_length=2)
     category_field: str = "data.category"
     ground_truth_field: str | None = "data.ground_truth"
@@ -75,11 +75,18 @@ def _saved_configs() -> dict[str, dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
+def _external_id(value: Any, label: str) -> str:
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        raise HTTPException(422, detail=f"{label} must be a string or integer")
+    result = str(value).strip()
+    if not result or len(result) > 200:
+        raise HTTPException(422, detail=f"{label} must be 1–200 characters")
+    return result
+
+
 def _project_id(project: Any) -> str:
     value = project.get("id") if isinstance(project, dict) else project
-    if value is None or not str(value).strip():
-        raise HTTPException(422, detail="Label Studio project ID is required")
-    return str(value)
+    return _external_id(value, "Label Studio project ID")
 
 
 def _config(project: Any, tenant: str | None = None) -> ConnectorConfig:
@@ -129,7 +136,7 @@ def _task_values(task: Any, config: ConnectorConfig, index: int | None = None) -
         except (TypeError, ValueError, OverflowError) as exc:
             raise HTTPException(422, detail=f"Invalid factor {name}") from exc
     category = _field(data, config.category_field) or "default"
-    return str(task["id"]), str(category), factors
+    return _external_id(task["id"], "Task ID"), _external_id(category, "Category"), factors
 
 
 async def _ensure_domain(session: AsyncSession, config: ConnectorConfig) -> None:
@@ -192,6 +199,7 @@ async def setup(payload: dict[str, Any], session: Session, _: Authorized) -> dic
     if setup_tenant:
         session.info["tenant_id"] = setup_tenant
         await _ensure_domain(session, _bind_config(config, setup_tenant))
+        await commit_write(session)
     return {"model_version": "jm-v1"}
 
 
@@ -206,7 +214,7 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
     predictions: list[dict[str, Any]] = []
     for index, task in enumerate(tasks):
         label_id, category, factors = _task_values(task, config, index)
-        annotator_id = str(task.get("annotator_id")) if task.get("annotator_id") is not None else None
+        annotator_id = _external_id(task["annotator_id"], "Annotator ID") if task.get("annotator_id") is not None else None
         existing = await session.scalar(select(LabelLog).where(
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
             LabelLog.label_id == label_id))
@@ -246,24 +254,36 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
                                 "checks_failed": [name for name, passed in checks.items() if not passed]}})
     if warning := session.info.get("volume_warning"):
         response.headers["X-Volume-Warning"] = warning
+    await commit_write(session)
     return {"results": predictions}
 
 
 @router.post("/webhook")
 async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tenant: Tenant) -> dict[str, str]:
-    if payload.get("action") not in {"ANNOTATION_CREATED", "ANNOTATION_UPDATED"}:
+    action = payload.get("action")
+    if not isinstance(action, str):
+        raise HTTPException(400, detail=f"action must be a string, got {type(action).__name__}")
+    if action not in {"ANNOTATION_CREATED", "ANNOTATION_UPDATED"}:
         return {"status": "ignored"}
     config = _bind_config(_config(payload.get("project"), tenant), tenant)
     annotation = payload.get("annotation")
     if not isinstance(annotation, dict):
         raise HTTPException(422, detail="annotation is required")
     raw_annotation_id = annotation.get("id")
-    if raw_annotation_id is None or not str(raw_annotation_id).strip():
-        raise HTTPException(422, detail="annotation id is required")
-    source_annotation_id = str(raw_annotation_id).strip()
+    source_annotation_id = _external_id(raw_annotation_id, "Annotation ID")
     annotation_id = f"{config.project_id}:{source_annotation_id}"
     if len(annotation_id) > 200:
         raise HTTPException(422, detail="annotation id is too long")
+    raw_source_time = annotation.get("updated_at") or annotation.get("created_at")
+    source_time: datetime | None = None
+    if raw_source_time is not None:
+        try:
+            source_time = datetime.fromisoformat(str(raw_source_time).replace("Z", "+00:00"))
+            if source_time.tzinfo is None:
+                raise ValueError("timezone required")
+            source_time = source_time.astimezone(timezone.utc)
+        except ValueError:
+            raise HTTPException(422, detail="Invalid annotation timestamp") from None
     task = payload.get("task")
     if not isinstance(task, dict):
         task = {"id": annotation.get("task"), "data": payload.get("data", {})}
@@ -287,13 +307,19 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
         row = await session.scalar(select(LabelLog).where(
             LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
             LabelLog.label_id == row.superseded_by).with_for_update())
+    if row is not None and source_time is not None and row.source_updated_at is not None:
+        stored = row.source_updated_at
+        if stored.tzinfo is None:
+            stored = stored.replace(tzinfo=timezone.utc)
+        if source_time <= stored:
+            return {"status": "processed"}
     if row is None:
         ingest_id = "annotation:" + hashlib.sha256(
             f"{label_id}\0{annotation_id}".encode()).hexdigest()
         try:
             item = IngestItem(
                 label_id=ingest_id, category=category,
-                annotator_id=str(annotation["completed_by"]) if annotation.get("completed_by") is not None else None,
+                annotator_id=_external_id(annotation["completed_by"], "Annotator ID") if annotation.get("completed_by") is not None else None,
                 factors=factors)
         except ValidationError as exc:
             raise HTTPException(422, detail="Invalid task at index 0") from exc
@@ -306,17 +332,29 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
     row.source_task_id = label_id
     if row.category != category or row.factors_json != factors:
         raise HTTPException(409, detail="Task changed after scoring")
-    reviewer = (str(annotation["completed_by"])
+    reviewer = (_external_id(annotation["completed_by"], "Annotator ID")
                 if annotation.get("completed_by") is not None else row.annotator_id)
     ground_truth = _field(task["data"], config.ground_truth_field) if config.ground_truth_field else None
     if ground_truth is None:
+        await commit_write(session)
         return {"status": "pending_ground_truth"}
     if row.verified_at is None and reviewer is not None:
         row.annotator_id = reviewer
     correct = ground_truth == actual if isinstance(ground_truth, str) else ground_truth
     if not isinstance(correct, bool):
         raise HTTPException(422, detail="Ground truth must be an action or boolean")
+    if row.verified_at is not None and (source_time is None or row.source_updated_at is None):
+        seen = await session.scalar(select(LabelLog.id).where(
+            LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
+            LabelLog.annotation_id == annotation_id, LabelLog.id != row.id,
+            LabelLog.actual_action == actual, LabelLog.verified_outcome == correct,
+            LabelLog.annotator_id == reviewer).limit(1))
+        if seen is not None:
+            return {"status": "processed"}
     if row.verified_at is not None and (row.actual_action, row.verified_outcome, row.annotator_id) == (actual, correct, reviewer):
+        if source_time is not None:
+            row.source_updated_at = source_time
+        await commit_write(session)
         return {"status": "processed"}
     if row.verified_at is not None and payload["action"] != "ANNOTATION_UPDATED":
         raise HTTPException(409, detail="Verification already exists")
@@ -330,8 +368,16 @@ async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tena
             raise HTTPException(422, detail=f"Category not in domain schema: {row.category}")
         repository.sync_engine_categories(engine, domain.config_json["categories"])
         await repository.verify_and_learn(session, engine, config.domain_id, row.label_id, actual, correct)
+        row.source_updated_at = source_time
+        await commit_write(session)
         return {"status": "processed"}
     await repository.verify_and_relearn(session, config.domain_id, row, actual, correct, reviewer)
+    successor = await session.scalar(select(LabelLog).where(
+        LabelLog.domain_id == config.domain_id, LabelLog.tenant_id == tenant,
+        LabelLog.label_id == row.superseded_by))
+    assert successor is not None
+    successor.source_updated_at = source_time
+    await commit_write(session)
     return {"status": "processed"}
 
 

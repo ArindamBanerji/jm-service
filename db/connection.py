@@ -59,17 +59,9 @@ def sanitize_database_error(exc: Exception) -> str:
             if operation:
                 parts.append(f"{operation.group(1).upper()} {operation.group(2)}")
         source = getattr(exc, "orig", exc)
-        message = str(source)
         state = getattr(source, "sqlstate", None) or getattr(source, "pgcode", None)
         if isinstance(state, str) and re.fullmatch(r"[A-Z0-9]{5}", state, re.I):
             parts.append(f"SQLSTATE {state}")
-        for candidate in re.findall(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s'\"<>]+", message):
-            parsed = urlsplit(candidate.rstrip(".,;"))
-            if parsed.hostname:
-                parts.append(f"host {parsed.hostname}")
-        unreachable = re.search(r"\b([A-Za-z0-9.-]+)\s+unreachable\b", message)
-        if unreachable:
-            parts.append(f"host {unreachable.group(1)}")
         return "; ".join(parts)
     except Exception:
         return "Database operation failed (diagnostics withheld)"
