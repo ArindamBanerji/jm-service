@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import os
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -15,11 +18,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import Session, Tenant
-from db.connection import AsyncSessionLocal
+from db.connection import AsyncSessionLocal, sanitize_database_error
 from db.models import ApiKey, PaddleWebhookEvent
 
 router = APIRouter(prefix="/v1/billing", tags=["Billing"])
 logger = logging.getLogger(__name__)
+MAX_WEBHOOK_BYTES = 64 * 1024
 
 TIER_VOLUME_CAPS: dict[str, int | None] = {
     "trial": 50,  # per day
@@ -87,6 +91,7 @@ async def get_checkout_url(tenant: Tenant, session: Session, tier: str = "starte
             response.raise_for_status()
             checkout_url = response.json().get("data", {}).get("checkout", {}).get("url")
     except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
+        logger.error("Paddle checkout failed: %s", exc)
         raise HTTPException(502, "Could not create Paddle checkout") from exc
     if not isinstance(checkout_url, str) or not checkout_url.startswith("https://"):
         raise HTTPException(502, "Paddle did not return a checkout URL")
@@ -156,9 +161,35 @@ async def _update_contact(session: AsyncSession, record: ApiKey, customer: objec
         logger.warning("Paddle contact email conflicts with an existing API key")
 
 
+@asynccontextmanager
+async def _billing_session() -> AsyncIterator[AsyncSession]:
+    try:
+        async with AsyncSessionLocal.begin() as session:
+            yield session
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Paddle database operation failed: %s", sanitize_database_error(exc))
+        raise HTTPException(500, "Billing processing failed") from None
+
+
 @router.post("/webhook")
 async def paddle_webhook(request: Request) -> dict[str, str]:
-    body = await request.body()
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            if int(length) > MAX_WEBHOOK_BYTES:
+                raise HTTPException(413, "Webhook body too large")
+        except ValueError:
+            raise HTTPException(400, "Invalid Content-Length") from None
+    chunks: list[bytes] = []
+    received = 0
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > MAX_WEBHOOK_BYTES:
+            raise HTTPException(413, "Webhook body too large")
+        chunks.append(chunk)
+    body = b"".join(chunks)
     secret = os.environ.get("PADDLE_WEBHOOK_SECRET", "")
     if not secret.strip():
         if os.environ.get("PADDLE_SANDBOX") != "true":
@@ -169,7 +200,7 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
         raise HTTPException(401, "Invalid webhook signature")
 
     try:
-        data = await request.json()
+        data = json.loads(body)
         event_type = data.get("event_type", "")
         payload = data.get("data", {})
     except (ValueError, AttributeError, TypeError) as exc:
@@ -196,7 +227,7 @@ async def paddle_webhook(request: Request) -> dict[str, str]:
     if not isinstance(event_id, str) or not event_id.strip() or len(event_id) > 200:
         raise HTTPException(422, "Invalid event_id")
     occurred_at = _occurred_at(data.get("occurred_at"))
-    async with AsyncSessionLocal.begin() as session:
+    async with _billing_session() as session:
         session.add(PaddleWebhookEvent(event_id=event_id))
         try:
             await session.flush()

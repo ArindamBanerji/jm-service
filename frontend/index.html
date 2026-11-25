@@ -13,6 +13,13 @@
     <meta name="twitter:title" content="RGI Data Label Judgment" />
     <meta name="twitter:description" content="AI-powered data labeling judgment — score, verify, and improve label quality at scale." />
     <title>RGI Data Label Judgment</title>
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <script>
+      if (typeof Paddle !== 'undefined') {
+        Paddle.Environment.set('sandbox');
+        Paddle.Initialize({ seller: 161556 });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
