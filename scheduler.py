@@ -6,7 +6,7 @@ import logging
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 
 from db.connection import AsyncSessionLocal, sanitize_database_error
 from db.models import Annotator, ApiKey, Domain, Engine, LabelLog, TransitionLog
@@ -55,7 +55,8 @@ async def send_trial_expiry_emails() -> int:
     async with AsyncSessionLocal() as session:
         records = (await session.scalars(select(ApiKey).where(
             ApiKey.tier == "trial", ApiKey.is_active.is_(True),
-            ApiKey.subscription_state.in_(("trial", "trial_expired"))))).all()
+            or_(ApiKey.subscription_state.is_(None),
+                ApiKey.subscription_state.in_(("trial", "trial_expired")))))).all()
         for record in records:
             if not record.created_at:
                 continue

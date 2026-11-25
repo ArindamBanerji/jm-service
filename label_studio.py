@@ -262,7 +262,7 @@ async def predict(payload: dict[str, Any], response: Response, session: Session,
 async def webhook(payload: dict[str, Any], session: Session, _: Authorized, tenant: Tenant) -> dict[str, str]:
     action = payload.get("action")
     if not isinstance(action, str):
-        raise HTTPException(400, detail=f"action must be a string, got {type(action).__name__}")
+        raise HTTPException(422, detail=f"action must be a string, got {type(action).__name__}")
     if action not in {"ANNOTATION_CREATED", "ANNOTATION_UPDATED"}:
         return {"status": "ignored"}
     config = _bind_config(_config(payload.get("project"), tenant), tenant)

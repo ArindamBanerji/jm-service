@@ -923,3 +923,4 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Tests: 70 passed, 22 skipped, 4 xfailed on local PostgreSQL port 5433. Both runs collected 96 tests. The initial run on the default port 5432 had 68 fixture errors because PostgreSQL rejected the harness password, so an unchanged pass count could not be established.
 - Frontend build: passed. Chromium verified the contact link, the three public HTML policies and all four pricing rows on localhost:8080.
 - mypy: clean (jm_service.py and legal_pages.py).
+| 2026-11-25 | Contact email on legal pages | PASS | Added support@dakshineshwari.net to /terms, /privacy, /refund and /attribution server HTML |

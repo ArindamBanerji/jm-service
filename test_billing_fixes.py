@@ -156,7 +156,7 @@ def test_non_string_product_rejected(client):
 def test_unknown_product_rejected(client, caplog):
     response = deliver(client, event(product="Unmapped"))
     assert response.status_code == 400 and response.json()["detail"] == "Unknown product"
-    assert "Unmapped" in caplog.text and key(client).paddle_customer_id is None
+    assert "Unmapped" not in caplog.text and key(client).paddle_customer_id is None
 
 
 def test_known_product_upgrades(client):

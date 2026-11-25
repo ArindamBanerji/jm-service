@@ -13,7 +13,7 @@ import billing
 import jm_service
 import scheduler
 from label_health import api as health_api
-from db.models import ApiKey
+from db.models import ApiKey, LabelLog
 from ..fixtures.factory import Wire
 
 
@@ -148,16 +148,44 @@ async def test_s4_forced_unhandled_database_failure_through_asgi_and_scheduler(w
 
 
 @pytest.mark.prompt_a
-@pytest.mark.xfail(strict=True, reason="Prompt A not yet shipped")
-def test_s5_malformed_connector_dispatch_results():
+@pytest.mark.anyio
+async def test_s5_malformed_connector_dispatch_results(wire: Wire):
     """S5. Malformed connector dispatch/results."""
-    # TODO: Validate before access, controlled response and zero writes, N03/R31.
-    pytest.skip("Scenario S5: awaiting Prompt A")
+    headers = {"X-LS-Token": "harness-ls"}
+    for action in ({"bad": "value"}, ["ANNOTATION_CREATED"], None):
+        response = await wire.request("POST", "/v1/label-studio/webhook", status=422,
+                                      headers=headers, json={"action": action, "project": "p"})
+        assert "action must be a string" in response.text
+    await wire.request("POST", "/v1/label-studio/webhook", status=422,
+                       headers=headers, json={"action": "ANNOTATION_CREATED",
+                                              "project": "p", "annotation": []})
+    async with wire.factory.sessions() as fresh:
+        assert await fresh.scalar(select(func.count()).select_from(LabelLog)) == 0
 
 
 @pytest.mark.prompt_a
-@pytest.mark.xfail(strict=True, reason="Prompt A not yet shipped")
-def test_s6_identifier_limits_through_all_create_reuse_paths():
+@pytest.mark.anyio
+async def test_s6_identifier_limits_through_all_create_reuse_paths(wire: Wire):
     """S6. Identifier limits through all create/reuse paths."""
-    # TODO: PostgreSQL 422 and no writes at max+1, success at max, R05/R11.
-    pytest.skip("Scenario S6: awaiting Prompt A")
+    longest = {"label_id": "L" * 200, "category": "C" * 200,
+               "annotator_id": "A" * 200}
+    base = {"domain_id": "bounded", "factors": {"quality": .8, "difficulty": .2}}
+    await wire.request("POST", "/v1/labels/ingest", json={**base, **longest})
+    for field in longest:
+        invalid = {**longest, field: longest[field] + "X"}
+        await wire.request("POST", "/v1/labels/ingest", status=422,
+                           json={**base, **invalid})
+    await wire.request("POST", "/v1/labels/ingest", status=422,
+                       json={**base, **longest, "domain_id": "D" * 201})
+    await wire.request("POST", "/v1/labels/bounded/tasks", status=422,
+                       json={"label_id": "T" * 201, "text": "Task"})
+    await wire.request("POST", "/v1/label-studio/webhook", status=422,
+                       headers={"X-LS-Token": "harness-ls"}, json={
+                           "action": "ANNOTATION_CREATED", "project": "p",
+                           "annotation": {"id": "Z" * 200, "actual_action": "approve"},
+                           "task": {"id": 1, "data": {"category": "A", "quality": .8,
+                                                        "difficulty": .2}},
+                       })
+    async with wire.factory.sessions() as fresh:
+        rows = (await fresh.scalars(select(LabelLog))).all()
+        assert len(rows) == 1 and rows[0].label_id == longest["label_id"]

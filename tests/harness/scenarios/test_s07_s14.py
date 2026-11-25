@@ -8,12 +8,16 @@ from uuid import UUID
 
 import httpx
 from sqlalchemy import func, select
+from sqlalchemy import text
 
 import billing
+import account as account_module
+from db import migrate as db_migrate
 import scheduler
+import trial_guard
 from db.tenant_lock import lock_tenant
 from db.models import Domain
-from db.models import ApiKey, CheckoutIntent, PaddleWebhookEvent, ProjectBillingOwner, SubscriptionBinding, TenantGuard, TransitionLog
+from db.models import ApiKey, CheckoutIntent, PaddleWebhookEvent, ProjectBillingOwner, ProviderRepairManifest, ProviderRepairQuarantine, SubscriptionBinding, TenantGuard, TransitionLog
 from ..fixtures.factory import Wire
 
 
@@ -62,6 +66,18 @@ async def test_s7_checkout_with_two_keys_and_existing_customer(wire: Wire, monke
         unpaid = await fresh.get(ApiKey, purchaser.id)
         assert paid is not None and unpaid is not None
         assert paid.tier == "professional" and unpaid.tier == "trial"
+    await wire.request("POST", "/v1/projects", status=201, json={
+        "name": "Payer project", "public_domain_id": "payer-project",
+        "factors": ["quality", "difficulty"], "categories": ["A"],
+    })
+    await wire.request("POST", "/v1/labels/ingest", headers={"X-Api-Key": purchaser_key},
+                       json={"domain_id": "payer-project", "label_id": "payer-score",
+                             "category": "A", "factors": {"quality": .8, "difficulty": .2}})
+    async with wire.factory.sessions() as fresh:
+        paid = await fresh.get(ApiKey, payer.id)
+        unpaid = await fresh.get(ApiKey, purchaser.id)
+        assert paid is not None and unpaid is not None
+        assert paid.labels_today == 1 and unpaid.labels_today == 0
 
 
 @pytest.mark.prompt_a
@@ -256,16 +272,134 @@ async def test_s12_two_old_cancelled_siblings_versus_one_entitled_sibling(wire: 
 
 
 @pytest.mark.prompt_a
-@pytest.mark.xfail(strict=True, reason="Prompt A not yet shipped")
-def test_s13_historical_postgresql_provider_upgrade_twice_sqlite_advisory():
+@pytest.mark.anyio
+async def test_s13_historical_postgresql_provider_upgrade_twice_sqlite_advisory(wire: Wire, db_engine, monkeypatch):
     """S13. Historical PostgreSQL provider upgrade twice (SQLite advisory)."""
-    # TODO: Stored linkage and tenant ownership preserved or explicitly quarantined, R23.
-    pytest.skip("Scenario S13: awaiting Prompt A")
+    ambiguous_key = await wire.factory.user("ambiguous-tenant")
+    await wire.factory.user("ambiguous-tenant")
+    legacy_key = await wire.factory.user("legacy-tenant")
+    async with wire.factory.sessions.begin() as session:
+        confirmed = await session.scalar(select(ApiKey).where(ApiKey.tenant_id == wire.factory.tenant))
+        ambiguous = await session.scalar(select(ApiKey).where(
+            ApiKey.key_hash == hashlib.sha256(ambiguous_key.encode()).hexdigest()))
+        legacy = await session.scalar(select(ApiKey).where(
+            ApiKey.key_hash == hashlib.sha256(legacy_key.encode()).hexdigest()))
+        assert confirmed is not None and ambiguous is not None and legacy is not None
+        confirmed.paddle_customer_id = "ctm_confirmed"
+        confirmed.paddle_subscription_id = "sub_confirmed"
+        confirmed.labels_day_key = "2026-11-25"
+        confirmed.labels_today = 11
+        confirmed.labels_month_key = "2026-11"
+        confirmed.labels_this_month = 321
+        ambiguous.paddle_customer_id = "ctm_ambiguous"
+        ambiguous.paddle_subscription_id = "sub_ambiguous"
+        confirmed_id, ambiguous_id, legacy_id = confirmed.id, ambiguous.id, legacy.id
+    async with db_engine.begin() as connection:
+        await connection.execute(text("ALTER TABLE api_keys ADD COLUMN lemon_squeezy_customer_id VARCHAR(200)"))
+        await connection.execute(text("UPDATE api_keys SET lemon_squeezy_customer_id='legacy_123' WHERE id=:id"),
+                                 {"id": legacy_id.hex})
+    monkeypatch.setattr(db_migrate, "engine", db_engine)
+    await db_migrate.migrate()
+    await db_migrate.migrate()
+    async with wire.factory.sessions() as fresh:
+        confirmed = await fresh.get(ApiKey, confirmed_id)
+        manifest = await fresh.get(ProviderRepairManifest, confirmed_id)
+        binding = await fresh.get(SubscriptionBinding, "sub_confirmed")
+        owner = await fresh.get(ProjectBillingOwner, wire.factory.tenant)
+        quarantined = await fresh.get(ProviderRepairQuarantine, ambiguous_id)
+        legacy_quarantine = await fresh.get(ProviderRepairQuarantine, legacy_id)
+        legacy = await fresh.get(ApiKey, legacy_id)
+        assert confirmed is not None and manifest is not None and binding is not None and owner is not None
+        assert confirmed.paddle_customer_id == "ctm_confirmed"
+        assert binding.payer == confirmed_id and owner.billing_key_id == confirmed_id
+        assert (manifest.labels_today, manifest.labels_this_month) == (11, 321)
+        assert (confirmed.labels_today, confirmed.labels_this_month) == (11, 321)
+        assert quarantined is not None and quarantined.reason_code == "ambiguous_payer"
+        assert legacy_quarantine is not None and legacy_quarantine.reason_code == "legacy_provider_unmapped"
+        assert legacy is not None and legacy.paddle_customer_id is None
+        assert await fresh.scalar(select(func.count()).select_from(ProviderRepairManifest)) == 1
+    async with db_engine.connect() as connection:
+        legacy_value = await connection.scalar(text(
+            "SELECT lemon_squeezy_customer_id FROM api_keys WHERE id=:id"), {"id": legacy_id.hex})
+        assert legacy_value == "legacy_123"
+    monkeypatch.setenv("PADDLE_API_KEY", "provider-test-key")
+    monkeypatch.setenv("PADDLE_PRICE_MAP", "starter=pri_test")
+    await wire.request("GET", "/v1/billing/checkout-url?tier=starter", status=409,
+                       headers={"X-Api-Key": ambiguous_key})
+    await wire.request("GET", "/v1/billing/checkout-url?tier=starter", status=409,
+                       headers={"X-Api-Key": legacy_key})
+    async with db_engine.begin() as connection:
+        assert await connection.run_sync(lambda sync: db_migrate.undo_provider_link(sync, confirmed_id))
+    async with wire.factory.sessions() as fresh:
+        assert await fresh.get(ProviderRepairManifest, confirmed_id) is None
+        assert await fresh.get(SubscriptionBinding, "sub_confirmed") is None
+    await db_migrate.migrate()
+    async with wire.factory.sessions.begin() as session:
+        confirmed = await session.get(ApiKey, confirmed_id)
+        assert confirmed is not None
+        confirmed.labels_today += 1
+    async with db_engine.begin() as connection:
+        with pytest.raises(ValueError, match="manual reconciliation"):
+            await connection.run_sync(lambda sync: db_migrate.undo_provider_link(sync, confirmed_id))
 
 
 @pytest.mark.prompt_a
-@pytest.mark.xfail(strict=True, reason="Prompt A not yet shipped")
-def test_s14_cancelled_paid_utc_day_and_month_boundaries():
+@pytest.mark.anyio
+async def test_s14_cancelled_paid_utc_day_and_month_boundaries(wire: Wire, monkeypatch):
     """S14. Cancelled/paid UTC day and month boundaries."""
-    # TODO: Summary agrees with last permitted reservation and rejection, R18.
-    pytest.skip("Scenario S14: awaiting Prompt A")
+    clock = {"now": datetime(2026, 11, 25, 23, 59, tzinfo=timezone.utc)}
+
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock["now"].astimezone(tz or timezone.utc)
+
+    monkeypatch.setattr(trial_guard, "datetime", FrozenDateTime)
+    monkeypatch.setattr(account_module, "datetime", FrozenDateTime)
+    async with wire.factory.sessions.begin() as session:
+        cancelled = await session.scalar(select(ApiKey).where(ApiKey.tenant_id == wire.factory.tenant))
+        assert cancelled is not None
+        cancelled.tier = "professional"
+        cancelled.subscription_state = "cancelled"
+        cancelled.cancelled_at = clock["now"] - timedelta(days=1)
+        cancelled.labels_day_key = "2026-11-25"
+        cancelled.labels_today = 49
+        cancelled.labels_month_key = "2026-11"
+        cancelled.labels_this_month = 400
+
+    async def score(key: str | None, name: str, expected: int) -> None:
+        headers = {"X-Api-Key": key} if key else None
+        response = await wire.client.post("/v1/labels/ingest", headers=headers, json={
+            "domain_id": "boundary", "label_id": name, "category": "A",
+            "factors": {"quality": .8, "difficulty": .2},
+        })
+        assert response.status_code == expected, response.text
+
+    await score(None, "cancelled-last", 200)
+    await score(None, "cancelled-over", 429)
+    summary = await wire.request("GET", "/v1/account")
+    assert summary.json()["usage"]["labels_today"] == 50
+    assert summary.json()["usage"]["daily_cap"] == 50
+    clock["now"] = datetime(2026, 11, 26, 0, 1, tzinfo=timezone.utc)
+    await score(None, "cancelled-new-day", 200)
+    assert (await wire.request("GET", "/v1/account")).json()["usage"]["labels_today"] == 1
+
+    paid_key = await wire.factory.user("paid-tenant")
+    async with wire.factory.sessions.begin() as session:
+        paid = await session.scalar(select(ApiKey).where(
+            ApiKey.key_hash == hashlib.sha256(paid_key.encode()).hexdigest()))
+        assert paid is not None
+        paid.tier = "starter"
+        paid.subscription_state = "active"
+        paid.labels_month_key = "2026-11"
+        paid.labels_this_month = 9_999
+    clock["now"] = datetime(2026, 11, 30, 23, 59, tzinfo=timezone.utc)
+    await score(paid_key, "paid-last", 200)
+    await score(paid_key, "paid-over", 429)
+    paid_summary = await wire.request("GET", "/v1/account", headers={"X-Api-Key": paid_key})
+    assert paid_summary.json()["usage"]["labels_this_month"] == 10_000
+    assert paid_summary.json()["usage"]["monthly_cap"] == 10_000
+    clock["now"] = datetime(2026, 12, 1, 0, 1, tzinfo=timezone.utc)
+    await score(paid_key, "paid-new-month", 200)
+    paid_summary = await wire.request("GET", "/v1/account", headers={"X-Api-Key": paid_key})
+    assert paid_summary.json()["usage"]["labels_this_month"] == 1

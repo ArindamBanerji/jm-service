@@ -12,7 +12,7 @@ from .fixtures.factory import Wire
 async def test_malformed_connector_action_has_no_write(wire: Wire):
     headers = {"X-LS-Token": "harness-ls"}
     for action in ({"unexpected": True}, ["ANNOTATION_CREATED"], None):
-        response = await wire.request("POST", "/v1/label-studio/webhook", status=400,
+        response = await wire.request("POST", "/v1/label-studio/webhook", status=422,
                                       headers=headers, json={"action": action})
         assert "action must be a string" in response.json()["detail"]
     async with wire.factory.sessions() as fresh:

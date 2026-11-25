@@ -99,6 +99,9 @@ def test_scheduler_log_hides_database_password(monkeypatch, caplog):
         raise _db_error()
 
     monkeypatch.setattr(scheduler, 'send_trial_expiry_emails', fail)
+    async def no_expiry():
+        return 0
+    monkeypatch.setattr(scheduler, 'expire_trial_keys', no_expiry)
     with caplog.at_level(logging.ERROR, logger='dlj.scheduler'):
         asyncio.run(scheduler.run_scheduled_tasks())
     assert 's3cret_p@ss' not in caplog.text
@@ -113,5 +116,5 @@ def test_connector_rejects_nonstring_action(client):
         'X-Api-Key': 'tasks-key', 'X-LS-Token': 'test-token',
     }) as raw:
         response = raw.post('/v1/label-studio/webhook', json=payload)
-    assert response.status_code == 400, response.text
+    assert response.status_code == 422, response.text
     assert 'action must be a string' in response.text

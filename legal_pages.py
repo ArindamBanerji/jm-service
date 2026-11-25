@@ -53,6 +53,7 @@ Rate limiting is enforced.</p>
 <p>These terms are governed by the laws of the State of New Jersey, United States.</p>
 <h2>10. Contact</h2>
 <p>Questions: <a href="mailto:arindam.banerji@gmail.com">arindam.banerji@gmail.com</a></p>
+<p>Contact: <a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a></p>
 </body></html>"""
 
 PRIVACY_HTML = """<!doctype html><html lang="en"><head>
@@ -98,6 +99,7 @@ control what they submit and must have an appropriate basis for processing it.
 Data Processing Addendum available on request for Enterprise tier.</p>
 <h2>8. Contact</h2>
 <p>Privacy questions: <a href="mailto:arindam.banerji@gmail.com">arindam.banerji@gmail.com</a></p>
+<p>Contact: <a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a></p>
 </body></html>"""
 
 REFUND_HTML = """<!doctype html><html lang="en"><head>
@@ -120,6 +122,7 @@ to request a refund.</p>
 <h2>Free trial</h2>
 <p>The free trial does not require payment information and incurs no
 charges. No refund is applicable.</p>
+<p>Contact: <a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a></p>
 <p><a href="/">← Back to DLJ</a></p>
 </body></html>"""
 
@@ -145,6 +148,7 @@ table{border-collapse:collapse;width:100%}th,td{border:1px solid #d1d5db;padding
 <tr><td>Recharts</td><td>MIT</td><td>recharts team</td></tr>
 <tr><td>Tailwind CSS</td><td>MIT</td><td>Tailwind Labs</td></tr>
 </tbody></table>
+<p>Contact: <a href="mailto:support@dakshineshwari.net">support@dakshineshwari.net</a></p>
 </body></html>"""
 
 

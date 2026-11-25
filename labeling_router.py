@@ -21,7 +21,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from db.connection import commit_write, get_db
 from db.models import Domain, LabelLog
 from db import repository
-from auth import Tenant, scoped_domain_id
+from auth import ProjectTenant, scoped_domain_id
 from jm_core import ConservationState, DomainConfig, JudgmentMemoryEngine
 from policy_engine import AutonomyTier, evaluate_domain
 from rate_limit import limiter
@@ -33,7 +33,8 @@ autonomy_router = APIRouter(prefix="/v1/domains", tags=["Labeling"])
 Session = Annotated[AsyncSession, Depends(get_db)]
 
 
-def require_active_project(domain: Domain) -> None:
+async def require_active_project(session: AsyncSession, domain: Domain) -> None:
+    await session.refresh(domain, with_for_update=True)
     if domain.status != "active":
         raise HTTPException(409, detail="Project is read-only")
 
@@ -49,7 +50,7 @@ class GuidelinesPayload(BaseModel):
         return value
 
 
-async def guidelines_domain(domain_id: str, tenant: Tenant, session: Session) -> Domain:
+async def guidelines_domain(domain_id: str, tenant: ProjectTenant, session: Session) -> Domain:
     domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
     if domain is None:
         raise HTTPException(404, detail="Domain not found")
@@ -57,16 +58,16 @@ async def guidelines_domain(domain_id: str, tenant: Tenant, session: Session) ->
 
 
 @autonomy_router.get("/{domain_id}/guidelines", response_model=GuidelinesPayload)
-async def get_guidelines(domain_id: str, tenant: Tenant, session: Session) -> GuidelinesPayload:
+async def get_guidelines(domain_id: str, tenant: ProjectTenant, session: Session) -> GuidelinesPayload:
     domain = await guidelines_domain(domain_id, tenant, session)
     return GuidelinesPayload(guidelines=domain.guidelines)
 
 
 @autonomy_router.put("/{domain_id}/guidelines", response_model=GuidelinesPayload)
-async def put_guidelines(domain_id: str, payload: GuidelinesPayload, tenant: Tenant,
+async def put_guidelines(domain_id: str, payload: GuidelinesPayload, tenant: ProjectTenant,
                          session: Session) -> GuidelinesPayload:
     domain = await guidelines_domain(domain_id, tenant, session)
-    require_active_project(domain)
+    await require_active_project(session, domain)
     domain.guidelines = payload.guidelines
     await commit_write(session)
     return payload
@@ -334,7 +335,7 @@ async def _prepare_engine(session: AsyncSession, domain_id: str,
         await repository.create_domain(session, domain_id, domain_id, config,
                                        public_domain_id=public_domain_id)
     else:
-        require_active_project(domain)
+        await require_active_project(session, domain)
         if domain.public_domain_id is None and public_domain_id is not None:
             domain.public_domain_id = public_domain_id
         config = DomainConfig.from_dict(domain.config_json)
@@ -386,7 +387,7 @@ async def _ingest(session: AsyncSession, domain_id: str, item: IngestItem,
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest(request: IngestRequest, response: Response, session: Session, tenant: Tenant) -> IngestResponse:
+async def ingest(request: IngestRequest, response: Response, session: Session, tenant: ProjectTenant) -> IngestResponse:
     try:
         result = await _ingest(session, scoped_domain_id(tenant, request.domain_id), request,
                                request.domain_id)
@@ -401,8 +402,12 @@ async def ingest(request: IngestRequest, response: Response, session: Session, t
 
 
 @router.post("/verify", response_model=VerifyResponse)
-async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> VerifyResponse:
+async def verify(request: VerifyRequest, session: Session, tenant: ProjectTenant) -> VerifyResponse:
     domain_id = scoped_domain_id(tenant, request.domain_id)
+    domain = await repository.get_domain(session, domain_id)
+    if domain is None:
+        raise HTTPException(404, detail="Domain not found")
+    await require_active_project(session, domain)
     row = await session.scalar(select(LabelLog).where(LabelLog.domain_id == domain_id,
                                                      LabelLog.tenant_id == tenant,
                                                      LabelLog.label_id == request.label_id).with_for_update())
@@ -424,10 +429,7 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
     if request.actual_action not in engine.config.actions:
         raise HTTPException(status_code=422, detail="Unknown actual_action")
     assert row.category is not None
-    domain = await repository.get_domain(session, domain_id)
-    if domain is not None:
-        require_active_project(domain)
-    categories = DomainConfig.from_dict(domain.config_json).categories if domain is not None else []
+    categories = DomainConfig.from_dict(domain.config_json).categories
     if row.category not in categories:
         raise HTTPException(status_code=422, detail=f"Category not in domain schema: {row.category}")
     repository.sync_engine_categories(engine, categories)
@@ -449,12 +451,12 @@ async def verify(request: VerifyRequest, session: Session, tenant: Tenant) -> Ve
 @router.post("/{domain_id}/bulk-verify")
 @limiter.limit("10/minute")
 async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyRequest,
-                      session: Session, tenant: Tenant) -> dict:
+                      session: Session, tenant: ProjectTenant) -> dict:
     scoped = scoped_domain_id(tenant, domain_id)
     domain = await repository.get_domain(session, scoped)
     if domain is None:
         raise HTTPException(404, detail="Domain not found")
-    require_active_project(domain)
+    await require_active_project(session, domain)
     categories = set(DomainConfig.from_dict(domain.config_json).categories)
     rows = (await session.scalars(select(LabelLog).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
@@ -508,7 +510,7 @@ async def bulk_verify(request: Request, domain_id: str, payload: BulkVerifyReque
 
 @router.post("/ingest/batch", response_model=IngestBatchResponse)
 async def ingest_batch(request: IngestBatchRequest, response: Response, session: Session,
-                       tenant: Tenant) -> IngestBatchResponse:
+                       tenant: ProjectTenant) -> IngestBatchResponse:
     request_id = uuid4().hex
     results: list[IngestResponse] = []
     for index, item in enumerate(request.items):
@@ -536,7 +538,7 @@ async def ingest_batch(request: IngestBatchRequest, response: Response, session:
 
 
 @router.post("/{domain_id}/sample")
-async def seed_sample(domain_id: str, response: Response, session: Session, tenant: Tenant) -> dict[str, str | int]:
+async def seed_sample(domain_id: str, response: Response, session: Session, tenant: ProjectTenant) -> dict[str, str | int]:
     if domain_id != SAMPLE_DOMAIN:
         raise HTTPException(404, detail="Sample domain not found")
     items = _sample_items()
@@ -547,7 +549,7 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
     if domain is not None and domain.domain_name != SAMPLE_MARKER:
         raise HTTPException(409, detail="Domain name is already in use")
     if domain is not None:
-        require_active_project(domain)
+        await require_active_project(session, domain)
     ids = [item.label_id for item in items]
     existing_ids = set((await session.scalars(select(LabelLog.label_id).where(
         LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
@@ -584,7 +586,7 @@ async def seed_sample(domain_id: str, response: Response, session: Session, tena
 
 @router.post("/{domain_id}/tasks", status_code=201)
 async def create_text_task(domain_id: str, request: TextTaskRequest,
-                           session: Session, tenant: Tenant) -> dict[str, str | None]:
+                           session: Session, tenant: ProjectTenant) -> dict[str, str | None]:
     scoped = scoped_domain_id(tenant, domain_id)
     if await session.scalar(select(LabelLog.id).where(
             LabelLog.domain_id == scoped, LabelLog.tenant_id == tenant,
@@ -593,7 +595,7 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
     if request.category is not None:
         domain = await repository.get_domain(session, scoped)
         if domain is not None:
-            require_active_project(domain)
+            await require_active_project(session, domain)
         config = DomainConfig.from_dict(domain.config_json) if domain else None
         factors = {name: 0.5 for name in (config.factors if config else
                    ["model_confidence", "item_difficulty"])}
@@ -616,7 +618,7 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
     elif domain.public_domain_id is None:
         domain.public_domain_id = domain_id
     if domain is not None:
-        require_active_project(domain)
+        await require_active_project(session, domain)
     session.add(LabelLog(domain_id=scoped, tenant_id=tenant, label_id=request.label_id,
                          category=None, factors_json={}, text=request.text,
                          recommended_action=None, confidence=None, scored_at=null()))
@@ -630,11 +632,11 @@ async def create_text_task(domain_id: str, request: TextTaskRequest,
 
 @router.post("/{domain_id}/items/{label_id}/relabel")
 async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
-                       session: Session, tenant: Tenant) -> dict[str, str | None]:
+                       session: Session, tenant: ProjectTenant) -> dict[str, str | None]:
     scoped = scoped_domain_id(tenant, domain_id)
     project = await repository.get_domain(session, scoped)
     if project is not None:
-        require_active_project(project)
+        await require_active_project(session, project)
     original = await _current_label(session, domain_id, label_id, tenant, lock=True)
     if request.idempotency_token != str(original.id):
         raise HTTPException(409, detail="Stale label revision")
@@ -727,7 +729,7 @@ async def relabel_item(domain_id: str, label_id: str, request: RelabelRequest,
 
 @router.get("/{domain_id}/pending")
 @limiter.limit("60/minute")
-async def pending(request: Request, domain_id: str, response: Response, session: Session, tenant: Tenant,
+async def pending(request: Request, domain_id: str, response: Response, session: Session, tenant: ProjectTenant,
                   category: str | None = None, limit: int = Query(default=50, ge=1, le=200),
                   offset: int = Query(default=0, ge=0),
                   sort_by: Literal["label_id", "category", "annotator_id", "confidence", "recommended_action"] | None = None,
@@ -788,13 +790,14 @@ async def _current_label(session: AsyncSession, domain_id: str, label_id: str,
 
 @router.post("/{domain_id}/items/{label_id}/content", status_code=201)
 async def create_label_content(domain_id: str, label_id: str, payload: LabelContentRequest,
-                               session: Session, tenant: Tenant) -> dict[str, str | int]:
+                               session: Session, tenant: ProjectTenant) -> dict[str, str | int]:
+    domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
+    if domain is None:
+        raise HTTPException(404, detail="Domain not found")
+    await require_active_project(session, domain)
     row = await _current_label(session, domain_id, label_id, tenant, lock=True)
     if await repository.get_label_content(session, row.id) is not None:
         raise HTTPException(409, detail="Content already exists for this revision")
-    domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
-    assert domain is not None
-    require_active_project(domain)
     categories = set(DomainConfig.from_dict(domain.config_json).categories)
     if payload.content_type == "text_ner":
         if row.text is None:
@@ -835,7 +838,7 @@ async def create_label_content(domain_id: str, label_id: str, payload: LabelCont
 @router.get("/{domain_id}/{label_id}")
 @limiter.limit("60/minute")
 async def label_detail(request: Request, domain_id: str, label_id: str,
-                       session: Session, tenant: Tenant) -> dict:
+                       session: Session, tenant: ProjectTenant) -> dict:
     row = await _current_label(session, domain_id, label_id, tenant)
     previous_category = None
     if row.prior_revision_id is not None:
@@ -859,7 +862,7 @@ async def label_detail(request: Request, domain_id: str, label_id: str,
 
 @autonomy_router.get("/{domain_id}/autonomy")
 @limiter.limit("60/minute")
-async def domain_autonomy(request: Request, domain_id: str, session: Session, tenant: Tenant) -> dict:
+async def domain_autonomy(request: Request, domain_id: str, session: Session, tenant: ProjectTenant) -> dict:
     public_domain_id = domain_id
     domain_id = scoped_domain_id(tenant, domain_id)
     domain = await repository.get_domain(session, domain_id)

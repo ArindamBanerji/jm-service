@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import Session, Tenant
 from db.connection import AsyncSessionLocal, commit_write, sanitize_database_error
-from db.models import ApiKey, CheckoutIntent, PaddleWebhookEvent, ProjectBillingOwner, SubscriptionBinding, TransitionLog
+from db.models import ApiKey, CheckoutIntent, PaddleWebhookEvent, ProjectBillingOwner, ProviderRepairQuarantine, SubscriptionBinding, TransitionLog
 from db.tenant_lock import lock_tenant
 
 router = APIRouter(prefix="/v1/billing", tags=["Billing"])
@@ -115,6 +115,9 @@ async def get_checkout_url(tenant: Tenant, session: Session, tier: str = "starte
     if key_id is None:
         raise HTTPException(401, "Invalid API key")
     await lock_tenant(session, tenant)
+    if await session.scalar(select(ProviderRepairQuarantine.key_id).where(
+            ProviderRepairQuarantine.tenant_id == tenant)) is not None:
+        raise HTTPException(409, "Historical billing ownership requires reconciliation")
     owner = await session.get(ProjectBillingOwner, tenant)
     if owner is None:
         siblings = (await session.scalars(select(ApiKey.id).where(
@@ -257,6 +260,8 @@ async def _billing_session() -> AsyncIterator[AsyncSession]:
 
 @router.post("/webhook")
 async def paddle_webhook(request: Request) -> dict[str, str]:
+    if _billing_reader_slots.locked():
+        raise HTTPException(503, "Billing intake is busy")
     try:
         await asyncio.wait_for(_billing_reader_slots.acquire(), timeout=0.01)
     except TimeoutError:
@@ -337,10 +342,17 @@ async def _process_paddle_webhook(request: Request) -> dict[str, str]:
             if not isinstance(customer_id, str) or not 0 < len(customer_id) <= 200:
                 raise HTTPException(422, "Missing customer ID")
             custom = payload.get("custom_data")
-            if not isinstance(custom, dict) or not isinstance(custom.get("tenant_id"), str):
-                raise HTTPException(409, "Checkout tenant is unavailable")
-            await lock_tenant(session, custom["tenant_id"])
-            record = await _checkout_key(session, customer_id, custom if isinstance(custom, dict) else {})
+            if isinstance(custom, dict) and isinstance(custom.get("tenant_id"), str):
+                tenant_id = custom["tenant_id"]
+            else:
+                tenant_id = await session.scalar(select(ApiKey.tenant_id).where(
+                    ApiKey.paddle_customer_id == customer_id,
+                    ApiKey.is_active.is_(True)))
+                if tenant_id is None:
+                    raise HTTPException(409, "Checkout tenant is unavailable")
+                custom = {}
+            await lock_tenant(session, tenant_id)
+            record = await _checkout_key(session, customer_id, custom)
         else:
             tenant_id = await session.scalar(select(ApiKey.tenant_id).where(
                 ApiKey.paddle_subscription_id == subscription_id))
@@ -360,6 +372,9 @@ async def _process_paddle_webhook(request: Request) -> dict[str, str]:
                     return {"status": "ok"}
         old_state = _current_state(record)
         next_state = _next_state(event_type, payload, old_state)
+        if next_state == "active" and await session.scalar(select(ProviderRepairQuarantine.key_id).where(
+                ProviderRepairQuarantine.tenant_id == record.tenant_id)) is not None:
+            raise HTTPException(409, "Historical billing ownership requires reconciliation")
         if next_state != old_state and next_state not in ALLOWED_TRANSITIONS[old_state]:
             raise HTTPException(409, "Invalid subscription transition")
         if next_state != old_state:

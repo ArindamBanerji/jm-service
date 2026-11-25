@@ -71,10 +71,13 @@ def check_volume_cap(api_key_record: ApiKey) -> dict[str, str] | None:
 async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None:
     """Reserve one scored label in the caller's transaction, locking the API key row."""
     key_hash = session.info.get("api_key_hash")
-    if not key_hash:
+    payer_key_id = session.info.get("payer_key_id")
+    if not key_hash and payer_key_id is None:
         raise HTTPException(401, detail="Invalid API key")
+    payer_filter = ApiKey.id == payer_key_id if payer_key_id is not None else ApiKey.key_hash == key_hash
     record = await session.scalar(select(ApiKey).where(
-        ApiKey.key_hash == key_hash, ApiKey.is_active.is_(True)).with_for_update())
+        payer_filter, ApiKey.is_active.is_(True)).with_for_update()
+        .execution_options(populate_existing=True))
     if record is None:
         raise HTTPException(401, detail="Invalid API key")
     state = record.subscription_state

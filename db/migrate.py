@@ -3,14 +3,19 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-from sqlalchemy import Connection, DateTime, Table, inspect, text
+from uuid import UUID
+from sqlalchemy import Connection, DateTime, Table, inspect, select, text
+from sqlalchemy.orm import Session
 from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from db.connection import engine, sanitize_database_error
-from db.models import Base, LabelContent
+from db.models import (ApiKey, Base, CheckoutIntent, LabelContent, ProjectBillingOwner,
+                       ProviderRepairManifest, ProviderRepairQuarantine,
+                       SubscriptionBinding, TransitionLog)
 
 
 def _upgrade_timestamps(connection: Connection, table: str, columns: tuple[str, ...]) -> None:
@@ -71,6 +76,109 @@ def _rebuild_sqlite_label_log(connection: Connection) -> None:
             "CREATE INDEX ix_label_log_domain_category_verified ON label_log (domain_id, category, verified_at)",
         ):
             connection.execute(text(statement))
+
+
+def repair_provider_links(connection: Connection) -> None:
+    """Bind only confirmed Paddle IDs to an established, unambiguous payer."""
+    if not inspect(connection).has_table("api_keys"):
+        return
+    now = datetime.now(timezone.utc)
+    with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
+        legacy_columns = {column["name"] for column in inspect(connection).get_columns("api_keys")}
+        legacy_ids: set[UUID] = set()
+        for column in ("lemon_squeezy_customer_id", "lemon_squeezy_subscription_id"):
+            if column in legacy_columns:
+                legacy_ids.update(UUID(str(value)) for value in session.scalars(text(
+                    f"SELECT id FROM api_keys WHERE {column} IS NOT NULL")))
+        candidates = list(session.scalars(select(ApiKey).where(
+            (ApiKey.paddle_customer_id.is_not(None)) |
+            (ApiKey.paddle_subscription_id.is_not(None)))).all())
+        known = {key.id for key in candidates}
+        candidates.extend(key for key in session.scalars(select(ApiKey).where(ApiKey.id.in_(legacy_ids)))
+                          if key.id not in known)
+        for key in candidates:
+            if session.get(ProviderRepairManifest, key.id) is not None:
+                continue
+            if session.get(ProviderRepairQuarantine, key.id) is not None:
+                continue
+            customer, subscription = key.paddle_customer_id, key.paddle_subscription_id
+            siblings = session.scalars(select(ApiKey).where(ApiKey.tenant_id == key.tenant_id)).all()
+            owner = session.get(ProjectBillingOwner, key.tenant_id)
+            binding = session.get(SubscriptionBinding, subscription) if subscription else None
+            reason = None
+            if key.id in legacy_ids:
+                reason = "legacy_provider_conflict" if customer or subscription else "legacy_provider_unmapped"
+            elif not customer or not customer.startswith("ctm_") or not subscription or not subscription.startswith("sub_"):
+                reason = "unconfirmed_provider_ids"
+            elif owner is None and len(siblings) != 1:
+                reason = "ambiguous_payer"
+            elif owner is not None and owner.billing_key_id != key.id:
+                reason = "owner_mismatch"
+            elif binding is not None and (binding.payer != key.id or binding.customer_id != customer):
+                reason = "binding_mismatch"
+            elif owner is not None and owner.trial_started_at.replace(tzinfo=timezone.utc) != key.created_at.replace(tzinfo=timezone.utc):
+                reason = "trial_start_mismatch"
+            if reason is not None:
+                session.add(ProviderRepairQuarantine(
+                    key_id=key.id, tenant_id=key.tenant_id,
+                    reason_code=reason, quarantined_at=now))
+                continue
+            assert customer is not None and subscription is not None
+            owner_created = owner is None
+            binding_created = binding is None
+            if owner_created:
+                session.execute(text(
+                    "INSERT INTO tenant_guard (tenant_id) VALUES (:tenant) ON CONFLICT DO NOTHING"),
+                    {"tenant": key.tenant_id})
+                session.add(ProjectBillingOwner(owner_tenant_id=key.tenant_id,
+                                                billing_key_id=key.id,
+                                                trial_started_at=key.created_at))
+                session.flush()
+            if binding_created:
+                session.add(SubscriptionBinding(subscription_id=subscription,
+                                                payer=key.id, customer_id=customer))
+            session.add(ProviderRepairManifest(
+                key_id=key.id, tenant_id=key.tenant_id, customer_id=customer,
+                subscription_id=subscription, state_version=key.state_version,
+                trial_started_at=key.created_at, labels_day_key=key.labels_day_key,
+                labels_today=key.labels_today, labels_month_key=key.labels_month_key,
+                labels_this_month=key.labels_this_month,
+                owner_created=owner_created, binding_created=binding_created,
+                repaired_at=now))
+        session.commit()
+
+
+def undo_provider_link(connection: Connection, key_id: UUID) -> bool:
+    """Undo only an unchanged repair mapping; never remove live billing history."""
+    with Session(bind=connection, join_transaction_mode="create_savepoint") as session:
+        manifest = session.get(ProviderRepairManifest, key_id)
+        if manifest is None:
+            return False
+        key = session.get(ApiKey, key_id)
+        owner = session.get(ProjectBillingOwner, manifest.tenant_id)
+        binding = session.get(SubscriptionBinding, manifest.subscription_id)
+        if (key is None or owner is None or binding is None or
+                owner.billing_key_id != key_id or binding.payer != key_id or
+                binding.customer_id != manifest.customer_id or
+                key.paddle_customer_id != manifest.customer_id or
+                key.paddle_subscription_id != manifest.subscription_id or
+                key.state_version != manifest.state_version or
+                key.created_at.replace(tzinfo=timezone.utc) != manifest.trial_started_at.replace(tzinfo=timezone.utc) or
+                (key.labels_day_key, key.labels_today, key.labels_month_key, key.labels_this_month) !=
+                (manifest.labels_day_key, manifest.labels_today,
+                 manifest.labels_month_key, manifest.labels_this_month)):
+            raise ValueError("Provider repair has changed; manual reconciliation required")
+        if session.scalar(select(CheckoutIntent.id).where(CheckoutIntent.tenant_id == manifest.tenant_id).limit(1)):
+            raise ValueError("Provider repair has checkout history; manual reconciliation required")
+        if session.scalar(select(TransitionLog.event_id).where(TransitionLog.key_id == key_id).limit(1)):
+            raise ValueError("Provider repair has billing transitions; manual reconciliation required")
+        if manifest.binding_created:
+            session.delete(binding)
+        if manifest.owner_created:
+            session.delete(owner)
+        session.delete(manifest)
+        session.commit()
+        return True
 
 
 async def migrate() -> None:
@@ -144,14 +252,6 @@ async def migrate() -> None:
                             "ALTER TABLE api_keys ADD COLUMN state_version BIGINT NOT NULL DEFAULT 0"))
                     sync_connection.execute(text(
                         "CREATE UNIQUE INDEX IF NOT EXISTS uq_key_owner ON api_keys (tenant_id, id)"))
-                    legacy_provider = "_".join(("lemon", "squeezy"))
-                    for suffix in ("customer_id", "subscription_id"):
-                        old, new = f"{legacy_provider}_{suffix}", f"paddle_{suffix}"
-                        if old in names and new not in names and sync_connection.dialect.name == "postgresql":
-                            sync_connection.execute(text(
-                                f"ALTER TABLE api_keys RENAME COLUMN {old} TO {new}"))
-                            names.remove(old)
-                            names.add(new)
                     additions = {
                         "tier": "VARCHAR(20) NOT NULL DEFAULT 'trial'",
                         "paddle_customer_id": "VARCHAR(200)",
@@ -178,6 +278,7 @@ async def migrate() -> None:
                         "ON api_keys (paddle_customer_id) WHERE paddle_customer_id IS NOT NULL"))
             await connection.run_sync(upgrade)
             await connection.run_sync(Base.metadata.create_all)
+            await connection.run_sync(repair_provider_links)
             await connection.run_sync(lambda sync_connection:
                                       cast(Table, LabelContent.__table__).create(sync_connection, checkfirst=True))
     except Exception as exc:

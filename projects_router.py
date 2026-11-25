@@ -34,6 +34,19 @@ async def _actor(session: AsyncSession, tenant: str) -> ApiKey:
     return record
 
 
+async def _ensure_billing_owner(session: AsyncSession, tenant: str, actor: ApiKey) -> None:
+    await lock_tenant(session, tenant)
+    if await session.get(ProjectBillingOwner, tenant) is not None:
+        return
+    siblings = (await session.scalars(select(ApiKey.id).where(
+        ApiKey.tenant_id == tenant, ApiKey.is_active.is_(True)).limit(2))).all()
+    if len(siblings) != 1 or siblings[0] != actor.id:
+        raise HTTPException(409, "Billing payer is ambiguous; reconcile before sharing")
+    session.add(ProjectBillingOwner(owner_tenant_id=tenant, billing_key_id=actor.id,
+                                    trial_started_at=actor.created_at))
+    await session.flush()
+
+
 async def _project(session: AsyncSession, project_id: UUID, tenant: str,
                    allowed: set[str] | None = None) -> tuple[Domain, str]:
     project = await session.get(Domain, project_id)
@@ -51,6 +64,14 @@ async def _project(session: AsyncSession, project_id: UUID, tenant: str,
         role = member.role
     if allowed is not None and role not in allowed:
         raise HTTPException(403, "Project role does not allow this action")
+    if allowed is not None and role != "owner":
+        owner = await session.get(ProjectBillingOwner, project.tenant_id)
+        payer = (await session.get(ApiKey, owner.billing_key_id,
+                                   with_for_update=True, populate_existing=True)
+                 if owner is not None else None)
+        if payer is None or not payer.is_active or payer.subscription_state in {
+                "past_due", "paused", "cancelled", "cleaned_up", "trial_expired"}:
+            raise HTTPException(403, "Project is read-only while the payer is not entitled")
     return project, role
 
 
@@ -65,7 +86,7 @@ class ProjectCreate(BaseModel):
 @router.post("", status_code=201)
 async def create_project(payload: ProjectCreate, session: Session, tenant: Tenant) -> dict:
     actor = await _actor(session, tenant)
-    await lock_tenant(session, tenant)
+    await _ensure_billing_owner(session, tenant, actor)
     if await session.scalar(select(ApiKey.id).where(
             ApiKey.tenant_id == tenant, ApiKey.subscription_state == "cleaned_up")):
         raise HTTPException(409, "Tenant has been cleaned up")
@@ -77,9 +98,6 @@ async def create_project(payload: ProjectCreate, session: Session, tenant: Tenan
     session.add(ProjectMember(project_id=project.id, member_tenant_id=tenant,
                               role="admin", granted_by_key_id=actor.id,
                               created_at=datetime.now(timezone.utc)))
-    if await session.get(ProjectBillingOwner, tenant) is None:
-        session.add(ProjectBillingOwner(owner_tenant_id=tenant, billing_key_id=actor.id,
-                                        trial_started_at=actor.created_at))
     await commit_write(session)
     return {"id": str(project.id), "public_domain_id": payload.public_domain_id,
             "name": payload.name, "status": project.status, "settings_version": project.settings_version}
@@ -107,7 +125,9 @@ class ProjectSettings(BaseModel):
 @router.put("/{project_id}/settings")
 async def update_settings(project_id: UUID, payload: ProjectSettings, session: Session,
                           tenant: Tenant) -> dict:
-    project, _ = await _project(session, project_id, tenant, {"owner", "admin"})
+    project, role = await _project(session, project_id, tenant, {"owner", "admin"})
+    if role != "owner" and (project.status != "active" or payload.status != project.status):
+        raise HTTPException(403, "Only the project owner can change lifecycle status")
     result = await session.execute(update(Domain).where(
         Domain.id == project.id, Domain.settings_version == payload.settings_version).values(
         description=payload.description, status=payload.status,
@@ -130,6 +150,7 @@ class AddMember(BaseModel):
 async def add_member(project_id: UUID, payload: AddMember, session: Session, tenant: Tenant) -> dict:
     project, _ = await _project(session, project_id, tenant, {"owner", "admin"})
     actor = await _actor(session, tenant)
+    await _ensure_billing_owner(session, project.tenant_id, actor)
     if project.status != "active":
         raise HTTPException(409, "Project is not active")
     if not await session.scalar(select(ApiKey.id).where(
@@ -166,6 +187,7 @@ async def invite_member(project_id: UUID, payload: InviteRequest, session: Sessi
                         tenant: Tenant) -> dict:
     project, _ = await _project(session, project_id, tenant, {"owner", "admin"})
     actor = await _actor(session, tenant)
+    await _ensure_billing_owner(session, project.tenant_id, actor)
     if project.status != "active":
         raise HTTPException(409, "Project is not active")
     now = datetime.now(timezone.utc)
@@ -204,6 +226,13 @@ async def accept_invite(project_id: UUID, invite_id: UUID, payload: AcceptInvite
     actor = await _actor(session, tenant)
     if project.status != "active" or not actor.contact_email:
         raise HTTPException(403, "Invitation cannot be accepted")
+    owner = await session.get(ProjectBillingOwner, project.tenant_id)
+    payer = (await session.get(ApiKey, owner.billing_key_id,
+                               with_for_update=True, populate_existing=True)
+             if owner is not None else None)
+    if payer is None or not payer.is_active or payer.subscription_state in {
+            "past_due", "paused", "cancelled", "cleaned_up", "trial_expired"}:
+        raise HTTPException(403, "Project is read-only while the payer is not entitled")
     invite = await session.scalar(select(ProjectInvite).where(
         ProjectInvite.id == invite_id, ProjectInvite.project_id == project_id).with_for_update())
     if (invite is None or invite.email != actor.contact_email.lower()

@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.connection import commit_write, get_db
-from db.models import ApiKey, SignupChallenge
+from db.models import ApiKey, Domain, ProjectBillingOwner, ProjectMember, SignupChallenge
 from db.tenant_lock import lock_tenant
 from email_service import send_signup_challenge_email
 from rate_limit import limiter
@@ -129,6 +129,70 @@ async def require_tenant(session: Session,
 
 
 Tenant = Annotated[str, Depends(require_tenant)]
+
+
+async def require_project_tenant(request: Request, session: Session, actor_tenant: Tenant) -> str:
+    """Resolve a member's public project alias while retaining the actor identity."""
+    public_id = request.path_params.get("domain_id")
+    if public_id is None and request.method == "POST":
+        try:
+            body = await request.json()
+            public_id = body.get("domain_id") if isinstance(body, dict) else None
+        except (ValueError, UnicodeError):
+            pass
+    if not isinstance(public_id, str) or not public_id:
+        return actor_tenant
+    owned = await session.scalar(select(Domain.id).where(
+        Domain.tenant_id == actor_tenant,
+        Domain.public_domain_id == public_id).limit(1))
+    if owned is not None:
+        owner = await session.get(ProjectBillingOwner, actor_tenant)
+        if owner is not None:
+            write = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            payer = await session.get(ApiKey, owner.billing_key_id,
+                                      with_for_update=write, populate_existing=write)
+            if payer is None or not payer.is_active:
+                raise HTTPException(403, "Project payer is unavailable")
+            if write and payer.subscription_state in {"past_due", "paused", "cleaned_up", "trial_expired"}:
+                raise HTTPException(403, "Project is read-only while the payer is not entitled")
+            session.info["payer_key_id"] = payer.id
+            session.info["project_role"] = "owner"
+        return actor_tenant
+    memberships = (await session.execute(select(Domain, ProjectMember).join(
+        ProjectMember, ProjectMember.project_id == Domain.id).where(
+        Domain.public_domain_id == public_id,
+        ProjectMember.member_tenant_id == actor_tenant,
+        ProjectMember.active.is_(True)).limit(2))).all()
+    if not memberships:
+        return actor_tenant
+    if len(memberships) != 1:
+        raise HTTPException(409, "Project name is ambiguous; use a project-specific route")
+    project, member = memberships[0]
+    write = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+    if write and project.status != "active":
+        raise HTTPException(409, "Project is read-only")
+    if write and member.role == "annotator" and (
+            "verify" in request.url.path or request.url.path.endswith("/guidelines")):
+        raise HTTPException(403, "Project role does not allow this action")
+    if write and member.role == "reviewer" and request.url.path.endswith("/guidelines"):
+        raise HTTPException(403, "Project role does not allow this action")
+    owner = await session.get(ProjectBillingOwner, project.tenant_id)
+    if owner is None:
+        raise HTTPException(409, "Project billing owner must be reconciled")
+    payer = await session.get(ApiKey, owner.billing_key_id,
+                              with_for_update=write, populate_existing=write)
+    if payer is None or not payer.is_active:
+        raise HTTPException(403, "Project payer is unavailable")
+    if write and payer.subscription_state in {"past_due", "paused", "cancelled", "cleaned_up", "trial_expired"}:
+        raise HTTPException(403, "Project is read-only while the payer is not entitled")
+    session.info["actor_tenant_id"] = actor_tenant
+    session.info["tenant_id"] = project.tenant_id
+    session.info["payer_key_id"] = payer.id
+    session.info["project_role"] = member.role
+    return project.tenant_id
+
+
+ProjectTenant = Annotated[str, Depends(require_project_tenant)]
 
 
 class CreateKey(BaseModel):

@@ -160,6 +160,31 @@ class ProjectBillingOwner(Base):
     trial_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class ProviderRepairManifest(Base):
+    __tablename__ = "provider_repair_manifest"
+    key_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("api_keys.id"), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    customer_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    subscription_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    trial_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    labels_day_key: Mapped[str] = mapped_column(String(10), nullable=False)
+    labels_today: Mapped[int] = mapped_column(Integer, nullable=False)
+    labels_month_key: Mapped[str] = mapped_column(String(7), nullable=False)
+    labels_this_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    owner_created: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    binding_created: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    repaired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProviderRepairQuarantine(Base):
+    __tablename__ = "provider_repair_quarantine"
+    key_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("api_keys.id"), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    reason_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    quarantined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class CheckoutIntent(Base):
     __tablename__ = "checkout_intent"
     __table_args__ = (

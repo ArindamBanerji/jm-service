@@ -1,5 +1,7 @@
 from collections.abc import AsyncIterator
+import asyncio
 from pathlib import Path
+import sys
 from unittest.mock import AsyncMock
 
 import httpx
@@ -14,6 +16,16 @@ import scheduler
 from db import connection
 from .fixtures.factory import Factory, Wire
 from .fixtures.pg_schema import database
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    if sys.platform == "win32":
+        # asyncpg's teardown can raise a late Proactor socket reset; Playwright
+        # subprocesses require Proactor. Choose per test before async fixtures.
+        policy = (asyncio.WindowsProactorEventLoopPolicy if "browser" in item.path.parts
+                  else asyncio.WindowsSelectorEventLoopPolicy)
+        asyncio.set_event_loop_policy(policy())
 
 
 def pytest_addoption(parser):

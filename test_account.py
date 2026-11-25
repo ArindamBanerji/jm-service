@@ -87,7 +87,7 @@ def test_minimal_key_summary_and_utc_counters(tmp_path, monkeypatch):
                 await session.commit()
         asyncio.run(update("old", "old", "trial"))
         body = http.get("/v1/account", headers=auth()).json()
-        assert set(body) == {"tenant_id", "tenant_name", "tier", "created_at", "is_active",
+        assert set(body) == {"tenant_id", "tenant_name", "tier", "subscription_state", "created_at", "is_active",
                              "cancelled_at", "trial_expires_at", "trial_expired", "usage"}
         assert body["tenant_id"] == "tenant-a" and body["tenant_name"] == "Team tenant-a"
         assert body["usage"]["labels_today"] == body["usage"]["labels_this_month"] == 0
@@ -152,7 +152,7 @@ def test_checkout_webhook_refreshes_tier(tmp_path, monkeypatch):
                 calls.append((url, kwargs))
                 class Reply:
                     def raise_for_status(self): pass
-                    def json(self): return {"data": {"checkout": {"url": "https://checkout.paddle.com/test"}}}
+                    def json(self): return {"data": {"id": "txn_account_test", "checkout": {"url": "https://checkout.paddle.com/test"}}}
                 return Reply()
         monkeypatch.setattr(billing.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
         monkeypatch.setenv("PADDLE_API_KEY", "test")

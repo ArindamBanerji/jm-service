@@ -112,7 +112,7 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
         payload = {"event_type": event, "event_id": f"evt-{event}-{status}",
                    "occurred_at": datetime.now(timezone.utc).isoformat(),
                    "data": {"id": "sub-1", "customer_id": "customer-1",
-                            "status": status,
+                            **({"status": status} if status else {}),
                             "items": [{"product": {"name": product}}]}}
         body = json.dumps(payload).encode()
         ts = "1234567890"
@@ -195,7 +195,7 @@ def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatc
                 def raise_for_status(self):
                     pass
                 def json(self):
-                    return {"data": {"checkout": {"url": "https://checkout.paddle.com/pay/txn-1"}}}
+                        return {"data": {"id": "txn_1", "checkout": {"url": "https://checkout.paddle.com/pay/txn-1"}}}
             return Response()
 
     monkeypatch.setattr(billing.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
@@ -208,7 +208,9 @@ def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatc
     assert response.json() == {"checkout_url": "https://checkout.paddle.com/pay/txn-1",
                                "tier": "professional"}
     assert calls[0][0] == "https://sandbox-api.paddle.com/transactions"
-    assert calls[0][1]["json"]["custom_data"] == {"tenant_id": "tenant-1", "key_id": str(key.id)}
+    assert calls[0][1]["json"]["custom_data"]["tenant_id"] == "tenant-1"
+    assert calls[0][1]["json"]["custom_data"]["key_id"] == str(key.id)
+    assert calls[0][1]["json"]["custom_data"]["checkout_intent_id"]
     assert calls[0][1]["json"]["items"] == [{"price_id": "pri_pro", "quantity": 1}]
     asyncio.run(db_engine.dispose())
 
@@ -237,7 +239,7 @@ def test_webhook_links_tenant_from_custom_data(tmp_path, monkeypatch) -> None:
         "customer": {"email": "owner@example.com"},
         "items": [{"product": {"name": "DLJ Business"}}]}}
     assert client.post("/v1/billing/webhook", json=payload).status_code == 200
-    assert client.post("/v1/billing/webhook", json=payload).status_code == 409
+    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
 
     async def inspect_record() -> ApiKey:
         async with factory() as session:

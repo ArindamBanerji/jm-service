@@ -12,7 +12,7 @@ from sqlalchemy import Float, and_, case, cast, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import repository
-from auth import Tenant, scoped_domain_id
+from auth import ProjectTenant, scoped_domain_id
 from db.connection import get_db
 from db.models import Domain, LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/v1/dashboard", tags=["Dashboard"])
 Session = Annotated[AsyncSession, Depends(get_db)]
 
 
-async def require_domain(domain_id: str, session: Session, tenant: Tenant) -> Domain:
+async def require_domain(domain_id: str, session: Session, tenant: ProjectTenant) -> Domain:
     domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
     if domain is None:
         raise HTTPException(404, detail="Domain not found")
