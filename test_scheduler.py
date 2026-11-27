@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -11,6 +12,7 @@ import scheduler
 from db.models import Annotator, ApiKey, Base, Domain, Engine, LabelLog
 
 
+@pytest.mark.sqlite_only
 def test_trial_notice_sent_once(tmp_path, monkeypatch) -> None:
     engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'mail.db').as_posix()}")
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -43,6 +45,7 @@ def test_trial_notice_sent_once(tmp_path, monkeypatch) -> None:
     assert recipients == ["trial@example.com"]
 
 
+@pytest.mark.sqlite_only
 def test_cleanup_cancelled_tenants(tmp_path, monkeypatch) -> None:
     engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'cleanup.db').as_posix()}")
     factory = async_sessionmaker(engine, expire_on_commit=False)

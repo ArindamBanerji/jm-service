@@ -19,6 +19,8 @@ from db import connection as db_connection
 from db.models import Base, Engine, LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
 
+pytestmark = pytest.mark.sqlite_only
+
 
 @asynccontextmanager
 async def database():

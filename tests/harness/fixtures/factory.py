@@ -1,15 +1,21 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import json
+import os
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from httpx import AsyncClient, Response
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from auth import generate_api_key, scoped_domain_id
 from db import repository
+from db.models import ApiKey, CheckoutIntent
 from jm_core import DomainConfig, JudgmentMemoryEngine
 
 
@@ -55,6 +61,20 @@ class Wire:
     directory: Path
     observers: dict[str, Callable[[], Awaitable[None]]] = field(default_factory=dict)
 
+    async def paddle_intent(self, tier: str, transaction_id: str) -> dict[str, str]:
+        """Seed the provider-bound purchase represented by a signed test delivery."""
+        digest = hashlib.sha256(self.client.headers["x-api-key"].encode()).hexdigest()
+        async with self.factory.sessions.begin() as session:
+            payer = await session.scalar(select(ApiKey).where(ApiKey.key_hash == digest))
+            assert payer is not None
+            intent = CheckoutIntent(id=uuid4(), tenant_id=payer.tenant_id,
+                                    purchaser=payer.id, payer=payer.id, tier=tier,
+                                    transaction_id=transaction_id,
+                                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+            session.add(intent)
+        return {"tenant_id": payer.tenant_id, "key_id": str(payer.id),
+                "checkout_intent_id": str(intent.id)}
+
     async def observe(self, request_id: str) -> None:
         observer = self.observers[request_id]
         await observer()
@@ -64,6 +84,15 @@ class Wire:
                       before_send: Callable[[], Awaitable[None]] | None = None,
                       omit_api_key: bool = False, **kwargs: Any) -> Response:
         request_id = uuid4().hex if before_send is not None else None
+        if path.startswith("/v1/billing/webhook") and "json" in kwargs:
+            body = json.dumps(kwargs.pop("json"), separators=(",", ":")).encode()
+            stamp = "1700000000"
+            signature = hmac.new(os.environ["PADDLE_WEBHOOK_SECRET"].encode(),
+                                 stamp.encode() + b":" + body, hashlib.sha256).hexdigest()
+            kwargs["content"] = body
+            kwargs["headers"] = {**kwargs.get("headers", {}),
+                                 "Content-Type": "application/json",
+                                 "Paddle-Signature": f"ts={stamp};h1={signature}"}
         if request_id is not None and before_send is not None:
             self.observers[request_id] = before_send
             kwargs["headers"] = {**kwargs.get("headers", {}), "X-Harness-Request-Id": request_id}

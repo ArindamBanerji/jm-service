@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-test.use({ baseURL: process.env.TAG_IMAGE_BASE_URL ?? 'http://localhost:8080' });
+if (process.env.TAG_IMAGE_BASE_URL) test.use({ baseURL: process.env.TAG_IMAGE_BASE_URL });
 
 async function mockReview(page: Page, content: Record<string, unknown>, text: string | null) {
   await page.addInitScript(() => {
@@ -57,6 +57,7 @@ test('image viewer reports a broken image and keeps category controls', async ({
     image_url: 'https://images.example.test/broken.png' }, null);
   await page.route('https://images.example.test/broken.png', route => route.abort());
   await page.goto('/#/review/item-1');
+  await page.getByRole('button', { name: 'Load external image' }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'Image not available' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Category' })).toBeVisible();
 });

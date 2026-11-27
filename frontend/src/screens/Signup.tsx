@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, confirmAccount, registerAccount, type RegistrationResponse } from '../api'
 import ErrorBanner from '../components/ErrorBanner'
 
+import { getAccountGeneration } from '../operationContext'
+
 const deferredKey = 'dlj-deferred-registration'
 type StoredReceipt = { result: RegistrationResponse; startingKey: string | null; active?: boolean }
 const readDeferred = (): StoredReceipt | null => {
@@ -39,6 +41,7 @@ export default function Signup() {
     const onKeyChange = () => {
       registrationEpoch.current += 1
       sessionStorage.removeItem(deferredKey)
+      setEmail(''); setName(''); setError(null)
       setDeferred(false)
       setCopied(false)
       setKey('')
@@ -85,10 +88,12 @@ export default function Signup() {
     registrationEpoch.current += 1
     const myEpoch = registrationEpoch.current
     setBusy(true); setError(null)
+    const accountGeneration = getAccountGeneration()
     const startingKey = localStorage.getItem('rgi-api-key')
     try {
       const result = await confirmAccount(token.trim())
-      if (myEpoch !== registrationEpoch.current) return
+      if (accountGeneration !== getAccountGeneration() || localStorage.getItem('rgi-api-key') !== startingKey) return
+      if (mounted.current && myEpoch !== registrationEpoch.current) return
       if (!mounted.current || !window.location.hash.startsWith('#/signup') ||
           localStorage.getItem('rgi-api-key') !== startingKey) {
         if (localStorage.getItem('rgi-api-key') !== startingKey) return
@@ -133,7 +138,7 @@ export default function Signup() {
   }
   return <div className="page"><div className="eyebrow">Free trial</div><h1>Start your free trial.</h1><p className="subtitle">Create an account to score labels and review the results.</p>
     <div className="card card-pad signup-card">
-      {key ? <div className="stack"><div className="success">{deferred ? 'Registration completed. This key is not active on this browser.' : 'Your trial is ready.'}</div><label className="field">Your API key<input aria-label="Your API key" value={key} readOnly onFocus={event => event.currentTarget.select()} /></label>
+      {key ? <div className="stack"><div className="success">{deferred ? 'Registration completed. This key is not active on this browser.' : 'Your account is ready.'}</div><label className="field">Your API key<input aria-label="Your API key" value={key} readOnly onFocus={event => event.currentTarget.select()} /></label>
         <strong>Save this key — it cannot be recovered.</strong><div className="button-row"><button className="button" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy key'}</button>{deferred && <button className="button" onClick={useDeferredKey}>Use this key</button>}<button className="button secondary" onClick={() => navigate('/upload')}>Continue to Upload</button></div></div>
         : confirmationPending ? <form onSubmit={event => void confirm(event)} className="stack"><p>Check your email for a confirmation code.</p><label className="field">Confirmation code<input autoComplete="one-time-code" required minLength={64} maxLength={64} value={token} onChange={event => setToken(event.target.value)} /></label><button className="button" type="submit" disabled={busy}>{busy ? 'Confirming…' : 'Confirm email'}</button></form>
         : <div className="stack"><form onSubmit={event => void submit(event)} className="stack"><label className="field">Email<input type="email" autoComplete="email" required maxLength={200} value={email} onChange={event => setEmail(event.target.value)} /></label><label className="field">Name (optional)<input autoComplete="name" maxLength={200} value={name} onChange={event => setName(event.target.value)} /></label><button className="button" type="submit" disabled={busy}>{busy ? 'Sending email…' : 'Start Free Trial'}</button></form><button className="button secondary" type="button" onClick={() => setConfirmationPending(true)}>I already have a code</button></div>}

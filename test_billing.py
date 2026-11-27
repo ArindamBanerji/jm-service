@@ -7,6 +7,7 @@ import hmac
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -18,7 +19,7 @@ import billing
 from auth import generate_api_key
 from db.connection import get_db
 import db.migrate as migrations
-from db.models import ApiKey, Base
+from db.models import ApiKey, Base, CheckoutIntent
 from email_service import (api_key_email, cancellation_email, trial_expired_email,
                            trial_expiring_email)
 from trial_guard import check_trial_expiry, check_volume_cap
@@ -88,9 +89,11 @@ def test_email_templates(template, subject_fragment: str, body_fragment: str) ->
     assert "dlj.dakshineshwari.net" in html
 
 
+@pytest.mark.sqlite_only
 def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
     db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'billing.db').as_posix()}")
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    custom: dict[str, str] = {}
 
     async def setup() -> None:
         async with db_engine.begin() as connection:
@@ -99,6 +102,13 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
             entry = record()
             entry.paddle_customer_id = "customer-1"
             session.add(entry)
+            await session.flush()
+            intent = CheckoutIntent(id=uuid4(), tenant_id="tenant", purchaser=entry.id,
+                                    payer=entry.id, tier="starter", transaction_id="txn_lifecycle",
+                                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+            session.add(intent)
+            custom.update({"tenant_id": "tenant", "key_id": str(entry.id),
+                           "checkout_intent_id": str(intent.id)})
             await session.commit()
 
     asyncio.run(setup())
@@ -112,6 +122,8 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
         payload = {"event_type": event, "event_id": f"evt-{event}-{status}",
                    "occurred_at": datetime.now(timezone.utc).isoformat(),
                    "data": {"id": "sub-1", "customer_id": "customer-1",
+                            **({"custom_data": custom, "transaction_id": "txn_lifecycle"}
+                               if event == "subscription.created" else {}),
                             **({"status": status} if status else {}),
                             "items": [{"product": {"name": product}}]}}
         body = json.dumps(payload).encode()
@@ -136,8 +148,8 @@ def test_subscription_webhook_lifecycle(tmp_path, monkeypatch) -> None:
     assert saved.paddle_subscription_id == "sub-1"
     assert saved.tier == "professional"
     assert saved.cancelled_at is not None
-    assert post("subscription.updated", "DLJ Professional", "active").status_code == 200
-    assert asyncio.run(inspect_record()).cancelled_at is None
+    assert post("subscription.updated", "DLJ Professional", "active").status_code == 409
+    assert asyncio.run(inspect_record()).cancelled_at is not None
     asyncio.run(db_engine.dispose())
 
 
@@ -150,16 +162,17 @@ def test_webhook_rejects_bad_signature(monkeypatch) -> None:
     assert response.status_code == 401
 
 
-def test_sandbox_accepts_unsigned_webhook(monkeypatch) -> None:
+def test_sandbox_rejects_unsigned_webhook_without_secret(monkeypatch) -> None:
     monkeypatch.setenv("PADDLE_SANDBOX", "true")
     monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
     app = FastAPI()
     app.include_router(billing.router)
     response = TestClient(app).post("/v1/billing/webhook", json={
         "event_type": "transaction.completed", "data": {}})
-    assert response.status_code == 200
+    assert response.status_code == 503
 
 
+@pytest.mark.sqlite_only
 def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatch) -> None:
     db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'checkout.db').as_posix()}")
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
@@ -215,31 +228,45 @@ def test_checkout_url_requires_auth_and_creates_transaction(tmp_path, monkeypatc
     asyncio.run(db_engine.dispose())
 
 
+@pytest.mark.sqlite_only
 def test_webhook_links_tenant_from_custom_data(tmp_path, monkeypatch) -> None:
     db_engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'webhook.db').as_posix()}")
     factory = async_sessionmaker(db_engine, expire_on_commit=False)
+    custom: dict[str, str] = {}
 
     async def setup() -> None:
         async with db_engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
         async with factory() as session:
-            session.add(record())
+            entry = record()
+            session.add(entry)
+            await session.flush()
+            intent = CheckoutIntent(id=uuid4(), tenant_id="tenant", purchaser=entry.id,
+                                    payer=entry.id, tier="business", transaction_id="txn_link",
+                                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+            session.add(intent)
+            custom.update({"tenant_id": "tenant", "key_id": str(entry.id),
+                           "checkout_intent_id": str(intent.id)})
             await session.commit()
 
     asyncio.run(setup())
     monkeypatch.setattr(billing, "AsyncSessionLocal", factory)
-    monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "webhook-secret")
     monkeypatch.setenv("PADDLE_SANDBOX", "true")
     app = FastAPI()
     app.include_router(billing.router)
     client = TestClient(app)
     payload = {"event_type": "subscription.created", "event_id": "evt-legacy",
                "occurred_at": "2026-01-01T00:00:00Z", "data": {
-        "id": "sub-1", "customer_id": "customer-1", "custom_data": {"tenant_id": "tenant"},
+        "id": "sub-1", "customer_id": "customer-1", "transaction_id": "txn_link", "custom_data": custom,
         "customer": {"email": "owner@example.com"},
         "items": [{"product": {"name": "DLJ Business"}}]}}
-    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
-    assert client.post("/v1/billing/webhook", json=payload).status_code == 200
+    body = json.dumps(payload).encode()
+    stamp = "1234567890"
+    signature = hmac.new(b"webhook-secret", stamp.encode() + b":" + body, hashlib.sha256).hexdigest()
+    headers = {"Paddle-Signature": f"ts={stamp};h1={signature}", "Content-Type": "application/json"}
+    assert client.post("/v1/billing/webhook", content=body, headers=headers).status_code == 200
+    assert client.post("/v1/billing/webhook", content=body, headers=headers).status_code == 200
 
     async def inspect_record() -> ApiKey:
         async with factory() as session:
@@ -255,6 +282,7 @@ def test_webhook_links_tenant_from_custom_data(tmp_path, monkeypatch) -> None:
     asyncio.run(db_engine.dispose())
 
 
+@pytest.mark.sqlite_only
 def test_migration_adds_billing_columns_to_existing_table(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "old.db"
     legacy_provider = "_".join(("lemon", "squeezy"))

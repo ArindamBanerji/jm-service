@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 import billing
 import label_studio
 import scheduler
-from db.models import ApiKey, Domain, LabelLog
+from db.models import ApiKey, ConnectorConfigRow, Domain, LabelLog
 from test_billing_fixes import deliver, event
 from test_tasks import open_tasks_client
 
@@ -22,7 +22,7 @@ def client(tmp_path, monkeypatch):
     if url := os.getenv("DLJ_DATABASE_URL"):
         monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("PADDLE_SANDBOX", "true")
-    monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "test-signing-secret")
     monkeypatch.setenv("LABEL_STUDIO_TOKEN", "test-token")
     monkeypatch.setenv("LS_CONFIG_PATH", str(tmp_path / "connector.json"))
     with open_tasks_client(tmp_path) as http:
@@ -141,13 +141,14 @@ def test_bulk_explicit_true_on_approve(client):
     assert detail(client)["verified_outcome"] is True
 
 
-def test_bulk_implicit_compatibility_has_no_warning(client, caplog):
+def test_bulk_without_truth_does_not_verify(client):
     assert ingest(client).status_code == 200
     response = client.post("/v1/labels/medical/bulk-verify", json={
         "label_ids": ["L1"], "action": "reject"})
     assert response.status_code == 200, response.text
-    assert detail(client)["verified_outcome"] is False
-    assert "Implicit bulk verification outcome is deprecated" not in caplog.text
+    assert response.json() == {"processed": 0, "skipped": 1,
+                               "errors": [{"label_id": "L1", "error": "outcome_required"}]}
+    assert detail(client)["verified_at"] is None
 
 
 def test_batch_conflict_log_redacts_source(client, caplog):
@@ -218,12 +219,11 @@ def connector_event(result, annotation_id=1):
                                       "agreement_score": .2, "ground_truth": "approve"}}}
 
 
-def test_malformed_connector_result_skipped(client, caplog):
+def test_malformed_connector_result_rejected_before_lookup(client):
     response = client.post("/v1/label-studio/webhook", headers={"X-LS-Token": "test-token"},
                            json=connector_event([3]))
-    assert response.status_code == 200
-    assert response.json()["status"] == "skipped"
-    assert "Skipped malformed connector annotation" in caplog.text
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid annotation result"
     assert count(client, LabelLog) == 0
 
 
@@ -246,9 +246,13 @@ def test_concurrent_connector_config_preserves_both_projects(client):
     for thread in threads:
         thread.join()
     assert [response.status_code for response in results] == [200, 200]
-    saved = label_studio._saved_configs()
-    assert len(saved) == 2
-    assert {"tasks-tenant\0p1", "tasks-tenant\0p2"} == set(saved)
+    async def read_configs():
+        async with client.app.state.session_factory() as session:
+            return (await session.scalars(select(ConnectorConfigRow).where(
+                ConnectorConfigRow.tenant_id == "tasks-tenant"))).all()
+    saved = asyncio.run(read_configs())
+    assert {row.project_id for row in saved} == {"p1", "p2"}
+    assert all(row.version == 1 and row.config_json["domain_id"] == "medical" for row in saved)
 
 
 def test_connector_overflow_integer_is_422(client):

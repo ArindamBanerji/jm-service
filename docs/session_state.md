@@ -924,3 +924,884 @@ Notes: The committed candidate was tested as an exported Git tree. Managed Postg
 - Frontend build: passed. Chromium verified the contact link, the three public HTML policies and all four pricing rows on localhost:8080.
 - mypy: clean (jm_service.py and legal_pages.py).
 | 2026-11-25 | Contact email on legal pages | PASS | Added support@dakshineshwari.net to /terms, /privacy, /refund and /attribution server HTML |
+
+## DLJ-PROMPT-A-2 — Prompt A Completion
+
+- Date: 2026-11-25
+- P1s addressed: R02, R14, R19, N05, B6-03, R08, R09, N02, N03, R05, R23 (11 of 11).
+- Scenarios activated: S1–S14 (14 of 14); additional project, invite, archive, and historical-key recovery tests are active.
+- Schema: both A migration blocks from A-1 are applied; A-2 added proof-rotation markers and guarded historical provider repair. New tables across Prompt A: 11. New domain/key columns across Prompt A: 9.
+- Billing FSM: subscription lifecycle, payer-bound checkout intent, current subscription binding, transition log, tenant-serialized retention, and bounded webhook admission.
+- Signup: register → mailbox challenge (202) → single-use confirm (201). The first upgrade deactivates active historical email-linked keys without mailbox proof; a successful challenge rotates their digest in place, preserving tenant and billing history. Previously revoked keys without the migration marker cannot self-reactivate.
+- Project routes: create/list, versioned settings, member grants, mailbox-bound invites and acceptance. Owner-only archive/reactivation and admin grants, inviter authority recheck, and read-only archive enforcement on HTTP and connector writes are covered.
+- Admission: bounded report/upload and billing readers before body parsing. Diagnostics: database and job errors use approved diagnostic fields.
+- Historical repair: confirmed Paddle links are bound to an unambiguous payer; ambiguous/legacy links are quarantined; a guarded manifest supports conditional undo. PostgreSQL is authoritative and SQLite is advisory.
+- Files modified: `auth.py`, `billing.py`, `account.py`, `labeling_router.py`, `label_studio.py`, `scheduler.py`, `trial_guard.py`, `db/models.py`, `db/migrate.py`, `db/connection.py`, `jm_service.py`, `label_health/api.py`, `email_service.py`, `frontend/src/api.ts`, `frontend/src/screens/Signup.tsx`, and affected pytest/Playwright contracts.
+- Files created: `projects_router.py`, `db/tenant_lock.py`, `tests/harness/test_prompt_a_projects.py`, `tests/harness/test_prompt_a_lifecycle.py`.
+- Tests: combined root suite 544 passed, 14 skipped, 4 xfailed; `tests/` PostgreSQL and SQLite advisory each 100 passed, 13 skipped, 4 xfailed; PostgreSQL migration tests 6 passed, 1 skipped.
+- mypy: clean (12 service/model files). Frontend build and TypeScript checks: passed. Playwright: 124 passed.
+- Release note: first-upgrade deactivation requires affected email-linked key holders to complete mailbox confirmation. Export role checks await the Prompt D export endpoint; the signup receipt remains visible until the user can save the one-time key. `transition_log` records applied changes; rejected and duplicate delivery attempts do not yet get separate persisted rows because `event_id` is the table's primary key, so R2 must resolve that audit contract before launch.
+- Next gate: R2 Astra review (billing, projects and access); no production release decision is implied by this test pass.
+
+## DLJ-R2 — Billing, Projects and Access Review (Post-Wave 2)
+
+- Date: 2026-11-25
+- P1 closure: 1/11 CLOSED, 10 PARTIAL, 0 OPEN.
+- Scenarios: 3/14 PASS, 11 WEAK, 0 MISSING. All 14 ran.
+- New review findings: P1=14, P2=8, P3=1.
+- Tests: final serial PostgreSQL 100 passed, 13 skipped, 4 xfailed. SQLite advisory 100 passed, 13 skipped, 4 xfailed. PW 124 passed. Offline root discovery 562 collected, exit 0.
+- Run variance: default PostgreSQL credentials failed on 5432. Overlapping primary runs on 5433 each had one browser failure. The focused retry and serial full run passed.
+- Gate verdict: NOT READY.
+- Deferred: export authorization through the future Prompt D endpoint. Billing decision history and safe legacy credential recovery must pass R2.
+- Report: docs/quality/dlj_r2_review.md
+- Next: correct the R2 findings and repeat the review before starting Prompt B or Prompt C.
+
+## DLJ-R2-FIXER — R2 P1 Fixes + Scenario Strengthening
+
+- Date: 2026-11-25
+- P1 findings addressed: F1, F2, F3, F4, F5, F6, F7, F8, F10, F12, F15, F16, F17, F21 (14 of 14); independent R2 reopening remains the gate.
+- P2 findings addressed: F13 and F18. F11's malformed connector dispatch now returns 422 before lookup.
+- Scenarios strengthened: S2–S12 with claim and lock barriers, signed provider deliveries, fresh readback, diagnostic sinks, provider repair, and collision/ownership checks.
+- Billing: purchaser, payer, tier and transaction are bound to checkout intent; signed sandbox webhooks, event-specific transitions, durable decision receipts, lifecycle notices and state versions cover entitlement changes.
+- Retention and access: pending purchases, repair holds and disabled paid siblings protect tenant data; project mutations lock tenant then payer then project/member; ambiguous aliases are rejected and revisions retain the actual actor key.
+- Historical repair: conflicting bindings quarantine only the affected tenant, guarded undo checks binding and trial start, and unknown signup ownership requires operator reconciliation.
+- Files modified: `billing.py`, `auth.py`, `account.py`, `scheduler.py`, `projects_router.py`, `labeling_router.py`, `label_studio.py`, `trial_guard.py`, `db/models.py`, `db/migrate.py`, `db/connection.py`, `tests/harness/conftest.py`, `tests/harness/fixtures/factory.py`, `tests/harness/scenarios/test_s01_s06.py`, `tests/harness/scenarios/test_s07_s14.py`, `tests/harness/contracts/test_billing.py`, `test_billing.py`, `test_account.py`, `test_billing_fixes.py`, `test_resweep_fixes.py`.
+- Files created: `db/entitlement.py`, `tests/harness/test_r2_fixes.py`.
+- Tests: PostgreSQL `tests/` 123 passed, 13 skipped, 4 xfailed; SQLite advisory harness 122 passed, 14 skipped, 4 xfailed; offline root suite 444 passed, 1 skipped. Root discovery collected 585 with the known live Paddle import script excluded.
+- mypy: clean on 13 service/model files. Playwright: 124 passed with two workers. No frontend source changed; frontend build was not repeated.
+- Next gate: reopen the independent R2 billing, projects and access review before Prompt B or Prompt C.
+
+## DLJ-R2-REOPEN — Billing, Projects and Access Review (Post-Fixer)
+
+- Date: 2026-11-25
+- Original P1 closure: 2/11 CLOSED, 9 PARTIAL, 0 OPEN.
+- R2-found P1 closure: 4/14 CLOSED, 10 PARTIAL, 0 OPEN.
+- Scenarios: 7/14 PASS, 7 WEAK, 0 MISSING. All 14 active on PostgreSQL.
+- New findings: P1=3, P2=2, P3=0.
+- Tests: PostgreSQL tests/ and standalone harness each 123 passed, 13 skipped, 4 xfailed. Advisory SQLite 122 passed, 14 skipped, 4 xfailed. Playwright 124 passed. Frontend build passed. Offline root discovery collected 585.
+- Gate verdict: NOT READY.
+- Report: docs/quality/dlj_r2_review.md
+- Next: close the retention, billing, access and boundary findings and repeat R2. Prompt B and Prompt C remain blocked.
+
+## DLJ-R2-FIXER-2 — R2 Reopen Criteria 1-5
+
+- Date: 2026-11-25.
+- Criterion 1 (retention): shared `effective_state` protects disabled, null-state paid siblings; tenant deletion terminalizes all siblings, audits every transition, and admin issuance refuses a destroyed tenant. PostgreSQL and SQLite regression checks passed.
+- Criterion 2 (billing): retryable delivery attempts are audited separately from terminal receipts; premature signed updates can apply after creation. Resubscription requires a new subscription ID, the historical exemption checks customer and subscription provenance, and checkout metadata and audit IDs are bounded.
+- Criterion 3 (access): invitation acceptance refreshes after locking and claims conditionally; payer and issuer key locks are sorted. UUID project selection resolves legacy alias collisions, credential actor identity uses one lookup, and domain-creating paths check payer entitlement.
+- Criterion 4 (input and diagnostics): startup URL parsing is redacted, connector-derived IDs and actions are validated before writes, billing and report intake have hard waiter bounds, explicit null project settings return 422, and the PostgreSQL owner constraint matches its inverse.
+- Criterion 5 (scenarios): S3, S4, S5, S6, S9, S10 and S12 gained waiter, diagnostic, nested input, boundary, retry, renewal and concurrent retention observations.
+- New P1s addressed: N1, N2 and N3. New P2s addressed: N4 and N5. Independent closure review remains required.
+- Files modified: `account.py`, `auth.py`, `billing.py`, `db/connection.py`, `db/migrate.py`, `db/entitlement.py`, `label_health/api.py`, `label_studio.py`, `labeling_router.py`, `projects_router.py`, `scheduler.py`, `tests/harness/scenarios/test_s01_s06.py`, `tests/harness/scenarios/test_s07_s14.py`, `tests/harness/test_r2_fixes.py`, `e2e/components.spec.ts`.
+- Tests: sequential PostgreSQL `tests/` 130 passed, 13 skipped, 4 xfailed; SQLite advisory harness 127 passed, 16 skipped, 4 xfailed. The focused retention regression passed on both dialects. An overlapping run had fixture setup errors; the sequential PostgreSQL rerun passed.
+- mypy: clean on 13 requested backend files. Frontend build: passed. Playwright: 124 passed with two workers.
+- Next gate: independent R2 reopen review #2. Prompt B and Prompt C remain blocked until that gate passes.
+
+## DLJ-R2-REOPEN-2 — Post-Fixer Round 2 Review
+
+- Date: 2026-11-25
+- Original P1 closure: 5/11
+- First-R2 P1 closure: 9/14
+- Reopen P1 closure: 1/3
+- Scenarios: 10/14 PASS, 4 WEAK (S3, S5, S6, S10), 0 MISSING
+- New findings: P1=2, P2=1, P3=0
+- Tests: PostgreSQL tests/ and standalone harness each 130 passed, 13 skipped, 4 xfailed. SQLite advisory 127 passed, 16 skipped, 4 xfailed. PW first run 123 passed and 1 failed, isolated full rerun 124 passed. Frontend build passed.
+- Independent upgrade check: migrated a populated pre-A PostgreSQL schema twice, verified the disabled paid payer's domain survived sibling cleanup and executed the named ownership-constraint inverse.
+- Gate verdict: NOT READY
+- Report: docs/quality/dlj_r2_review.md
+- Next: resolve the outstanding closure rows and scenario evidence before repeating R2. Prompt B and Prompt C remain blocked.
+
+## DLJ-R2-FIXER-3 — Contract-aligned fixes
+
+- Date: 2026-11-25
+- Contract 1 (eligibility): unified checkout/fulfilment/issuance/cleanup eligibility via `resolve_entitlement`; added timestamp tiebreaking, historical provenance checks, disposition-aware receipt retry, and mixed-tombstone normalization.
+- Contract 2 (lock order): rechecked collaborator roles after locking, included the acceptor key in sorted invitation locks, and rejected UUID-shaped public aliases.
+- Contract 3 (validation first): validated connector shape before payer access, bounded action IDs, validated full provider transaction IDs, and gated project creation on payer eligibility.
+- Contract 4 (scenarios): strengthened S3 with peak/recovery assertions, S5 with ground-truth and validation-order checks, S6 with action boundaries, and S10 with both renewal/cleanup commit orders plus reconciliation evidence.
+- Findings closed by contract alignment: N6, N7, R02, R14, R19, F1, F2, N1, N2, N03, R05, F6, F16, F17, plus N8 P2.
+- Files modified: `account.py`, `auth.py`, `billing.py`, `db/entitlement.py`, `db/migrate.py`, `db/models.py`, `labeling_router.py`, `label_studio.py`, `projects_router.py`, `scheduler.py`, `trial_guard.py`, `frontend/src/screens/ScoredQueue.tsx`, `tests/harness/contracts/test_billing.py`, `tests/harness/scenarios/test_s01_s06.py`, `tests/harness/scenarios/test_s07_s14.py`, `tests/harness/test_r2_fixes.py`.
+- Tests: PostgreSQL `tests/` and standalone harness each 134 passed, 13 skipped, 4 xfailed; SQLite advisory harness 131 passed, 16 skipped, 4 xfailed.
+- mypy: clean on all 13 requested backend files.
+- Playwright: 124 passed in both full runs.
+- Frontend build: passed.
+- Next gate: R2 reopen review #3.
+
+## DLJ-R2-REOPEN-3 — Contract-verified review
+
+- Date: 2026-11-25
+- Contract 1 (eligibility): PARTIAL
+- Contract 2 (lock order): PARTIAL
+- Contract 3 (validation): PARTIAL
+- Contract 4 (scenarios): PARTIAL
+- P1 closure: 19/30 incoming findings CLOSED, 11 PARTIAL
+- Scenarios: 10/14 PASS, 4 WEAK (S3, S5, S6, S10), 0 MISSING
+- New findings: P1=3, P2=1, P3=0
+- Tests: PostgreSQL full and standalone each 134 passed, 13 skipped, 4 xfailed. Advisory SQLite 131 passed, 16 skipped, 4 xfailed. PW 124 passed ×2. Initial run variance is recorded in the report.
+- Gate verdict: NOT READY
+- Report: docs/quality/dlj_r2_review.md
+- Next: resolve the documented reopen criteria and repeat independent R2 before Prompt B or Prompt C.
+
+## DLJ-R2-UNIFIED — Accepted-risk ledger for v1.1
+
+The launch installation starts with an empty PostgreSQL schema. A marker recorded in the first migration keeps historical repair jobs off subsequent fresh-install deploys. Before importing a legacy snapshot, reopen the affected rows below. Estimates are engineering estimates for shared work packages and overlap across related IDs.
+
+| Item | Reason and mitigation | Trigger and owner | Future effort |
+|---|---|---|---|
+| N1 · old rejected receipts | An old receipt can lack trustworthy disposition history. Keep the existing retry/readback checks and preserve source events for reconciliation. New deliveries use applied receipts. | Billing owner, before importing any old receipt table or replaying unclassified deliveries. | 1–2 days |
+| N2 · erroneous existing manifests | A pre-existing manifest can associate a modern key with historical ownership. Preserve an audited snapshot and quarantine ambiguous mappings. | Storage owner, before importing manifests or unblocking a quarantined payer. | 2 days with R23 |
+| N9 · repair followed by checkout | A later valid checkout can make historical repair quarantine a previously reconciled payer. Keep historical repair off fresh redeploys. | Billing and storage owners, before rerunning repair on a previously repaired tenant with checkout activity. | 2 days with N2 |
+| R23 · provider ownership repair | Ambiguous pre-A provenance requires operator evidence before activation. Preserve the existing before/after manifest and conditional undo. | Migration owner, on the first proposed pre-A provider import. | 2–3 days with N2/N9 |
+| F1 · historical intent exemption | An old customer/subscription mapping may have insufficient provenance. New grants require a purchaser, payer and provider transaction bound to an intent. | Billing owner, before accepting an intent-free historical creation. | 1 day with R23 |
+| N10 · old mixed tombstones with a pending purchase | Historical normalization can override an outstanding intent. Keep those rows out of the launch database and preserve them for reconciliation. | Storage owner, before processing mixed historical keys or restoring such a backup. | 2–3 days with R14/F2/F5 |
+| R14 · historical terminalization | Replaying old terminal states requires guarded reconciliation and per-key version checks. Modern retention runs under the tenant guard. | Lifecycle owner, before admitting historical tombstones. | 1–2 days with N10 |
+| F2 · legacy cleanup holds | Historical rows can have mixed payer, intent and repair holds. Inventory holds before normalization. | Retention owner, when importing historical siblings with nonterminal obligations. | 1 day with N10 |
+| F5 · legacy audit gaps | Historical normalization can change state without a contemporaneous transition or notice. Preserve original versions and reconcile them offline. | Billing owner, before historical transitions feed notices or support tooling. | 1 day with N10 |
+| N11 · historical simultaneous events | Existing watermarks may encode a prior arrival-order decision. Preserve signed history for offline reconciliation. Current deliveries have a deterministic cancellation tie rule. | Billing owner, before replaying an old event stream with ties. | 1–2 days with R19 |
+| R19 · retrospective lifecycle reconciliation | Previously persisted state may disagree with a replay of equal-time events. Compare payer state, notice history, quota and retention before cutover. | Billing owner, before a historical payer or watermark enters service. | 1 day with N11 |
+
+## DLJ-R2-UNIFIED — Find, fix and verify sweep
+
+- Date: 2026-11-25
+- Classification: 6 LAUNCH and 8 DEFERRED among 14 incoming partial/new P1s. 19 previous P1 closures retained.
+- LAUNCH P1s fixed: N03, R05, F6, F16, F17 and prospective R19. N12 (P2) also fixed.
+- DEFERRED P1 rows: R14, F2, F5, N10, R23, N2, N9 and retrospective N11. Historical-only edges of N1, F1 and R19 are included in the accepted-risk ledger above.
+- Scenarios: 14/14 PASS on PostgreSQL. S3, S5, S6 and S10 strengthened.
+- Contracts verified: 4/4 for a fresh installation.
+- Additional fixes: fresh-install provenance survives redeployment, signed duplicates recheck under the guard, terminal deliveries have a specific reconciliation reason, invitation acceptance uses the verified signup mailbox, and expiry/invalid-task errors retain their public detail. Ordinary screens no longer wait for Paddle.js. Transaction landing pages initialize the checkout SDK.
+- Tests: PostgreSQL 140 passed, 13 skipped, 4 xfailed in both the full and standalone runs. SQLite advisory 137 passed, 16 skipped, 4 xfailed. Supplemental offline root suite 444 passed, 1 skipped.
+- Playwright: 124 passed ×2, two workers, zero retries. Frontend build and E2E typecheck passed.
+- mypy: clean on 21 files.
+- Gate verdict: PASS for fresh PostgreSQL.
+- Report: docs/quality/dlj_r2_review.md
+- Next: Prompt B + Prompt C (Wave 3, parallel).
+
+## DLJ-PROMPT-B — Project UI
+
+- Date: 2026-11-25
+- P1s addressed: R3-01, R3-02, R3-03, R3-08, F7-01 (5 of 5).
+- Scenarios activated: S28-S32 (5 of 5), including same-tab and cross-tab signup rotation, real chunked import rotation, project isolation, dirty review navigation, and malformed response recovery.
+- Design contract: §2 B/C verified across modified frontend paths; operations capture credential, project, generation, operation ID, and abort signal. Review navigation stores identifiers only.
+- Files modified: frontend/src/App.tsx, frontend/src/api.ts, frontend/src/domain.tsx, frontend/src/components/CategorySelector.tsx, frontend/src/components/CsvDropzone.tsx, frontend/src/screens/AnnotatorProfiles.tsx, Dashboard.tsx, ReviewCard.tsx, ScoredQueue.tsx, Settings.tsx, Signup.tsx, Upload.tsx, tests/harness/conftest.py, tests/harness/browser/test_browser_contracts.py, tests/harness/scenarios/test_s28_s32.py.
+- Files created: frontend/src/operationContext.ts, frontend/src/screens/Projects.tsx, frontend/src/screens/ProjectSettings.tsx.
+- Tests: 162 passed, 0 skipped, 0 xfailed in full `tests/` and standalone `tests/harness/` PostgreSQL runs. Joint B/C S27 queue bulk browser integration passed.
+- PW: 124 passed on final build (one worker); E2E typecheck passed.
+- mypy: clean for auth.py and labeling_router.py.
+- Frontend build: passed.
+- Next gate: R3 Astra review (B+C combined).
+
+## DLJ-PROMPT-C — Shared Writes
+
+- Date: 2026-11-25
+- P1s addressed: R01, R03, R04, R29, R45, R13/R3-07, B6-02, B7-01 (8 of 8).
+- Scenarios activated: S20-S27 (8 of 8).
+- Schema: C block applied (uq_revision_predecessor, connector_config, project_request, label_log columns).
+- Design contracts: §2 B/C and the four R2 contracts verified across modified files.
+- Files modified: db/models.py, db/migrate.py, db/repository.py, label_studio.py, labeling_router.py, dashboard_router.py, jm_service.py, tests/harness/scenarios/test_s20_s27.py, tests/harness/scenarios/test_s28_s32.py, tests/harness/contracts/test_connector.py, tests/harness/test_known_failures.py.
+- Files created: tests/harness/test_prompt_c_import.py, tests/harness/browser/test_prompt_c_joint.py.
+- Tests: PostgreSQL 164 passed, 0 skipped, 0 xfailed; SQLite advisory 161 passed, 3 skipped.
+- mypy: clean.
+- Frontend build: passed.
+- Playwright: 124 passed.
+- Next gate: R3 Astra review (B+C combined, then Wave 4).
+
+## DLJ-R3-UNIFIED — B+C combined review
+
+- Date: 2026-11-25
+- Contracts: 4/4 VERIFIED under the R2 fresh-install contracts. Connector configuration and stored task binding require scoped reads before payer access.
+- B P1 closure: 5/5 CLOSED.
+- C P1 closure: 8/8 CLOSED.
+- Schema: §4 C block MATCHES on fresh PostgreSQL and a populated A-to-C upgrade run twice.
+- B+C interaction: 5/5 paths VERIFIED.
+- Scenarios: 27/27 PASS, 0 WEAK.
+- New findings found and fixed: C retention dependencies, member import permissions, connector identity/watermark/first spans, configuration version and binding, UUID sample replay, stale signup receipts, route and draft ownership, DTO and truth validation. Strengthened concurrency, migration and real-browser regressions.
+- Deferred findings added: none.
+- Tests: PostgreSQL 167 passed in full discovery and 167 passed standalone; SQLite 164 passed, 3 PostgreSQL-only skips; Playwright 124 passed ×2 consecutively.
+- mypy: clean on 14 changed Python files. E2E TypeScript passed.
+- Frontend build: passed.
+- Gate verdict: PASS for fresh PostgreSQL.
+- Report: docs/quality/dlj_r3_review.md
+- Next: Prompt D + Prompt E (Wave 4, parallel).
+
+## DLJ-PROMPT-E — Webhooks
+- Date: 2026-11-25
+- Schema: E block applied (webhook_endpoint, shared webhook_event preserved/check-first, webhook_delivery, webhook_attempt); retention deletes dependent webhook rows before projects.
+- CRUD: register, list, paginated deliveries, update, deactivate, test, rotate; admin+ role gate, five active endpoints, ten tests/hour.
+- Delivery: dispatcher in scheduler loop, PostgreSQL SKIP LOCKED plus global claim fence, conditional SQLite fallback, four concurrent sends, one send/endpoint, four attempts (10/60/300-second retries), 30-second fenced leases and recovery.
+- Security: public HTTPS revalidated at connection time, redirects disabled, Fernet-encrypted secrets shown once, exact canonical UTF-8 bytes signed with HMAC-SHA256, no source text or response body in delivery logs.
+- Contracts: §2 E/F verified; shared Prompt D envelope unchanged; R2/R3 eligibility, lock-order and validation contracts preserved.
+- Files modified: db/models.py, db/migrate.py, scheduler.py, jm_service.py, requirements.txt, tests/harness/conftest.py, docs/session_state.md.
+- Files created: webhook_router.py, webhook_security.py, tests/harness/test_prompt_e_webhooks.py.
+- Tests: PostgreSQL 198 passed, 0 skipped, 0 xfailed; SQLite advisory 185 passed, 3 skipped; Prompt E 15/15 passed on both dialects.
+- mypy: clean.
+- Frontend build: passed.
+- Playwright: 124 passed.
+- Next gate: R4 Astra review (D+E combined).
+
+## DLJ-PROMPT-D — Export and Predictions
+
+- Date: 2026-11-25
+- Schema: D blocks applied (`project_export_slot`, `prediction`, `webhook_event`) with repeatable fresh/upgrade migration coverage and retention-safe child deletion.
+- Export: JSONL/CSV streaming response, optional DocBin, project filters, reviewer role gate, two five-minute lease slots, 5,000-document/16 MiB text caps, 32 MiB browser cap, CSV formula escaping, and PostgreSQL REPEATABLE READ keyset pages.
+- Predictions: import (1–100), idempotent replay, scored provenance, five-gate automation without machine learning evidence, optimistic human review, reopen, and state/source/accuracy statistics.
+- Event production: canonical `label.verified` and `prediction.auto_approved` envelopes are written transactionally to `webhook_event`; HTTP, prediction-review, and connector human-evidence paths are covered.
+- Contracts: §2 D/F verified; R2/R3 eligibility, lock/revalidation, validation-before-access, shared-write, and evidence contracts preserved.
+- Files modified: auth.py, db/models.py, db/migrate.py, db/repository.py, labeling_router.py, label_studio.py, scheduler.py, tests/harness/conftest.py, tests/harness/contracts/test_export.py, tests/harness/contracts/test_predictions.py, tests/harness/scenarios/test_s20_s27.py.
+- Files created: tests/harness/test_prompt_d_schema.py.
+- Tests: PostgreSQL 187 passed, 0 skipped, 0 xfailed; SQLite advisory 181 passed, 3 PostgreSQL-only skipped, plus the final D/S21/S26 subset 8 passed after connector event coverage.
+- mypy: clean on all 9 required backend modules.
+- Playwright: 124 passed.
+- Frontend build: passed.
+- Next gate: R4 Astra review (D+E combined).
+
+## EXP-DLJ Experiments (completed)
+
+- Date: 2026-11-25.
+- experiments/__init__.py (empty).
+- experiments/active_learning_harness.py — shared active learning harness.
+- experiments/exp_dlj_01_active_learning.py — centroid distance versus uncertainty sampling.
+- experiments/exp_dlj_02_transfer.py — cross-project transfer efficacy.
+- experiments/generate_charts.py — four publication charts.
+- tests/test_exp_dlj.py — 10 infrastructure tests.
+- experiments/results/exp_dlj_01_results.json — EXP-DLJ-01 PASS on deterministic synthetic fallback; centroid distance reached 85% in 200–250 labels across five seeds.
+- experiments/results/exp_dlj_02_results.json — EXP-DLJ-02 PASS on deterministic synthetic fallback; cold-start mean 335 labels, transfer mean 0 labels to 80%.
+- experiments/results/charts/ — four PNG charts.
+- Test count: baseline 188 collected + 10 new = 198 passed in the final full suite.
+- mypy: clean on five new Python files.
+- No changes to jm_core.py or existing production code.
+
+## EXP-DLJ Parameter Sweep (completed)
+
+- Date: 2026-11-26.
+- experiments/exp_dlj_sweep.py — configurable synthetic data generator and both parameter sweeps.
+- experiments/generate_sweep_charts.py — seven line and heatmap sweep charts.
+- tests/test_exp_dlj_sweep.py — six generator and sweep smoke tests.
+- experiments/results/exp_dlj_01_sweep_results.json — 24 unique cells across noise, dimensions, categories, batch size, pool size and the noise × dimensions grid.
+- experiments/results/exp_dlj_02_sweep_results.json — 19 unique cells across source size, similarity, dimensions and the source size × similarity grid.
+- experiments/results/charts/ — seven new sweep charts plus four prior charts, 11 total.
+- Test count: 201 selected baseline + six new = 207 passed, one unrelated SQLite test deselected; 16 experiment tests passed in isolation.
+- mypy: clean on six experiment and test modules.
+- Operating envelope: DLJ-01 centroid advantage +10.0 pp at default; still +5.5 pp at 20% training-label noise and +5.5 pp at ten factors. At a 500-item pool it loses by 0.8 pp. No noise or dimensionality breakdown was observed in the tested range.
+- Operating envelope: DLJ-02 transfer reduction 100% at full rule similarity. At 75% similarity, no transfer seed reached 80% within 500 labels; the negative reduction values in censored cells use a 525-label cap and are estimates.
+- All sweep results use deterministic synthetic data; AG News was not cached.
+- Baseline collection repair: relocated misplaced webhook `terminal_at` lines in db/models.py and db/migrate.py and the connector prediction guard in label_studio.py.
+
+## R4 Unified Review (D+E Combined)
+
+- Date: 2026-11-26
+- Reviewer: Astra+high unified sweep, Prompt D and Prompt E.
+- Scope: Fresh PostgreSQL deployment. The eight historical and four legacy accepted risks remain deferred to v1.1.
+- PostgreSQL gate: 208 passed, 0 failures in full tests/ discovery. The requested name filter passed 207 and deselected S13. The additional root CI regression run passed 427, skipped 1 SQLite-only case and deselected 33.
+- SQLite advisory: 189 passed, 3 PostgreSQL-only skips. PostgreSQL is the only gate. SQLite advisory tests remain for local dev convenience but do not block.
+- Playwright: Previous standalone result 124 passed. No frontend code changed. Browser-backed Python scenarios passed in the PostgreSQL gate.
+- P1 found: 10. P2 found: 9. P3 found: 0. P1 fixed: 10. P2 fixed: 9.
+- SQLite gate issue: Fixed the root regression job that still collected hard-coded SQLite fixtures. Retained the separate advisory job and all tests.
+- Integration D↔E: Verified canonical event and delivery persistence, rollback visibility, signed bytes, claim fencing, archive cancellation and child-first retention. A two-session probe observed exactly one claim after commit and none after rollback.
+- Export: Local PostgreSQL 17.11 returned 5,000 documents at exactly 16 MiB of source text. Both one-over limits returned 413 and released the slots. Railway Hobby resource measurements remain unverified.
+- mypy: Clean on 24 changed Python files. Frontend build passed.
+- Verdict: PASS for fresh PostgreSQL.
+- Report: docs/quality/dlj_r4_review.md
+
+## Prompt F — Guide, Prediction Review UI, Integrations Settings
+
+**Shipped:** 2026-11-26
+**Baseline (pre-F):** PG 192 passed (16 experiment tests deselected), PW 124 passed
+**Post-F:** PG 221 passed (16 experiment tests deselected), PW 136 passed
+**New tests:** 29 PG + 12 PW
+
+### Deliverables
+- `/#/docs` guide page with eight workflow sections, desktop sidebar navigation and a responsive mobile selector.
+- `/dlj_client.py` downloadable single-file `DLJClient` with chunked uploads, stable replay keys, three-attempt exponential retry and a configurable 30-second timeout.
+- `/docs` Swagger UI and `/openapi.json` remain available; new routes are tagged and documented.
+- Prediction review UI with origin/state filters, sortable queue, Accept/Correct/Reopen, optimistic revision checks and focus-scoped `a/c/r/n/p/Escape` shortcuts.
+- Project integrations settings with webhook CRUD, HTTPS validation, delivery health, one-time/rotated secrets and the latest 20 attempts.
+- Authenticated delivery-history and project webhook-health endpoints.
+
+### Scenarios
+- S1, S23 and S27 reruns passed; canonical S28–S31 browser-backed scenarios remained active and passed in the full PostgreSQL gate.
+- F-specific quickstart, role gates, sequential-review conflict, secret rotation during delivery and failure/recovery health gates passed.
+
+### Files changed
+- `backend/static/dlj_client.py` (new)
+- `jm_service.py`
+- `labeling_router.py`
+- `webhook_router.py`
+- `frontend/src/pages/GuidePage.tsx` (new)
+- `frontend/src/pages/PredictionReviewPage.tsx` (new)
+- `frontend/src/pages/IntegrationsSettingsPage.tsx` (new)
+- `frontend/src/components/PredictionReviewCard.tsx` (new)
+- `frontend/src/components/DeliveryHealthIndicator.tsx` (new)
+- `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/index.css`
+- `tests/__init__.py` (new; makes harness imports unambiguous)
+- `tests/test_prompt_f.py` (new — 29 tests)
+- `e2e/test_prompt_f.spec.ts` (new — 12 tests)
+
+### Verification
+- PostgreSQL gate: 221 passed, 16 experiment tests deselected, 0 failures.
+- Prompt F backend: 29/29 passed.
+- Playwright: 136/136 passed.
+- mypy: clean on `jm_service.py`, `labeling_router.py`, `webhook_router.py` and `tests/test_prompt_f.py`.
+- Frontend typecheck and production build: passed.
+- Python client: syntax valid; all eight public methods present.
+- No DDL changes and no new migrations.
+
+## R5 Review — Unified Astra Sweep (Prompt F + Full Regression)
+
+**Date:** 2026-11-26  
+**Verdict:** PASS. Prompt 12 is unblocked.  
+**Baseline:** PostgreSQL 221 passed, Playwright 136 passed.  
+**Post-review:** PostgreSQL 222 passed, 16 experiment tests deselected. Playwright 138 passed. The 16 experiment tests also passed separately.  
+**Findings:** P1: 6 resolved (including one verification-path error), P2: 7 fixed, P3: 1 open (guide section deep-link restoration).  
+**Scenarios:** 27/27 passed against their design oracles.  
+**Files reviewed:** 27 source, test and packaging files, including all 15 files listed for Prompt F.  
+**Checks:** mypy and TypeScript clean. Frontend production build passed.  
+**Fixes applied:** Corrected the verification targets, packaged the client in the release image, blocked credential-bearing redirects, required observed verification outcomes and span acknowledgement, guarded keyboard shortcuts, corrected retries and export writes, unified queue filtering and paging, validated review decisions, corrected webhook health and attempt history, aligned operator guidance with the signer and rotation behavior, and strengthened client, worker and browser regression tests.  
+**Report:** [R5 findings](quality/dlj_r5_review.md)
+
+## Sprint 0 — Smart Sampling + SLA Badge + Quickstart
+
+**Date:** 2026-11-26
+**Baseline:** PG 222, PW 138
+**Post-Sprint0:** PG 232, PW 142
+**New tests:** 10 PG + 4 PW
+
+### Deliverables
+- GET /v1/projects/{id}/next-batch — centroid distance ordering, fallback to random
+- GET /v1/projects/{id}/sla — accuracy floor, margin, gate status
+- Smart Queue toggle on dashboard/queue
+- SLA badge on dashboard (green/amber/red shield)
+- /#/quickstart — 5-step interactive walkthrough
+- Quickstart link in nav
+
+### Files changed
+- `labeling_router.py`
+- `frontend/src/api.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/index.css`
+- `frontend/src/screens/ScoredQueue.tsx`
+- `frontend/src/screens/Dashboard.tsx`
+- `frontend/src/components/SLABadge.tsx` (new)
+- `frontend/src/pages/QuickstartPage.tsx` (new)
+- `tests/test_sprint0.py` (new)
+- `e2e/test_sprint0.spec.ts` (new)
+- `frontend/dist/index.html` (production build output)
+
+Verification: PostgreSQL 232 passed with 16 experiment tests deselected; Playwright 142 passed; frontend TypeScript and production build passed; backend mypy passed. No DDL or migration changes. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+## Sprint 0 Review — Bug Sweep + Test Hardening
+
+**Date:** 2026-11-26  
+**Baseline:** PG 232 passed, PW 142 passed  
+**Post-review:** PG 251 passed, 16 experiment tests deselected. PW 160 passed.  
+**Bugs found:** 15, all fixed.  
+**Tests added:** 19 backend + 18 Playwright. The browser journeys run the built app against an isolated PostgreSQL schema. External webhook delivery is simulated.  
+**Verification:** Backend mypy, frontend and E2E TypeScript, and the production frontend build passed. The frozen engine hash matched. No schema or migration changes.  
+**Files:** `auth.py`, `labeling_router.py`, `frontend/src/api.ts`, `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/screens/ReviewCard.tsx`, `frontend/src/components/SLABadge.tsx`, `frontend/src/pages/GuidePage.tsx`, `frontend/src/pages/QuickstartPage.tsx`, `frontend/dist/index.html`, `tests/test_sprint0.py`, `tests/test_sprint0_extended.py`, `tests/sprint0_browser_server.py`, `tests/e2e/test_sprint0_extended.spec.ts`, `playwright.config.ts`, `e2e/tsconfig.json`, `e2e/test_prompt_f.spec.ts`, `docs/quality/dlj_sprint0_review.md`, `docs/session_state.md`.  
+**Report:** [Sprint 0 review](quality/dlj_sprint0_review.md)
+
+## Analytics UI — Distribution + Throughput + Confusion + Agreement
+
+**Date:** 2026-11-26  
+**Baseline:** PG 251, PW 160  
+**Post:** PG 268, PW 167  
+**New tests:** 17 PG + 7 PW
+
+### Deliverables
+- GET /v1/projects/{id}/analytics/distribution — category counts + imbalance warning
+- GET /v1/projects/{id}/analytics/throughput — daily labels, per-annotator, avg time
+- GET /v1/projects/{id}/analytics/confusion — category confusion matrix + top pairs
+- GET /v1/projects/{id}/analytics/agreement — inter-annotator agreement heatmap
+- Dashboard: distribution bars + throughput line chart
+- Insight: confusion matrix + agreement heatmap
+- No DDL changes
+
+### Files changed
+- `analytics_router.py` (new)
+- `jm_service.py`
+- `frontend/src/api.ts`
+- `frontend/src/App.tsx`
+- `frontend/src/index.css`
+- `frontend/src/screens/Dashboard.tsx`
+- `frontend/src/components/DistributionPanel.tsx` (new)
+- `frontend/src/components/ThroughputPanel.tsx` (new)
+- `frontend/src/pages/AnalyticsPage.tsx` (new)
+- `frontend/dist/index.html`
+- `tests/test_analytics.py` (new)
+- `tests/e2e/test_analytics.spec.ts` (new)
+
+Verification: PostgreSQL 268 passed with 16 experiment tests deselected; Playwright 167 passed on the clean rerun; backend mypy, frontend TypeScript, E2E TypeScript, and the production frontend build passed. No schema or migration files were changed. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+## Multi-Modality Design — Astra Review + Completion
+
+**Date:** 2026-11-26  
+**Input:** docs/design/dlj_multimodal_design_v2.md  
+**Output:** docs/design/dlj_multimodal_design_v3.md (execution-ready)  
+**Findings:** 9 P1, 7 P2, 2 P3  
+**Execution plan:** 7 Codex prompts, 116 estimated new tests (83 PostgreSQL + 33 Playwright)
+
+## Design Consolidation
+
+**Date:** 2026-11-26  
+**Input:** 4 current design docs (arch_redesign_v2, annotation_ui_v2, post_track2_v2, multimodal_v3)  
+**Output:** docs/design/dlj_product_design_v1.md (unified)  
+**Sections:** 16 chapters, 133 section/subsection headings; all 39 source sections mapped  
+**Contradictions resolved:** 17  
+**Gaps identified:** 15 (5 documentation gaps filled, 10 product or evidence questions remain)  
+**Superseded:** 8 files indexed in docs/design/SUPERSEDED.md  
+**Verification:** 100 mounted operations, 77 DTOs, 26 ORM tables and 238 columns cross-checked; 27 scenario IDs and all archive links verified. Documentation only. Latest recorded Analytics gate: PG 268, PW 167.
+
+## Notes + Guidelines
+
+**Date:** 2026-11-26
+**Baseline:** PG 268, PW 167
+**Post:** PG 280, PW 172
+**New tests:** 12 PG + 5 PW
+**DDL:** 3 nullable columns added (`notes`, `review_notes`, `guidelines_updated_at`; existing `guidelines` reused)
+
+### Deliverables
+- Per-label notes on verify/review (500 char, optional, in JSONL/CSV export)
+- Per-project guidelines (markdown, 10 KiB UTF-8 max, admin-only edit)
+- Guidelines banner at top of labeling queue (collapsible, state remembered per project)
+
+### Files changed
+- `db/models.py`, `db/migrate.py`, `db/repository.py`
+- `labeling_router.py`, `projects_router.py`
+- `frontend/src/api.ts`, `frontend/src/index.css`
+- `frontend/src/components/GuidelinesPanel.tsx`, `frontend/src/components/GuidelinesBanner.tsx`
+- `frontend/src/screens/ReviewCard.tsx`, `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/screens/ProjectSettings.tsx`
+- `e2e/components.spec.ts`, `tests/test_notes_guidelines.py`, `tests/e2e/test_notes_guidelines.spec.ts`
+- `frontend/dist/index.html`
+
+**Verification:** PostgreSQL 280 passed with 16 experiment tests deselected; Playwright 172 passed; backend mypy, frontend TypeScript, E2E TypeScript, and production frontend build passed. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+## MM-01 — Project Schema and Modality Policy
+
+**Date:** 2026-11-26
+**Baseline:** PG 280, PW 172
+**Post:** PG 289, PW 172
+**New tests:** 9 PG + 0 PW
+**DDL:** 3 columns on `domains` (`content_type`, `label_schema`, `modality_enforced`), 1 check constraint (`ck_domains_modality_pair`), `image_url` widened to `TEXT` on `label_content`
+
+### Deliverables
+- Domain model extended with `content_type`, `label_schema`, and `modality_enforced`
+- Database constraint enforces the five valid text/image and single/multi/NER pairs
+- `modality.py` provides the capability matrix, release-switch validation, and first-label lock check
+- Project creation accepts optional modality axes; omitted axes preserve legacy `text`/`single`, unenforced behavior
+- Project detail/list responses expose modality policy and lock state
+- `GET /v1/projects/capabilities` returns only currently enabled combinations
+- Settings updates preserve optimistic concurrency and reject modality changes after the first label
+- Runtime switches: `DLJ_IMAGE_PROJECTS_ENABLED`, `DLJ_MULTILABEL_PROJECTS_ENABLED`, `DLJ_NER_PROJECTS_ENABLED`
+
+### Files changed
+- `db/models.py`
+- `db/migrate.py`
+- `db/repository.py`
+- `modality.py` (new)
+- `projects_router.py`
+- `tests/test_modality_schema.py` (new)
+- `docs/session_state.md`
+
+**Verification:** PostgreSQL 289 passed with 16 experiment tests deselected; Playwright 172 passed; frontend TypeScript and backend mypy passed. Fresh, repeated, and populated-database migration paths passed on PostgreSQL. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+## MM-03 — Image Project Frontend Workflows
+
+**Date:** 2026-11-26
+**Baseline:** PG 306 (MM-02-inclusive actual), PW 172
+**Post:** PG 306, PW 181
+**New tests:** 0 PG + 9 PW
+
+### Deliverables
+- Project creation with capability-gated `content_type` and `label_schema` selectors
+- `ImageViewer.tsx` with lazy/async loading, per-project external-host consent, no-referrer requests, responsive sizing, and a hostname-safe broken-image fallback
+- Image rendering in labeling and prediction review while category controls, scoring, and keyboard verification remain unchanged
+- Image badges and captions in queue rows without exposing media URLs
+- CSV/JSON image import with reserved `item_media_url`/`item_text` fields, row-indexed errors, 100-item authenticated chunks, and no anonymous report upload
+- Project settings show editable modality before first item and locked modality afterward
+- Mobile-responsive image queue and account-change cleanup of image consent/import state
+
+### Files changed
+- `frontend/src/api.ts`, `frontend/src/domain.tsx`, `frontend/src/App.tsx`, `frontend/src/index.css`
+- `frontend/src/screens/Projects.tsx`, `frontend/src/screens/ProjectSettings.tsx`, `frontend/src/screens/Upload.tsx`
+- `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/screens/ReviewCard.tsx`
+- `frontend/src/components/ImageViewer.tsx`, `frontend/src/components/CsvDropzone.tsx`, `frontend/src/components/PredictionReviewCard.tsx`
+- `frontend/src/pages/PredictionReviewPage.tsx`, `frontend/src/pages/QuickstartPage.tsx`, `frontend/src/csv.ts`
+- `frontend/dist/index.html`
+- `tests/e2e/modality_image.spec.ts` (new), `tests/e2e/test_sprint0_extended.spec.ts` (real-PG render bounds)
+
+**Verification:** PostgreSQL 306 passed with 16 experiment tests deselected; Playwright 181 passed; frontend TypeScript, E2E TypeScript, production frontend build, and backend mypy passed. MM-03 introduced no backend application changes. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+## MM-02 — Atomic Media Ingestion and Bounded Intake
+
+**Date:** 2026-11-26
+**Baseline:** PostgreSQL 289 passed, Playwright 172 passed.
+**Post:** PostgreSQL 306 passed, 16 experiment tests deselected. Playwright 181 passed, including nine MM-03 tests added in the shared checkout.
+**New tests:** 17 PostgreSQL, 0 Playwright.
+**Closes:** G4 (admission and transport).
+
+### Deliverables
+
+- Media JSON routes enforce a 20 MiB transport limit before parsing. Two permits per worker bound large or unknown-length requests. A saturated worker returns 429 with Retry-After. Billing and anonymous reports retain their own intake policies.
+- Image projects accept validated HTTPS references with signed bytes preserved. Inline JPEG, PNG, GIF and WebP require DLJ_INLINE_IMAGES_ENABLED and pass signature and base64 checks under the 10 MiB decoded per-request budget.
+- Project and legacy imports, predictions, connector callbacks, content creation and revision paths enforce the selected project's policy. Atomic writes preserve source media, attribution and quota. Unenforced projects retain mixed-content support.
+- Canonical aliases replay existing receipts. Frozen legacy digest fixtures cover text and opaque HTTPS. A changed image under the same key returns 409.
+- With identical decision inputs, text and image scores, confidence, recommendations, factors and conservation status matched. The frozen jm_core.py SHA-256 was verified as 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
+- Backend mypy, frontend TypeScript and the production frontend build passed.
+
+### Files changed
+
+- Backend: `media_intake.py` (new), `modality.py`, `jm_service.py`, `labeling_router.py`, `label_studio.py`.
+- Tests: `tests/test_modality_ingest.py` (new). The existing project-switch scenario in `tests/harness/scenarios/test_s28_s32.py` checks the new project's HTTP response and its rendered rows.
+- Shared frontend integration: `frontend/src/api.ts`, `frontend/src/components/ImageViewer.tsx`, `frontend/src/screens/ProjectSettings.tsx`, `frontend/dist/index.html`, and the project-card assertion in `tests/e2e/modality_image.spec.ts`.
+- Handoff: `docs/session_state.md`.
+
+
+## MM-04 — Image Export and IMG Gate
+
+**Date:** 2026-11-26
+**Baseline:** PG 306 passed (16 experiment tests deselected), PW 181 passed.
+**Post:** PG 316 passed (16 experiment tests deselected), PW 181 passed.
+**New tests:** 10 PG + 0 PW. One new pytest case drives Chromium against the real app and PostgreSQL.
+
+### Deliverables
+
+- Image JSONL includes `image_url`, with JSON null for a missing reference. Image CSV places `image_url` immediately after `text`, with an empty cell for a missing reference. Signed HTTPS references and embedded PNGs survived export byte-for-byte.
+- The response headers `X-DLJ-Content-Type` and `X-DLJ-Label-Schema` report the project axes, with `mixed` for unenforced legacy projects. Both are exposed through CORS. Downloads retain `Cache-Control: no-store`.
+- The repeatable-read export uses cursor pages of keys and byte lengths, reads large media individually, and enforces a 32 MiB encoded media export budget before sending the attachment. Current prediction and revision provenance are preserved. Legacy text JSONL, populated CSV, and the historical empty text CSV header retain their previous formats.
+- The project CSV includes the original public IDs and scoring factors. A browser downloaded the CSV, re-imported it through the MM-03 upload screen into a second project, and verified the URLs, captions and factors by API readback. The queue identifies the project download separately from its page preview.
+- All ten IMG gate cases passed, including score parity, inline PNG decoding, export cap and slot release, missing media, project isolation, prediction provenance and revisions. The conservation case exercised both the 10-verification warmup and the pause after 50 human decisions.
+- Backend mypy, frontend TypeScript and the production build passed. The frozen `jm_core.py` SHA-256 remains `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+### Files changed
+
+- `labeling_router.py`, `jm_service.py`
+- `frontend/src/api.ts`, `frontend/src/csv.ts`, `frontend/src/screens/ScoredQueue.tsx`, `frontend/src/screens/Upload.tsx`, `frontend/dist/index.html`
+- `tests/test_img_gate.py` (new), `tests/harness/scenarios/test_s28_s32.py` (S30 holds the actual browser response and sends each request once)
+- `docs/session_state.md`
+
+
+## Pre-Launch Sweep — Find All + Fix All
+
+**Date:** 2026-11-26  
+**Baseline:** PostgreSQL 316 passed, 16 experiment cases deselected. Playwright 178 passed and 3 failed out of 181. Frontend typecheck, build and backend mypy passed.  
+**Post:** PostgreSQL 325 passed, 16 experiment cases deselected. Playwright 184 passed. Frontend and browser-spec TypeScript, the production frontend build and backend mypy passed.
+
+### Findings summary
+
+| Severity | Found | Fixed | Deferred |
+|---|---:|---:|---:|
+| P1 | 5 | 5 | 0 |
+| P2 | 14 | 14 | 0 |
+| P3 | 4 | 3 | 1 |
+
+### P1 findings
+
+| ID | Final file and line | Failure and correction |
+|---|---|---|
+| L01 | `media_intake.py:64` | A stalled body could hold a large-media permit indefinitely. A single monotonic 30-second deadline now covers reading the entire body. Expiry returns 408 and releases the permit. |
+| L02 | `frontend/src/csv.ts:8`, `:83` | Browser imports could silently convert null or boolean factors to numbers and discard incompatible image annotations. Validate the original numeric values, reject conflicting aliases and validate the content type, spans and tags before normalization. |
+| L03 | `frontend/src/screens/HealthReport.tsx:30`, `frontend/src/api.ts:442` | A PDF requested under a previous account could finish downloading after rotation. Invalidate the operation on account change or unmount, abort the fetch and check ownership before creating a download URL. |
+| L04 | `frontend/src/components/ImageViewer.tsx:20` | Legacy review could contact a third-party image host before consent, and an old load/error event could affect a new source. Scope the viewer to project and source, require explicit consent, and clear it on account change. Embedded media stays local. |
+| L05 | `jm_service.py:296`, `:322`, `requirements.txt:19` | Malformed input could be reflected in validation responses or captured in optional diagnostics. Keep field locations, types and actionable messages, omit raw inputs and contexts, and mark responses no-store. Disable sensitive Sentry collection of request bodies, headers, cookies, query data, database query data and frame variables. Validated SDK initialization locally without sending an event. |
+
+### P2 findings
+
+| ID | Final file and line | Failure and correction |
+|---|---|---|
+| L06 | `backend/static/dlj_client.py:26`, `:104` | The downloadable client could form an invalid batch from individually valid images or could only create legacy-style projects. Support explicit project axes and split uploads by item count, encoded JSON bytes and decoded image bytes. Preserve the replay key across retries. |
+| L07 | `backend/static/dlj_client.py:171` | Large valid image CSV fields exceeded the Python CSV parser default, EOF handling could terminate parsing with a closed-stream error, and a filter could change format behind the parser. Handle all three and verify an actual large CSV download. CSV parsing raises the process-wide field limit to at least 32 MiB. |
+| L08 | `db/repository.py:51` | Image webhooks omitted the media discriminator and authorized detail reference. Write both into the canonical event inside the label transaction. A legacy mixed project uses a scoped existence check. The event excludes the actual signed URL or inline bytes. |
+| L09 | `jm_service.py:258`, `:460` | Incomplete Railway production configuration could first fail during a customer operation, and readiness could open or create an empty legacy database. Validate required settings, PostgreSQL and Fernet setup during startup. Probe the existing legacy tenant table read-only off the event loop. |
+| L10 | `label_health/api.py:132` | A report upload using the wrong multipart field could leave temporary files open. Close the parsed form before returning 422. |
+| L11 | `rate_limit.py:16`, `jm_service.py:347` | Public dynamic routes lacked consistent intake limits and clients could not inspect the applicable window. Apply distinct per-worker public budgets, report the actual SlowAPI window on decorated routes, and expose reset/retry headers through allowlisted CORS. Browser shell traffic has a separate budget from readiness probes and report generation. |
+| L12 | `billing.py:95`, `auth.py:339`, `label_studio.py:44` | Paddle key rotation could reject a matching signature in a multi-signature header. Malformed non-ASCII credentials could cause comparison errors. Validate digest syntax, check each supplied signature against the original bytes, and compare admin/connector tokens as bytes. |
+| L13 | `analytics_router.py:110`, `:155`, `:228`, `:282` | Analytics loaded full label records, including unused content, to count or aggregate them. Group distribution in PostgreSQL, stream projected columns for throughput and agreement, and restrict revision/prediction fields for confusion. Lifetime throughput still reads historical timestamps to preserve the defined averages. |
+| L14 | `db/repository.py:136`, `:252`, `dashboard_router.py:41`, `labeling_router.py:446`, `:548` | Evidence recursion began outside the requested project and batch scoring repeated invariant lookups. Scope the recursive anchor, stream category evidence, reuse the locked domain and cache evidence within one batch and vocabulary. Engine persistence uses a version-checked update. For UUID writes, authorization identifies the owner directly and locks the actor and payer in sorted order. The import reuses its authorized domain and payer only inside the same HTTP request and transaction, and rechecks payer eligibility and quota on each reservation (`auth.py:223`, `db/entitlement.py:88`, `trial_guard.py:50`, `labeling_router.py:612`). The four-label regression counts exactly one payer-lock query and one evidence query and checks that the negative human outcome is retained. |
+| L15 | `frontend/src/screens/Projects.tsx:25` | A capability request failure hid the list of accessible projects. Load the list and capabilities independently and retain the identity checks and recoverable error. |
+| L16 | `tests/e2e/modality_image.spec.ts:69`, `tests/e2e/test_sprint0_extended.spec.ts:22`, `:102` | Real-database UI tests evaluated state before requests or failure notifications arrived. Synchronize the image queue, project and upload checks with the relevant responses, wait for the simulated lost request to fail, and allow canonical review detail to render. The replay test still compares both request bodies and counts committed rows. |
+| L17 | `.github/workflows/harness.yml:37`, `.dockerignore:12`, `tests/harness/requirements.txt:3` | CI could pass without running the complete PostgreSQL and Node Playwright suites, and build context included local artifacts. Run both suites, install the browser and Python SDK test dependency, and exclude test data, browser results, experiments and local env files from the image context. SQLite remains advisory. |
+| L18 | `projects_router.py:166`, `frontend/src/api.ts:537` | The chooser fetched all accessible projects and all modality-lock lookups in one response. Return 100 projects by default, cap pages at 200 and expose the next offset. Both browser choosers follow pages with the operation's original credential. Clients listing more than 100 projects must follow `X-Next-Offset`. |
+| L19 | `rate_limit.py:40` | Personalized API responses using the custom API-key header lacked a consistent HTTP cache policy. Set private, no-store by default for API responses other than public health and preserve explicit stricter download policies. This applies with the limiter enabled or disabled. |
+
+### P3 findings
+
+| ID | Location | Disposition |
+|---|---|---|
+| L20 | `frontend/src/pages/GuidePage.tsx:32` | Fixed the image import, privacy, storage and export guidance to match the shipped behavior. |
+| L21 | `scheduler.py:492` | Fixed the cleanup log unit. The counter measures expired keys. |
+| L22 | `pyproject.toml:6`, `frontend/package.json:8` | Fixed two sources of misleading test-tool output. Register harness markers for standalone test discovery and use the project-pinned TypeScript compiler for browser-spec typechecking in CI. |
+| L23 | Local test environment, `pytest_freezegun.py:17` | Deferred the external plugin's `distutils` deprecation warning. It comes from the installed pytest plugin and does not affect assertions or runtime code. |
+
+### Coverage and verification
+
+- The source inventory covered 34 backend Python modules, 47 frontend TypeScript/TSX files, 48 Python test/support files and 20 browser specs/support files at baseline. The runtime OpenAPI inventory contained 97 tagged operations. The PostgreSQL gate includes S1–S14 and S20–S32. Source checks included bare exception handlers, user-derived SQL, production console calls and candidate embedded secrets. Browser fixtures and external error sinks were reviewed separately.
+- Reviewed the root-level FastAPI modules and the `db/`, `label_health/`, frontend, current `tests/`, browser suites and deployment configuration against the product and modality designs. The deployed Python implementation lives at repository root. Existing protected routes use tenant/project authorization. Public signup, guide, health, signed billing notifications and anonymous reports have their own entry contracts. The CORS allowlist contains the two product origins and two localhost origins.
+- Reviewed query construction, parameter binding, commit/rollback boundaries, version checks, revision evidence, quota, and Paddle/webhook signing. HTTP contracts exercise signed bodies and duplicate delivery. No migration or DDL change in this sweep. The PostgreSQL gate includes fresh schema creation, repeated migration and preservation of seeded data (`tests/test_modality_schema.py:30`, `:67`, `:76`). No production database or live provider was contacted.
+- Checked the export snapshot, cursor paging, capped temporary spool, CSV escaping, JSONL records, modality metadata and text/image compatibility. The IMG gate covers real CSV re-import, signed references, embedded media, revision lineage and conservation. Export rows are generated in bounded pages within a repeatable-read transaction and spooled to disk above 1 MiB before download. The media middleware retains its 20 MiB limit and two large-body permits.
+- Verified scoped browser errors, account rotation, real upload/review flows, external image consent and fallback, mobile views, guide, quickstart and keyboard actions. Playwright includes both real PostgreSQL journeys and intercepted deterministic UI cases.
+- Reviewed runtime and build inputs for embedded credential patterns, public error responses, provider diagnostics and readiness. The commit history and externally managed credentials are outside the source scan. The manual Paddle sandbox switch is present in `frontend/index.html:21`.
+- Scoring measurement: 30 consecutive authenticated HTTP writes, after one warmup, on a disposable local PostgreSQL schema with connection pooling. The final quiet run measured 34.6 ms median, 46.5 ms p95 and 56.7 ms maximum. A run alongside regression tests measured 31.3, 42.7 and 46.8 ms respectively. An earlier pooled sample before the scoring changes measured 91.2 ms median and 150.0 ms p95. These are small-project loopback measurements. The engine SHA-256 is `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+- Release boundaries: verify the Railway image smoke test, environment values, backup/restore and latency under expected production load at cutover. CI workflow edits were checked locally. Docker was unavailable here. The shared local environment uses different uvicorn, Pydantic, pytest, pytest-asyncio and NumPy patch/minor versions from the image pins. A metadata check found no incompatible direct pinned package pair. The exact image remains a deployment smoke check. The previously accepted legacy and historical migration items remain on the v1.1 ledger. Agreement matrices grow with annotator count and historical analytics still scale with the project. No production capacity result is inferred from local tests.
+
+### Tests added
+
+- `tests/test_prelaunch.py` (9 pytest cases): private validation fields, CORS and rate-window headers, project list pagination, intake deadline and permit release, scoped evidence and payer-lock query counts, Paddle signature rotation, missing production configuration, upload byte budgets, and a real SDK image export with an authenticated webhook reference.
+- `e2e/fix_round6.spec.ts` (1) and `tests/e2e/modality_image.spec.ts` (2): stale report downloads, invalid image scoring evidence with independent queue readback, and project list pagination during a capability outage.
+
+### Files changed
+
+- **Production and client** — `jm_service.py`, `media_intake.py`, `rate_limit.py`, `analytics_router.py`, `auth.py`, `billing.py`, `dashboard_router.py`, `db/repository.py`, `db/entitlement.py`, `trial_guard.py`, `label_health/api.py`, `label_studio.py`, `labeling_router.py`, `projects_router.py`, `scheduler.py`, `backend/static/dlj_client.py`.
+- **Frontend and generated bundle** — `frontend/src/api.ts`, `frontend/src/csv.ts`, `frontend/src/screens/Projects.tsx`, `frontend/src/screens/HealthReport.tsx`, `frontend/src/components/ImageViewer.tsx`, `frontend/src/pages/GuidePage.tsx`, `frontend/dist/index.html`.
+- **Regression tests and harness** — `tests/test_prelaunch.py`, `e2e/fix_round6.spec.ts`, `e2e/components.spec.ts`, `e2e/tags_image.spec.ts`, `tests/e2e/modality_image.spec.ts`, `tests/e2e/test_sprint0_extended.spec.ts`, `tests/harness/conftest.py`.
+- **Build, CI and documentation** — `.dockerignore`, `.github/workflows/harness.yml`, `requirements.txt`, `tests/harness/requirements.txt`, `pyproject.toml`, `frontend/package.json`, `docs/session_state.md`.
+
+## G4 Verification Report
+
+**Date:** 2026-11-26
+**Verdict:** FAIL. A strict text import can commit and charge for a label after silently dropping submitted annotations. Three additional launch-contract checks also failed. Application code was left for the fixing prompt.
+**Baseline:** PostgreSQL 325 passed, 16 experiments deselected. Playwright 184 passed.
+**Post:** PostgreSQL 330 passed, 8 strict expected failures, 16 experiments deselected (exit 0). Playwright 184 passed (exit 0).
+**Frozen engine:** `jm_core.py` SHA-256 `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+### Audit results
+
+Counts in the last column are collected pytest cases, assigned once to their principal audit. “Gaps” counts distinct open findings. The design references are `docs/design/dlj_multimodal_design_v3.md:74` and `docs/design/dlj_product_design_v1.md:1024,1684,1829`. Production routers are at the repository root in this checkout.
+
+| Audit | Items checked | Gaps found | Tests added |
+|---|---|---:|---:|
+| 1. Bounded intake | 5 checks, including installed dispatch and all 51 non-GET method/path registrations | 1 | 2 |
+| 2. URL validation | 4 groups covering scheme, authority/characters/length, format and exact signed bytes | 1 | 2 |
+| 3. Data URI validation | 3 groups covering grammar, individual/aggregate size and four signatures | 0 independent; connector timing counted under 4 | 1 |
+| 4. Writer enforcement | 7 writer families including both connector adapters and prediction reopen | 3 | 5 |
+| 5. Error safety | Validation responses and application diagnostic sinks | 1 | 2 |
+| 6. No server fetch | HTTP/DNS call sites and image-reference data flow | 0 | 0; existing tests cover this |
+| 7. Replay compatibility | Canonical identity and persisted legacy receipts | 0 | 1 |
+
+### P1 findings
+
+| ID | Evidence | Required result |
+|---|---|---|
+| G4-01 | `media_intake.py:15`, `labeling_router.py:2016`. The registered prediction review endpoint implements correction. An unsupported encoding reached downstream validation (422). The route misses the admission, size, encoding and read-deadline policy required for correction endpoints in this audit. Its DTO rejects replacement media. | A normal-sized unsupported-encoding correction receives the transport 415 before parsing. Apply the same applicable correction policy to both review and label relabel. |
+| G4-02 | `labeling_router.py:139–171`, `modality.py:124–137`. On an enforced text/single project, submitting a nonempty flat tag list or span list returned 200. Each independent case read back one committed label and one quota charge. The flat fields disappeared before the shared validator ran. | Both cases return 422 with zero committed labels and zero quota charge. Keep valid legacy and typed representations compatible. |
+| G4-03 | `labeling_router.py:2095–2126`. Prediction reopen creates a successor without the stored-layout check used by review at line 2032. With a deliberately missing persisted image-content row, reopen returned 200 and linked a new invalid successor. This requires an already inconsistent source. Ordinary reopen of a valid image preserves it. | Reject the inconsistent source before changing the prediction or predecessor. Verify the revision link remains unchanged in a fresh session. |
+| G4-04 | `auth.py:183`, `label_studio.py:462–472,560–570`. Both mapped adapters rejected an over-budget image with the correct 413, **after five SQL statements** in each test. Config lookup and tenant locking precede validation, contrary to §4’s decoded-size-before-database rule. The test uses a small synthetic limit and counts statements without recording SQL or parameters. | Reject per-item/aggregate inline overflow before the first database statement. Keep the project-dependent mapping and layout checks under their normal authorization and locking rules. |
+
+### P2 findings and coverage gaps
+
+- **G4-05** — `labeling_router.py:957` includes the submitted category in the relabel 422. A synthetic private taxonomy value appeared verbatim in the response. Similar interpolations occur for stored categories at lines 711 and 777 and `label_studio.py:715`; factor names and task IDs occur at `label_studio.py:195,199,497,500`. Report a stable field description or index instead. The test establishes reflection to the requesting caller. It does not establish a cross-tenant leak.
+- **G4-06** — `modality.py:61` removes every trailing dot when validating a hostname. It subsequently accepts the original spelling with an empty DNS label before the root. Preserve a single valid terminal root dot and reject multiple terminal dots. No DNS lookup was used for this test.
+- Previously missing passing regressions now cover downstream exception/cancellation after a permit was acquired, external URL boundaries, multiple base64 decoder blocks, error paths with a signed-image canary and replay of an actual persisted pre-notes nested-image digest. The 30-second stalled-reader test already exists at `tests/test_prelaunch.py:67`.
+
+### 1. Transport and registered routes
+
+`jm_service.py:346` installs `MediaIntake` around the FastAPI router. Its receive loop completes before FastAPI’s body parser or `require_tenant` calls `request.json()` at `auth.py:179`. `media_intake.py:38–50` rejects unsupported encoding (415), malformed or multiple length declarations (400) and declared oversize (413). Lines 64–93 count each chunk before extending the buffer. The 20 MiB boundary is inclusive. Missing length reserves immediately; a small declaration crossing 1 MiB also requires a permit. A busy worker returns 429 with `Retry-After: 1`. The middleware replays only an accepted body to the router.
+
+The prelaunch L01 change in the working tree (`media_intake.py:64–76`) establishes one monotonic 30-second deadline for the full receive loop. The file is untracked here, so a commit hash could not be attributed. Lines 52–62 register release immediately in an `ExitStack` around both receive and downstream dispatch. Normal completion, validation rejection, oversize, disconnect, scoring/DB exception, read timeout and coroutine cancellation unwind that stack. The deadline governs receipt of bytes. It does not time out database or scoring work. Existing end-to-end tests cover declared/observed oversize, chunked input with no length, saturation, cancellation, deadline and retry (`tests/test_modality_ingest.py:67–145`, `tests/test_prelaunch.py:67`).
+
+The ledger below groups all 51 registered non-GET method/path pairs. Paths share the prefix `/v1`. Braces within an alternatives list denote separate registered routes. All GETs bypass this POST-only middleware.
+
+| Count | Method and actual routes | Media intake |
+|---:|---|---|
+| 2 | POST `/labels/ingest`, `/labels/ingest/batch` | Covered |
+| 2 | POST `/projects/{p}/labels`, `/projects/{p}/labels/batch` | Covered |
+| 4 | POST `/labels/{p}/items/{l}/{relabel,content}` and `/projects/{p}/labels/items/{l}/{relabel,content}` | Covered |
+| 1 | POST `/projects/{p}/predictions` | Covered; this is batch import. There is no registered `/predictions/batch`. |
+| 2 | POST `/label-studio/{predict,webhook}` | Covered; the webhook is the connector callback. |
+| 2 | POST `/projects/{p}/predictions/{id}/{review,reopen}` | Both excluded. Review supports correction (G4-01). Reopen accepts revision identity and reuses stored content (G4-03). |
+| 8 | POST `/labels/verify`, `/labels/{p}/{bulk-verify,sample,tasks}`, `/projects/{p}/labels/{verify,bulk-verify,sample,tasks}` | Excluded; evidence, text-only task or synthetic sample |
+| 3 | POST `/label-health/{analyze,report,report/pdf}` | Excluded; separate bounded multipart reader at `label_health/api.py:127` |
+| 2 | PUT `/projects/{p}/guidelines`, `/domains/{p}/guidelines` | Excluded; text settings |
+| 2 | POST `/label-studio/{configure,setup}` | Excluded; connector configuration |
+| 7 | POST `/admin/api-keys`, `/admin/api-keys/{k}/{rotate,reconcile-signup-owner}`, `/auth/{register,confirm}`, `/account/domains/resolve`, `/billing/webhook` | Excluded; identity/account policies and independent Paddle stream at `billing.py:383` |
+| 7 | POST `/projects`; PATCH/DELETE `/projects/{p}`; PUT `/projects/{p}/settings`; POST `/projects/{p}/{members,invites}`, `/projects/{p}/invites/{i}/accept` | Excluded; project administration |
+| 5 | POST `/projects/{p}/webhooks`; PATCH/DELETE `/projects/{p}/webhooks/{e}`; POST `/projects/{p}/webhooks/{e}/{rotate,test}` | Excluded; outbound webhook configuration and dispatch |
+| 4 | POST `/register`, `/domains`, `/domains/{p}/{score,learn}` | Excluded; separate legacy JM API |
+
+### 2–3. URL and inline validation
+
+| Check | Code and observed behavior |
+|---|---|
+| External scheme and authority | `modality.py:43–67` requires HTTPS, hostname and valid port, rejects userinfo and invalid authority. HTTP, FTP, file, JavaScript and data references are rejected by the external URL function. `labeling_router.py:123–128` deliberately dispatches valid image data URIs to a separate validator. G4-06 qualifies the hostname result. |
+| Characters and length | `modality.py:46–48` checks 1–2,048 characters, whitespace, Unicode controls, backslashes and fragments before parsing. Tests cover both the exact length and one beyond it. |
+| Strict format and original bytes | `modality.py:68–74` accepts case-insensitive JPG/JPEG/PNG/WebP/GIF suffixes and exact decoded format hints (`format`, `fm`, or §4’s `response-content-type`). PDF/SVG/HTML without a permitted hint are rejected. Opaque HTTPS is allowed on legacy projects. Validation returns the original string including query order, duplicates and percent-escape spelling. |
+| Inline grammar and size | `modality.py:35–40,77–104` requires a supported image prefix and canonical standard base64, rejects SVG, parameters, whitespace and bad padding. Encoded size is checked against 13,981,016 before decode. Decode uses 65,536-character blocks, followed by the independent 10,485,760-byte decoded limit. `labeling_router.py:131–136,287–309` computes the request-wide total on normalized content. `modality.py:138–146` gates new embedded writes on `DLJ_INLINE_IMAGES_ENABLED`; the replay check precedes that policy, so historical receipts remain readable. Connector ordering is G4-04. |
+| Magic bytes | `modality.py:39–40,105–112` checks JPEG FF D8, full eight-byte PNG signature, GIF87a or GIF89a, or RIFF plus WEBP at offset 8. MIME mismatch fails. This establishes signature matching, not successful image rendering. |
+
+### 4. Writers and persisted media
+
+| Writer | Shared check and transaction effect |
+|---|---|
+| Project import, legacy ingest and their batch routes | `labeling_router.py:608,639,662,810,2215` → `prepare_content:475` → `validate_media_for_project:479`. Project batch preflights every normalized item before the score loop. `_ingest:548` performs the scored write and persists structured content at line 565. Enforced text rejects image, enforced image requires it. G4-02 identifies input lost ahead of preflight. |
+| Prediction import | `labeling_router.py:1914–1954` uses batch syntax/aggregate validation and shared content preparation before scoring. The original revision carries the image. For embedded data the prediction snapshot stores the original-content reference and digest; detail reconstructs it at line 1205. |
+| Connector predict and webhook | `label_studio.py:212,221–247,460–495,536,627–650` maps into the shared content type, validates new writes through shared preparation, and checks stored layout/source equality for bound writes. Existing-source reassignment gets 409. G4-04 concerns when the decoded bound runs. |
+| Relabel and prediction correction/reopen | `labeling_router.py:361–367,958–987,1057,2032,2057` rejects supplied replacement media, checks compatible edits and stored layout, and copies the source into the successor. `db/repository.py:224–228` copies discriminator, spans, tags and exact URL. Reopen’s source check is missing (G4-03). |
+| Single and bulk verification | `labeling_router.py:689,738,801` checks the existing layout on single verify; bulk delegates to it. Ordinary verification updates evidence in place. The connector relearn successor copies content at `db/repository.py:386`. |
+| Typed content creation | `labeling_router.py:1134,1146–1175` calls the shared project validator and the per-discriminator checks before persisting. |
+| Synthetic sample and text task | `labeling_router.py:853,899` explicitly call the shared validator with no image. These text-only writers refuse a strict image project. |
+
+### 5–7. Diagnostics, external loading and receipts
+
+- **Diagnostic sinks.** The FastAPI handler (`jm_service.py:321–325`) projects validation errors to location, type and message; the optional Sentry configuration at line 296 disables private data capture. SQLAlchemy hides parameter values and the DB exception formatter selects trusted metadata (`db/connection.py:53,80,93,121`). Batch warnings record index and exception class (`labeling_router.py:828,834`). One synthetic signed URL was submitted across nine invalid/conflicting request cases covering 400, 401, 409, 413, 415 and 422. Its private query marker was absent from all nine responses and captured INFO-and-higher logs. G4-05 is a separate hand-built error, outside the global validation handler. No external telemetry service was exercised.
+- **Server fetch.** The model stores the reference in `LabelContent.image_url` (`db/models.py:124`). URL splitting and caption derivation in `modality.py:43,115` are local. Connector task lookup and equality comparison use stored values. `db/repository.py:216,224` persists/copies content. `labeling_router.py:1205,1219,1560,1684,1704,1800,1953,2159` resolves, emits, counts or omits the stored reference. `db/repository.py:62–65` emits a media indicator and an authenticated reference for events. There is no image dereference in these paths. The actual network clients handle Paddle (`billing.py:169`), email (`email_service.py:17`) and distinct configured webhook destinations (`scheduler.py:155–176`, `webhook_security.py:79`). The existing test at `tests/test_modality_ingest.py:147` guards DNS lookup of its fixture image host. The previous consent finding was browser-side: `frontend/src/components/ImageViewer.tsx:27–49` renders remote images after consent and sets no-referrer and lazy loading.
+- **Receipts.** `labeling_router.py:592–604,625–639` hashes normalized compact sorted JSON before caption generation. Project, actor, operation and request key scope the lookup. Old-receipt fallback removes the later notes field only for inputs representable by the old serializer. It retains original nested media. The frozen no-content and opaque-HTTPS vectors live in `tests/test_modality_ingest.py:198,306`; strict image identity and mismatch are covered at lines 336 and 351. A new test seeds the historical nested-image digest, obtains the stored result through the flat alias, then gets 409 for changed image bytes under that key. Independent SQL readback finds the original URL and exactly one charge.
+
+### Tests added and gate decision
+
+`tests/test_g4_verification.py` adds 11 functions, 13 collected cases. Five pass. Eight assertions cover the six open findings. They are strict expected failures restricted to the specific contract-mismatch exception. Setup errors remain ordinary failures, and an unexpected pass makes the suite fail until the mark is removed.
+
+| Test | Evidence |
+|---|---|
+| `test_permit_after_downstream_exit` | Holds the other permit, exercises scoring/DB exceptions, rejection and cancellation after the final receive, then proves another dispatch succeeds. |
+| `test_prediction_correction_has_intake_policy` | Checks the registered correction route through the real middleware with a small encoding-policy request. |
+| `test_external_reference_contract` | Scheme, suffix cases, inclusive length, controls and exact signed bytes. |
+| `test_image_reference_requires_valid_hostname` | Distinguishes a legal rooted DNS name from an empty trailing label. |
+| `test_inline_reference_signatures` | All four media signatures across multiple decode blocks and invalid parameter/whitespace/container cases. |
+| `test_text_single_rejects_incompatible_annotation` (2) | Checks HTTP status, rows and usage after incompatible tags or spans. |
+| `test_reopen_checks_existing_image_layout` | Checks rejection and absence of a successor for an explicitly inconsistent stored image. |
+| `test_connector_inline_size_before_database` (2) | Counts statements before a mapped image is rejected through predict or webhook. |
+| `test_media_error_responses_and_logs` | Signed-image query canary across transport, auth, typed validation, conflict and private-media replacement errors. |
+| `test_relabel_diagnostic_uses_field_metadata` | Distinguishes naming an invalid category field from returning its submitted private value. |
+| `test_old_nested_receipt_cannot_authorize_replacement` | Real legacy receipt, equivalent current alias, changed media conflict and persisted usage. |
+
+**Browser run history.** Two intermediate full runs overlapped PostgreSQL testing and finished with 183/184 and 182/184. The SLA badge assertion timed out on the first run. The second timed out on the annotators screen and on the labeling journey’s accuracy display. The SLA test passed on its own, and the complete two-worker Playwright suite passed 184/184 after PostgreSQL testing finished. No browser test was edited or disabled.
+
+**Conclusion:** G4 fails the specified launch contracts. Running `python -m pytest tests/test_g4_verification.py -m xfail --runxfail -q --timeout=120` produced **8 failures, 5 deselected**. The default regression suite result includes those documented expected failures. Reopen the gate when the four P1s pass without expected-failure marks and the two P2s have been resolved or explicitly accepted.
+
+## G4 Fix — Four P1 Blockers + Two P2s
+
+**Date:** 2026-11-26
+
+**Baseline:** PostgreSQL 330 passed, 8 expected failures, 16 experiment cases deselected. Playwright 184 passed.
+
+**Post:** PostgreSQL 344 passed, 0 expected failures, 16 experiment cases deselected. Playwright 184 passed.
+
+### P1 fixes
+
+1. Strict imports retain the presence of nonempty flat tags and spans through parsing. A strict text/single project returns 422 before scoring or charging. Label and prediction imports also check before returning a cached receipt. Legacy digest serialization and valid typed annotation formats are preserved.
+2. The ASGI media-intake route matcher now includes prediction review/correction. Unsupported content encoding returns 415 before FastAPI validation; the same size, permit and read-deadline rules as label relabel apply.
+3. Prediction review and reopen validate the locked source revision before creating a successor. Missing image content, an invalid URL or malformed inline media returns 409. The successor copies the validated source, and existing inline media remains reviewable after new inline imports are disabled.
+4. Connector predict and webhook authenticate the connector token, then validate embedded image syntax, signatures and individual/aggregate decoded size before tenant or mapping SQL. Since field names are configurable, all embedded image values in the JSON envelope count toward the request budget. Project policy and source binding still use the authorized mapping under lock. All four connector budget cases observed zero database statements.
+
+### P2 fixes
+
+5. Relabel, verify and connector errors identify the invalid category without returning its value. Related connector diagnostics omit raw task and factor names.
+6. HTTPS hostname validation accepts a single DNS root dot and rejects an empty label caused by additional trailing dots. The stored URL retains its original spelling.
+
+### G4 verdict
+
+**PASS.** All eight former expected failures pass as ordinary tests. The focused module passed all 19 cases, including six additional checks for aggregate budgets, corrupted source references and receipt replays. Backend mypy and frontend TypeScript passed. The frozen `jm_core.py` SHA-256 is `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+During an overlapping run, PostgreSQL pytest finished with 343 passed and one browser queue-navigation failure. Playwright finished with 182 passed and two timeouts in the sample-queue and throughput-chart tests. The queue-navigation test passed individually. Both full suites then passed when run sequentially with the same settings.
+
+### Files changed
+
+- Application: `labeling_router.py`, `modality.py`, `media_intake.py`, `label_studio.py`, `db/repository.py`.
+- Regression tests: `tests/test_g4_verification.py`, `tests/test_modality_ingest.py`, `test_validation_fixes.py`.
+- Session record: `docs/session_state.md`.
+
+## Prompt 12 — Release Gate
+
+**Date:** 27 November 2026
+**Decision:** NO-GO. The authenticated scoring latency exceeds both local release limits.
+**Baseline:** PostgreSQL 344 passed, 16 experiments deselected. Playwright 184 passed.
+**Final:** PostgreSQL 17: 360 passed, 16 experiments deselected, including all 27 design scenarios and 16 release tests. Playwright: 196 passed in 6.5 minutes, including eight new spot tests and four new journeys. The browser suite passed after moving login and readiness into the page fixture so each spec gets the same setup. Both specs explicitly set their intended time budget.
+
+### Part A — Findings and fixes
+
+| Severity | Location | Finding and disposition |
+|---|---|---|
+| P1 | billing.py, paddle_transaction_url | An unrecognized sandbox flag selected the live transaction endpoint. Only explicit true/false values are accepted. A configuration error stops checkout before an intent is written. |
+| P1 | jm_service.py, validate_production_config; docker-entrypoint.sh | An ENVIRONMENT-only production deployment skipped preflight. A malformed or incomplete price map could pass startup, and migration ran before configuration validation. Production now validates the four advertised tiers, mode, required settings, database and Fernet key before migration. |
+| P1 | docker-entrypoint.sh; rate_limit.py, RateLimitHeaders | The default Uvicorn access line could record private searches in request targets. Deployed access events use a static route template and status. The raw access logger is disabled for the image. |
+| P1 | db/tenant_lock.py:9, labeling_router.py:473, db/repository.py:254 | Existing PostgreSQL guard rows now take a single locking read. First creation still handles competing writers. The evidence query reuses a parameterized statement and reads current transaction data. The final native benchmark still exceeds both thresholds; this P1 is open. |
+| P2 | jm_service.py, health | Pool exhaustion could outlast the container health deadline without a response. PostgreSQL readiness now returns a bounded 503 and recovers on the next successful probe. |
+| P2 | frontend/src/screens/ScoredQueue.tsx | The full-project CSV button was hidden for text projects. Eligible reviewers can now download either modality. The image-specific notice remains scoped to image projects. |
+| P2 | projects_router.py, list_projects | Membership role was missing from the summary used by the queue. The listing now returns the active role in the same query. The UI positively checks export eligibility and the API enforces it independently. |
+| P2 | frontend/src/App.tsx, domain.tsx and screens/Projects.tsx | The directory performed a second paginated project fetch and could show a blank list during loading. The directory and sidebar share the account-scoped result, refresh on directory entry, and expose loading, empty and retry states. |
+| P2 | account.py, domains; frontend/src/api.ts | Account Settings fetched an unbounded ORM result, including unused columns. Pages now default to 100 rows, cap at 200, and return X-Next-Offset. The client follows every page with the original credential and abort signal. |
+| P2 | e2e/fix_round3.spec.ts, fix_state.spec.ts, ner_editor.spec.ts and tags_image.spec.ts | Four browser specifications could silently target port 8080 during a candidate run. They inherit the configured target and retain the explicit editor-specific overrides. |
+| P2 | tests/e2e/modality_image.spec.ts | The pagination regression depended on another test having already created a project. It now creates both projects and waits for the actual final page before checking the result. |
+| P2 | e2e/screens.spec.ts:43 and tests/e2e/release_flows.spec.ts | A fixed delay for the initial redirect and immediate assertions on asynchronous imports, detail reads and settings reloads produced false failures while the page was still loading. The checks now wait for the redirect or the scoped real HTTP response, then assert the rendered state. |
+| P2 | tests/sprint0_browser_server.py:26 and tests/e2e/test_sprint0_extended.spec.ts:19 | The browser fixture used a separate health engine and opened a database connection for each operation on a single event loop. Readiness and business operations now share one isolated pool. Its worker setup has its own bounded startup budget, independent of feature assertions. |
+| P3 | .dockerignore and Dockerfile | Root experiment and demo modules were included by the image copy. They are excluded from the build context, and an obsolete cache-bust comment was removed. |
+
+Four P1 findings received changes. Three closed; scoring latency remains open. All nine P2 findings and the Docker packaging P3 were fixed. The browser test fixes also removed an import-order dependency in the release login fixture.
+
+### Part B — Tests added
+
+- 16 backend cases in tests/test_release_gate.py cover text and image signup through verification, signed payment notifications, minute and daily limits, streamed export, schema constraints and repeat migration, checkout configuration, SPA assets, export roles, tenant-scoped pagination, readiness, pool recovery, private access logs and production preflight.
+- Eight browser spot checks and four multi-step journeys run against real API and PostgreSQL fixtures. The flows cover text CSV through review and export, embedded PNG through rendering and export, prediction acceptance and the project modality lock.
+- Signup tests deliver actual messages to a private test Maildir. Successful provider checkout and delivery to a real inbox require sandbox/provider credentials. The opt-in checkout check reads the actual Paddle transaction and compares its price ID. Production checkout links are opaque transaction links.
+
+### Part C — Release verification
+
+- The 27 design scenarios plus two additional signup cases passed during the sweep. S4 also passed after restoring its existing database injection path.
+- Mypy passed on the changed Python modules, including the release and Sprint 0 runners. The frontend production build and TypeScript checks passed.
+- The Dockerfile, .dockerignore, Railway health path, entrypoint shell syntax, frontend bundle and downloadable client were checked. Docker and Podman were unavailable locally. Staging must build, boot and smoke-test the exact image.
+- PostgreSQL migrations were rehearsed on an empty schema and a populated disposable schema. Checks include primary/foreign keys, named checks, uniques, indexes and retained rows. Rollback and restoration of a Railway backup are separate operator checks.
+- The IMG gate and G4 cover bounded admission, connector pre-SQL rejection, strict text annotations, correction/reopen, media preservation, modality locking and export. The browser flows exercise real image decoding and text/image CSV downloads.
+- The final 30 authenticated writes measured 153.45 ms median and 271.34 ms p95 against limits of 50 and 100 ms. Earlier native runs measured 166.69/335.02 and 268.97/638.78 ms. The earlier WSL measurement of 49.76/68.48 ms was on an intermediate candidate.
+- Standalone confirmation on 27 November: two consecutive runs of `python -m tests.release_server --measure` used a disposable local PostgreSQL 17 instance. Each verified 30 timed writes after one warmup. Run 1 measured 153.09 ms median and 266.41 ms p95 (3,878 MiB available, 27% CPU before the run). Run 2 measured 151.51 ms median and 254.06 ms p95 (3,795 MiB available, 43% CPU before the run). Both prechecks found zero browser processes and zero competing test runners. Norton remained enabled. Both runs exceeded both limits.
+- Norton quarantined the temporary timing helpers `p12_time_breakdown.py` and `dlj-p12-time-signoff.py` under `IDP.Generic` at 03:42:16 and 04:39:02 Pacific, respectively. The quarantine metadata gives no specific triggering operation. The normal benchmark completed before the second helper was quarantined. No fine-grained timing result was produced; both helpers were left in quarantine.
+- Engine SHA-256: 1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09.
+- Risks: [accepted_risks.md](quality/accepted_risks.md). Configuration, cutover and rollback: [release_checklist.md](quality/release_checklist.md).
+- The 120-second Windows browser-fixture teardown timeout cleared on the successful full PostgreSQL run after process cleanup. The full browser rerun passed with the corrected shared login fixture. Release performance remains unverified on Railway. No production deployment was performed.
+
+### Manual steps remaining
+
+1. Take and restore-test the Railway and legacy-volume backups. Record the previous image and schema.
+2. Install the persistent WEBHOOK_ENCRYPTION_KEY and other required secrets before starting the candidate.
+3. Build and deploy the candidate to staging, then perform the provider, migration and latency smoke checks.
+4. Coordinate the live PADDLE_SANDBOX=false switch, matching provider credentials and price map with the manual frontend sandbox-line removal, reviewed push and image deployment.
+5. Enable DLJ_IMAGE_PROJECTS_ENABLED and verify capabilities and external-image review.
+6. Enable DLJ_INLINE_IMAGES_ENABLED after the staging intake/export memory check.
+7. Complete production health, checkout, delivery, isolation and data readbacks; take the post-deployment backup.
+
+### Files changed
+
+- Service and packaging: .dockerignore, Dockerfile, docker-entrypoint.sh, account.py, billing.py, db/repository.py, db/tenant_lock.py, jm_service.py, labeling_router.py, projects_router.py, rate_limit.py.
+- Frontend: frontend/src/App.tsx, frontend/src/api.ts, frontend/src/domain.tsx, frontend/src/screens/Projects.tsx, frontend/src/screens/ScoredQueue.tsx.
+- Tests: tests/test_release_gate.py, tests/release_server.py, tests/harness/fixtures/pg_schema.py, tests/e2e/release_fixture.ts, tests/e2e/release_spot.spec.ts, tests/e2e/release_flows.spec.ts, tests/e2e/modality_image.spec.ts, e2e/fix_round3.spec.ts, e2e/fix_state.spec.ts, e2e/ner_editor.spec.ts, e2e/tags_image.spec.ts.
+- Browser regression fixes also touched e2e/screens.spec.ts, tests/sprint0_browser_server.py and tests/e2e/test_sprint0_extended.spec.ts.
+- Operations: docs/quality/accepted_risks.md, docs/quality/release_checklist.md, docs/session_state.md.
+
+## Prompt 12d — Scoring Latency Fix
+
+**Date:** 27 November 2026
+**Baseline latency:** 153 ms median / 271 ms p95 (previous release sign-off measurement).
+**Post-fix latency:** 146.47 ms median / 300.61 ms p95, 30 committed writes after one warmup on native Windows PostgreSQL 17.
+**Budget:** <50 ms median / <100 ms p95.
+**Verdict:** FAIL. Functional verification passed. Scoring latency remains the launch blocker.
+
+### Diagnostic findings
+
+The benchmark is `python -m tests.release_server --measure`. It warms up once, sends 30 sequential authenticated one-item batches over loopback HTTP and checks that all 31 rows are pending. The signup-to-score pytest case additionally creates a schema, authenticates a user, verifies a label, reads its SLA and tears down the schema. The SQL counts below isolate the scoring transaction.
+
+| Measurement | Original candidate | Revised candidate |
+|---|---:|---:|
+| Application SQL statements per warm write | 13 | 11 |
+| Transaction control | one BEGIN and one COMMIT | one BEGIN and one COMMIT |
+| Sum of mean PostgreSQL execution times for application statements | 3.16 ms | 2.96 ms |
+
+The original transaction authenticated the active key, discovered the project, locked its tenant guard, read the billing binding, locked and revalidated the actor and payer in UUID order, re-read and locked the project, checked the replay receipt, loaded the engine, updated quota, inserted the label, updated the versioned engine, streamed revision-aware evidence and inserted the receipt. COMMIT preceded the response. The revised path combines project discovery with the guard lock and billing binding lookup with the sorted key locks. Credential reads on either side of locking serve distinct purposes. On first engine creation the repository rechecks the domain and engine. A newly used pooled connection can add three asyncpg type-discovery statements.
+
+The call chain is `MediaIntake` → `require_tenant` (body validation and key digest lookup) → `require_project_tenant` / `resolve_entitlement` → `project_import_batch` (replay digest and modality validation) → `_ingest`. Ingest awaits `_prepare_engine`, quota reservation, `score_and_persist` and `_category_stats`. Engine scoring, state serialization and tier evaluation run in process. The handler adds the replay receipt and awaits `commit_write`. The benchmark uses no named annotator or typed content.
+
+Native PostgreSQL 17 statement statistics and parameter-suppressed transaction logs measured the five most expensive original application statements at 1.030 ms for the label insert, 0.930 ms for the receipt insert, 0.178 ms for quota update, 0.167 ms for engine update and 0.147 ms for the evidence query. With statement logging on, the original HTTP median was 168.85 ms, about 165.7 ms above the sum of SQL means. Across 30 warm requests the median transaction span was 86 ms, with 7.30 ms median cumulative server parse, bind, execute and transaction-control time. Backend IDs confirmed connection pooling. PostgreSQL JIT was unavailable in this build.
+
+HTTP client events correlated to the database log gave medians of 42.5 ms from sending the request body to BEGIN, 83 ms from BEGIN to COMMIT, 25 ms from COMMIT to client response headers and 2.5 ms from headers to body completion. One slow write had a 187 ms gap between the label insert and engine update. Phase medians are independent. A second diagnostic used the existing client workload with a separate native Uvicorn process. It measured 144.48 ms median and 202.75 ms p95. Its 11 SQL means summed to 2.96 ms, about 141.5 ms below the HTTP median. ASGI and PostgreSQL timestamps gave medians of 19.5 ms from ASGI start to receipt of the body, 6 ms from receipt to BEGIN, 64.5 ms from BEGIN to COMMIT and 1.5 ms from COMMIT to the first ASGI send.
+
+With Chrome closed, the High performance plan measured 156.56/316.75 ms. Available memory stayed at or above 5,017 MiB and the Windows CPU performance counter averaged 23.2% of nominal during the benchmark process. The Balanced control measured 153.81/324.09 ms. Balanced was restored and the temporary scheme removed. Norton remained enabled. An explicit TCP listener and the pinned Uvicorn version also missed the budget. The release benchmark source was restored after the listener experiment.
+
+The measured bottleneck is elapsed time outside SQL execution, including intervals between database calls and across HTTP processing. The traces do not identify a single host component or prove that Prompt 12a introduced the historical difference. Local Git refs, stash, worktrees and editor history did not yield the pre-12a scoring build. The 34.6/46.5 ms historical result lacks a comparable phase trace.
+
+### Fixes applied
+
+- `auth.py` discovers the project UUID and locks an existing owner tenant guard in one query. The guard subquery is restricted to the authenticated tenant. Missing guards and member writes follow their original locking paths. The project is re-read under lock after the keys.
+- `db/entitlement.py` resolves an established billing binding and locks its actor/payer keys together in UUID order. The shared eligibility check and legacy single-candidate validation remain active. The query leads with the key table so the existing payer-lock regression check continues to observe the lock.
+
+### Verification
+
+- PostgreSQL: 360 passed, 16 experiment tests deselected. All 27 required scenario IDs passed (29 scenario-file cases).
+- Playwright: 196 passed in 7.0 minutes. PostgreSQL, Playwright and the final benchmark ran sequentially.
+- Both changed Python modules passed mypy. The unchanged evidence/payer-lock test and signup-to-score test passed individually. The complete suite covered authorization, quota, replay, revision evidence and commit-before-response.
+- Frozen engine SHA-256: `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+- Files changed for 12d: `auth.py`, `db/entitlement.py`, `docs/session_state.md`.

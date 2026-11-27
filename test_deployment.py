@@ -1,12 +1,15 @@
 """Deployment readiness and container configuration contracts."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -17,7 +20,8 @@ from db.connection import normalize_database_url
 
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    database = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'labeling.db').as_posix()}")
+    url = os.getenv("DLJ_DATABASE_URL") or f"sqlite+aiosqlite:///{(tmp_path / 'labeling.db').as_posix()}"
+    database = create_async_engine(url, poolclass=NullPool)
     monkeypatch.setattr(jm_service, "labeling_engine", database)
     monkeypatch.setattr(jm_service, "DB_PATH", str(tmp_path / "legacy.db"))
     with TestClient(jm_service.app) as http:
@@ -45,8 +49,9 @@ def test_health_checks_structure(client: TestClient, monkeypatch: pytest.MonkeyP
 
 def test_health_engine_hash(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     assert client.get("/v1/health").json()["checks"]["engine_hash"] == "verified"
-    monkeypatch.setattr(jm_service, "labeling_engine",
-                        create_async_engine("sqlite+aiosqlite:///missing/labeling.db"))
+    unavailable = Mock()
+    unavailable.connect.side_effect = ConnectionError("test database unavailable")
+    monkeypatch.setattr(jm_service, "labeling_engine", unavailable)
     response = client.get("/v1/health")
     assert response.status_code == 503
     assert response.json()["status"] == "unhealthy"
@@ -122,6 +127,7 @@ def test_url_normalization_railway_external_ssl(monkeypatch):
     assert args == {"ssl": True}
 
 
+@pytest.mark.sqlite_only
 def test_url_normalization_sqlite_unchanged():
     original = "sqlite+aiosqlite:///test.db"
     assert normalize_database_url(original) == (original, {})

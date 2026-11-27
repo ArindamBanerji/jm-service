@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -12,23 +14,108 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.sql.dml import Insert
+from sqlalchemy.sql.elements import BindParameter
 
 from jm_core import DomainConfig, JudgmentMemoryEngine, LearnResult, ScoreResult
-from db.models import Annotator, Domain, Engine, LabelContent, LabelLog
+from db.models import Annotator, Domain, Engine, LabelContent, LabelLog, Prediction, WebhookDelivery, WebhookEndpoint, WebhookEvent
 
 
 def _tenant(session: AsyncSession) -> str:
     return str(session.info.get("tenant_id", ""))
 
 
+async def prediction_for_revision(session: AsyncSession, revision: UUID) -> Prediction | None:
+    return await session.scalar(select(Prediction).where(Prediction.current_label_log_id == revision))
+
+
+def record_unassessed_prediction_review(prediction: Prediction, revision: LabelLog) -> None:
+    """A generic human verification is evidence about the label only."""
+    prediction.current_label_log_id = revision.id
+    prediction.state = "human_reviewed"
+    prediction.human_reviewed_at = revision.verified_at
+    prediction.reviewer_key_id = revision.verified_by_key_id
+    prediction.assessment = "unknown"
+    prediction.human_spans_reviewed = False
+    prediction.decision_version += 1
+
+
+async def cancel_open_deliveries(session: AsyncSession, endpoint: WebhookEndpoint,
+                                 destination_version: int) -> None:
+    await session.execute(update(WebhookDelivery).where(
+        WebhookDelivery.endpoint_id == endpoint.id,
+        WebhookDelivery.destination_version == destination_version,
+        WebhookDelivery.state.in_(("pending", "leased"))).values(
+            state="cancelled", lease_token=None, lease_until=None, next_attempt_at=None,
+            terminal_at=datetime.now(timezone.utc), error_class="destination_changed"))
+
+
+async def record_webhook_event(session: AsyncSession, domain: Domain, event_type: str,
+                               transition_key: str, data: dict) -> WebhookEvent:
+    """Append the canonical D/E event in the caller's business transaction."""
+    event_id = uuid4()
+    occurred_at = datetime.now(timezone.utc)
+    if event_type in {"label.verified", "prediction.auto_approved"} and "label_id" in data:
+        image = domain.content_type == "image"
+        if not domain.modality_enforced:
+            image = bool(await session.scalar(select(exists().where(
+                LabelLog.tenant_id == domain.tenant_id, LabelLog.domain_id == domain.domain_id,
+                LabelLog.label_id == data["label_id"], LabelContent.label_log_id == LabelLog.id,
+                LabelContent.image_url.is_not(None)))))
+        if image:
+            label = quote(data["label_id"], safe="")
+            data = {**data, "media_kind": "image",
+                    "item_detail_path": f"/v1/projects/{domain.id}/labels/items/{label}"}
+    envelope = {
+        "event_id": str(event_id),
+        "event_type": event_type,
+        "project_id": str(domain.id),
+        "occurred_at": occurred_at.isoformat().replace("+00:00", "Z"),
+        "schema_version": 1,
+        "data": data,
+    }
+    event = WebhookEvent(
+        id=event_id, project_id=domain.id, event_type=event_type,
+        transition_key=transition_key, schema_version=1,
+        canonical_body=json.dumps(envelope, sort_keys=True, separators=(",", ":")),
+        created_at=occurred_at,
+    )
+    session.add(event)
+    await session.flush()
+    if event_type != "webhook.test":
+        endpoints = await session.scalars(select(WebhookEndpoint).where(
+            WebhookEndpoint.project_id == domain.id, WebhookEndpoint.active.is_(True)
+        ).order_by(WebhookEndpoint.id).with_for_update())
+        for endpoint in endpoints:
+            if event_type in endpoint.subscribed_events:
+                session.add(WebhookDelivery(endpoint_id=endpoint.id, event_id=event.id,
+                    destination_version=endpoint.destination_version, state="pending",
+                    attempts=0, next_attempt_at=occurred_at))
+    return event
+
+
 async def create_domain(session: AsyncSession, domain_id: str, domain_name: str,
                         config: DomainConfig, tenant_id: str | None = None,
-                        public_domain_id: str | None = None) -> Domain:
-    domain = Domain(domain_id=domain_id, tenant_id=tenant_id if tenant_id is not None else _tenant(session),
-                    domain_name=domain_name, public_domain_id=public_domain_id,
-                    config_json=config.to_dict())
-    session.add(domain)
-    await session.flush()
+                        public_domain_id: str | None = None, *, content_type: str = "text",
+                        label_schema: str = "single", modality_enforced: bool = False) -> Domain:
+    scope = tenant_id if tenant_id is not None else _tenant(session)
+    values = dict(domain_id=domain_id, tenant_id=scope, domain_name=domain_name,
+                  public_domain_id=public_domain_id, config_json=config.to_dict(),
+                  content_type=content_type, label_schema=label_schema,
+                  modality_enforced=modality_enforced)
+    dialect = session.get_bind().dialect.name
+    if dialect == "postgresql":
+        pg_statement = pg_insert(Domain).values(**values).on_conflict_do_nothing(
+            index_elements=[Domain.domain_id])
+        result = await session.execute(pg_statement)
+    else:
+        sqlite_statement = sqlite_insert(Domain).values(**values).on_conflict_do_nothing(
+            index_elements=[Domain.domain_id])
+        result = await session.execute(sqlite_statement)
+    if getattr(result, "rowcount", None) != 1:
+        raise HTTPException(409, detail="Domain already exists")
+    domain = await session.scalar(select(Domain).where(Domain.domain_id == domain_id,
+                                                      Domain.tenant_id == scope))
+    assert domain is not None
     return domain
 
 
@@ -50,23 +137,24 @@ def _engine_query(domain_id: str, annotator_id: str | None, tenant_id: str):
 async def save_engine_state(session: AsyncSession, domain_id: str, annotator_id: str | None,
                             engine: JudgmentMemoryEngine) -> Engine:
     state = engine.export_state()
-    existing = await session.scalar(_engine_query(domain_id, annotator_id, _tenant(session)).with_for_update())
-    if existing is None:
+    expected = getattr(engine, "_db_version", 0)
+    if not expected:
+        if await session.scalar(_engine_query(domain_id, annotator_id, _tenant(session)).with_only_columns(Engine.id)) is not None:
+            raise StaleDataError("Engine version changed during update")
         row = Engine(domain_id=domain_id, tenant_id=_tenant(session), annotator_id=annotator_id,
                      state_json=state, version=1)
         session.add(row)
         await session.flush()
     else:
-        expected = getattr(engine, "_db_version", 0)
-        result = await session.execute(
-            update(Engine).where(Engine.id == existing.id, Engine.tenant_id == _tenant(session),
-                                 Engine.version == expected)
+        updated = await session.scalar(
+            update(Engine).where(Engine.domain_id == domain_id, Engine.annotator_id == annotator_id,
+                                 Engine.tenant_id == _tenant(session), Engine.version == expected)
             .values(state_json=state, version=expected + 1, updated_at=datetime.now(timezone.utc))
+            .returning(Engine).execution_options(populate_existing=True)
         )
-        if getattr(result, "rowcount", None) != 1:
+        if updated is None:
             raise StaleDataError("Engine version changed during update")
-        await session.refresh(existing)
-        row = existing
+        row = updated
     setattr(engine, "_db_version", row.version)
     return row
 
@@ -86,9 +174,15 @@ async def load_or_create_engine(session: AsyncSession, domain_id: str,
     existing = await load_engine(session, domain_id, annotator_id)
     if existing is not None:
         return existing
-    domain = await get_domain(session, domain_id)
+    domain = await session.scalar(select(Domain).where(
+        Domain.domain_id == domain_id, Domain.tenant_id == _tenant(session)).with_for_update())
     if domain is None:
         raise HTTPException(status_code=404, detail="Domain not found")
+    # The domain lock serializes the first engine writer. A predecessor may
+    # have created the engine while this transaction waited for that lock.
+    existing = await load_engine(session, domain_id, annotator_id)
+    if existing is not None:
+        return existing
     return JudgmentMemoryEngine(DomainConfig.from_dict(domain.config_json))
 
 
@@ -103,9 +197,11 @@ def sync_engine_categories(engine: JudgmentMemoryEngine, categories: list[str]) 
 
 async def record_score(session: AsyncSession, domain_id: str, label_id: str,
                        annotator_id: str | None, category: str, factors: dict[str, float],
-                       recommended_action: str, confidence: float, text: str | None = None) -> LabelLog:
+                       recommended_action: str, confidence: float, text: str | None = None,
+                       notes: str | None = None) -> LabelLog:
     row = LabelLog(domain_id=domain_id, tenant_id=_tenant(session), label_id=label_id, annotator_id=annotator_id,
-                   category=category, factors_json=factors, text=text, recommended_action=recommended_action,
+                   category=category, factors_json=factors, text=text, notes=notes,
+                   recommended_action=recommended_action,
                    confidence=confidence)
     session.add(row)
     await session.flush()
@@ -126,8 +222,9 @@ async def record_label_content(session: AsyncSession, label_log_id: UUID, conten
     return row
 
 
-async def copy_label_content(session: AsyncSession, source: UUID, target: UUID) -> None:
-    existing = await get_label_content(session, source)
+async def copy_label_content(session: AsyncSession, source: UUID | LabelContent | None, target: UUID) -> None:
+    """Reuse the validated source when the caller already loaded its media."""
+    existing = await get_label_content(session, source) if isinstance(source, UUID) else source
     if existing is not None:
         await record_label_content(session, target, existing.content_type,
                                    existing.spans_json, existing.tags_json, existing.image_url)
@@ -135,7 +232,8 @@ async def copy_label_content(session: AsyncSession, source: UUID, target: UUID) 
 
 async def record_verification(session: AsyncSession, domain_id: str, label_id: str,
                               actual_action: str, verified_outcome: bool,
-                              reason: str | None = None) -> LabelLog:
+                              reason: str | None = None,
+                              notes: str | None = None) -> LabelLog:
     row = await session.scalar(select(LabelLog).where(LabelLog.domain_id == domain_id,
                                                      LabelLog.tenant_id == _tenant(session),
                                                      LabelLog.label_id == label_id).with_for_update())
@@ -146,17 +244,20 @@ async def record_verification(session: AsyncSession, domain_id: str, label_id: s
     row.actual_action = actual_action
     row.verified_outcome = verified_outcome
     row.verified_at = datetime.now(timezone.utc)
+    row.verified_by_key_id = session.info.get("actor_key_id") or session.info.get("payer_key_id")
     row.verification_reason = reason
+    row.review_notes = notes
     await session.flush()
     return row
 
 
-def active_verified_evidence():
+def active_verified_evidence(domain_id: str | BindParameter[str], tenant_id: str | BindParameter[str]):
     """Keep the latest verified observation along each revision chain."""
     lineage = select(
         LabelLog.id.label("root_id"), LabelLog.superseded_by.label("next_id"),
         LabelLog.tenant_id.label("tenant_id"), LabelLog.domain_id.label("domain_id"),
-    ).where(LabelLog.verified_at.is_not(None), LabelLog.superseded_by.is_not(None)).cte(
+    ).where(LabelLog.domain_id == domain_id, LabelLog.tenant_id == tenant_id,
+            LabelLog.verified_at.is_not(None), LabelLog.superseded_by.is_not(None)).cte(
         "verified_lineage", recursive=True)
     descendant = aliased(LabelLog)
     lineage = lineage.union_all(select(
@@ -184,7 +285,7 @@ async def verified_accuracy(session: AsyncSession, domain_id: str, category: str
     ).where(LabelLog.domain_id == domain_id, LabelLog.tenant_id == _tenant(session),
             LabelLog.category == category,
             LabelLog.verified_at.is_not(None), LabelLog.verified_outcome.is_not(None),
-            active_verified_evidence())
+            active_verified_evidence(domain_id, _tenant(session)))
     if annotator_id is not None:
         query = query.where(LabelLog.annotator_id == annotator_id)
     count, accuracy = (await session.execute(query)).one()
@@ -241,10 +342,11 @@ async def get_annotator(session: AsyncSession, domain_id: str, annotator_id: str
 
 async def score_and_persist(session: AsyncSession, engine: JudgmentMemoryEngine, domain_id: str,
                             label_id: str, annotator_id: str | None, category: str,
-                            factors: dict[str, float], text: str | None = None) -> ScoreResult:
+                            factors: dict[str, float], text: str | None = None,
+                            notes: str | None = None) -> ScoreResult:
     result = engine.score(factors, category)
     await record_score(session, domain_id, label_id, annotator_id, category,
-                       factors, result.recommended_action, result.confidence, text)
+                       factors, result.recommended_action, result.confidence, text, notes)
     await save_engine_state(session, domain_id, annotator_id, engine)
     return result
 
@@ -264,7 +366,7 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     engine = await load_or_create_engine(session, domain_id, annotator_id)
     domain = await get_domain(session, domain_id)
     if domain is None or old_row.category not in domain.config_json["categories"]:
-        raise HTTPException(422, detail=f"Category not in domain schema: {old_row.category}")
+        raise HTTPException(422, detail="Category not in domain schema")
     sync_engine_categories(engine, domain.config_json["categories"])
     scored = await score_and_persist(session, engine, domain_id, label_id, annotator_id,
                                      old_row.category, old_row.factors_json)
@@ -277,8 +379,11 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
     successor.annotation_id = old_row.annotation_id
     successor.source_task_id = old_row.source_task_id
     successor.text = old_row.text
+    successor.notes = old_row.notes
+    successor.review_notes = old_row.review_notes
     successor.prior_revision_id = str(old_row.id)
     successor.revision_actor = _tenant(session)
+    successor.revision_by_key_id = session.info.get("actor_key_id") or session.info.get("payer_key_id")
     successor.revision_at = datetime.now(timezone.utc)
     await copy_label_content(session, old_row.id, successor.id)
     old_row.superseded_by = label_id
@@ -288,7 +393,7 @@ async def verify_and_relearn(session: AsyncSession, domain_id: str, old_row: Lab
 
 async def verify_and_learn(session: AsyncSession, engine: JudgmentMemoryEngine, domain_id: str,
                            label_id: str, actual_action: str, verified_outcome: bool,
-                           reason: str | None = None) -> LearnResult:
+                           reason: str | None = None, notes: str | None = None) -> LearnResult:
     row = await session.scalar(select(LabelLog).where(LabelLog.domain_id == domain_id,
                                                      LabelLog.tenant_id == _tenant(session),
                                                      LabelLog.label_id == label_id).with_for_update())
@@ -311,6 +416,6 @@ async def verify_and_learn(session: AsyncSession, engine: JudgmentMemoryEngine, 
                           confirmed=row.recommended_action == actual_action,
                           outcome_correct=verified_outcome, track_outcome=True)
     del engine.decision_log[decision_id]
-    await record_verification(session, domain_id, label_id, actual_action, verified_outcome, reason)
+    await record_verification(session, domain_id, label_id, actual_action, verified_outcome, reason, notes)
     await save_engine_state(session, domain_id, row.annotator_id, engine)
     return result

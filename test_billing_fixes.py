@@ -4,8 +4,9 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -13,7 +14,7 @@ from sqlalchemy import select
 
 import billing
 from auth import generate_api_key
-from db.models import ApiKey
+from db.models import ApiKey, CheckoutIntent
 from test_tasks import open_tasks_client
 
 
@@ -22,7 +23,7 @@ def client(tmp_path, monkeypatch):
     if url := os.getenv("DLJ_DATABASE_URL"):
         monkeypatch.setenv("DATABASE_URL", url)
     monkeypatch.setenv("PADDLE_SANDBOX", "true")
-    monkeypatch.delenv("PADDLE_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "test-signing-secret")
     with open_tasks_client(tmp_path) as http:
         http.app.include_router(billing.router)
         monkeypatch.setattr(billing, "AsyncSessionLocal", http.app.state.session_factory)
@@ -36,8 +37,57 @@ def event(kind="created", sequence=1, product="DLJ Professional", **fields):
                      "items": [{"product": {"name": product}}], **fields}}
 
 
+def bind_intent(client, payload):
+    if payload["event_type"] != "subscription.created":
+        return payload
+    data = payload["data"]
+    custom = data.setdefault("custom_data", {})
+    if "checkout_intent_id" in custom:
+        async def existing_transaction():
+            async with client.app.state.session_factory() as session:
+                intent = await session.get(CheckoutIntent, UUID(custom["checkout_intent_id"]))
+                assert intent is not None
+                return intent.transaction_id
+        data.setdefault("transaction_id", asyncio.run(existing_transaction()))
+        return payload
+    if "key_id" in custom:
+        data.setdefault("transaction_id", "txn_unbound")
+        return payload
+    product = data.get("items", [{}])[0].get("product", {}).get("name")
+    tier = billing.PADDLE_TIER_MAP.get(product) if isinstance(product, str) else None
+    if tier is None:
+        data.setdefault("transaction_id", "txn_unknownproduct")
+        return payload
+    transaction_id = "txn_" + hashlib.sha256(payload["event_id"].encode()).hexdigest()
+    async def seed():
+        async with client.app.state.session_factory.begin() as session:
+            previous = await session.scalar(select(CheckoutIntent).where(
+                CheckoutIntent.transaction_id == transaction_id))
+            if previous is not None:
+                return str(previous.id), str(previous.purchaser)
+            payer = (await session.scalars(select(ApiKey).where(
+                ApiKey.tenant_id == custom["tenant_id"]))).one()
+            intent = CheckoutIntent(id=uuid4(), tenant_id=payer.tenant_id,
+                                    purchaser=payer.id, payer=payer.id, tier=tier,
+                                    transaction_id=transaction_id,
+                                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=30))
+            session.add(intent)
+            return str(intent.id), str(payer.id)
+    intent_id, key_id = asyncio.run(seed())
+    custom.update(checkout_intent_id=intent_id, key_id=key_id)
+    data["transaction_id"] = transaction_id
+    return payload
+
+
 def deliver(client, payload):
-    return client.post("/v1/billing/webhook", json=payload)
+    payload = bind_intent(client, payload)
+    body = json.dumps(payload).encode()
+    secret = os.environ.get("PADDLE_WEBHOOK_SECRET", "")
+    stamp = "1767268800"
+    digest = hmac.new(secret.encode(), stamp.encode() + b":" + body,
+                      hashlib.sha256).hexdigest()
+    return client.post("/v1/billing/webhook", content=body, headers={
+        "Paddle-Signature": f"ts={stamp};h1={digest}", "Content-Type": "application/json"})
 
 
 def key(client, plain="tasks-key"):
@@ -65,22 +115,23 @@ def test_unsigned_live_rejected(client, monkeypatch):
             monkeypatch.delenv("PADDLE_SANDBOX")
         else:
             monkeypatch.setenv("PADDLE_SANDBOX", setting)
-        response = deliver(client, event())
-        assert response.status_code == 503
-        assert response.json()["detail"] == "Webhook secret not configured"
+        response = client.post("/v1/billing/webhook", json=event())
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid webhook signature"
     assert key(client).tier == "trial"
 
 
-def test_unsigned_sandbox_accepted(client):
-    assert deliver(client, event()).status_code == 200
-    assert key(client).tier == "professional"
+def test_unsigned_sandbox_rejected(client):
+    response = client.post("/v1/billing/webhook", json=event())
+    assert response.status_code == 401
+    assert key(client).tier == "trial"
 
 
 def test_valid_signature_live(client, monkeypatch):
     monkeypatch.setenv("PADDLE_WEBHOOK_SECRET", "test-signing-secret")
     monkeypatch.setenv("PADDLE_SANDBOX", "false")
-    payload = event()
-    assert deliver(client, payload).status_code == 401
+    payload = bind_intent(client, event())
+    assert client.post("/v1/billing/webhook", json=payload).status_code == 401
     body = json.dumps(payload).encode()
     ts = "1767268800"
     digest = hmac.new(b"test-signing-secret", ts.encode() + b":" + body, hashlib.sha256).hexdigest()
@@ -110,10 +161,10 @@ def test_checkout_upgrades_specific_key(client, monkeypatch):
     assert deliver(client, event(custom_data=custom)).status_code == 200
     assert key(client, purchaser).tier == "professional"
     assert key(client, other_key).tier == "trial"
-    # Once linked, the customer's original key wins over a later same-tenant hint.
+    # A new purchase without the recorded transaction cannot reuse the customer link.
     other = {"tenant_id": "tasks-tenant", "key_id": str(key(client, other_key).id)}
-    assert deliver(client, event(sequence=2, product="DLJ Business", custom_data=other)).status_code == 200
-    assert key(client, purchaser).tier == "business"
+    assert deliver(client, event(sequence=2, product="DLJ Business", custom_data=other)).status_code == 409
+    assert key(client, purchaser).tier == "professional"
     assert key(client, other_key).paddle_customer_id is None
 
 
@@ -132,9 +183,9 @@ def test_older_activation_preserves_cancellation(client):
     assert saved.tier == "professional" and saved.paddle_event_id == "evt-3"
     assert saved.cancelled_at == saved.paddle_event_occurred_at
     assert saved.cancelled_at.replace(tzinfo=timezone.utc) == datetime(2026, 1, 3, 12, tzinfo=timezone.utc)
-    assert deliver(client, event(sequence=2)).status_code == 200
-    assert deliver(client, event("updated", 4, status="active")).status_code == 200
-    assert key(client).cancelled_at is None
+    assert deliver(client, event(sequence=2, product="DLJ Business")).status_code == 200
+    assert deliver(client, event("updated", 4, status="active")).status_code == 409
+    assert key(client).cancelled_at is not None
 
 
 def test_email_conflict_preserves_entitlement(client, caplog):

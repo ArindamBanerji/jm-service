@@ -1,0 +1,85 @@
+import { randomUUID } from 'node:crypto'
+import { expect } from '@playwright/test'
+import { api, download, open, project, seed, test, verify } from './release_fixture'
+
+test.describe.configure({ timeout: 60_000 })
+
+test('test_full_text_lifecycle', async ({ page, server }) => {
+  await open(page, server, 'quickstart')
+  await page.getByLabel('Project name').fill('CSV release ' + randomUUID())
+  const created = page.waitForResponse(r => r.url().endsWith('/v1/projects') && r.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Create project' }).click()
+  const { id } = await (await created).json()
+  await page.locator('input[type=file]').setInputFiles({ name: 'launch.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('First example,metadata\nSecond example,metadata\nThird example,metadata') })
+  await expect(page.getByLabel('One item per line')).toHaveValue('First example\nSecond example\nThird example')
+  const imported = page.waitForResponse(r => new URL(r.url()).pathname === `/v1/projects/${id}/labels/batch`)
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  expect((await imported).status()).toBe(200)
+  await expect(page.getByText('3 items uploaded ✓')).toBeVisible()
+  await open(page, server, 'projects/' + id + '/queue')
+  await expect(page.getByRole('link', { name: 'Review →' })).toHaveCount(3)
+  await page.getByRole('link', { name: 'Review →' }).first().click()
+  await verify(page)
+  await expect(page.getByLabel('Known outcome')).toHaveValue('')
+  await verify(page)
+  await open(page, server, 'projects/' + id + '/dashboard')
+  await expect(page.getByRole('heading', { name: 'Throughput' })).toBeVisible()
+  expect((await api(page, server, '/' + id + '/sla')).verified_count).toBe(2)
+  await open(page, server, 'projects/' + id + '/queue')
+  const csv = await download(page)
+  for (const name of ['First example', 'Second example', 'Third example']) expect(csv).toContain(name)
+})
+
+test('test_full_image_lifecycle', async ({ page, server }) => {
+  const capabilities = await api(page, server, '/capabilities')
+  expect(capabilities.combinations).toContainEqual(expect.objectContaining({ content_type: 'image', label_schema: 'single' }))
+  const { id } = await project(page, server, 'image')
+  const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+  await open(page, server, 'projects/' + id + '/upload')
+  await page.locator('input[type=file]').setInputFiles({ name: 'images.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('label_id,category,item_text,item_media_url,factor_quality,factor_difficulty\nimg,A,Pixel,"' + image + '",0.8,0.2') })
+  await page.getByRole('button', { name: 'Import image labels' }).click()
+  const detail = page.waitForResponse(r => new URL(r.url()).pathname === `/v1/projects/${id}/labels/items/img`)
+  await page.getByRole('link', { name: 'Review →' }).click()
+  expect((await detail).status()).toBe(200)
+  const rendered = page.getByRole('img', { name: 'Pixel' })
+  await expect(rendered).toBeVisible()
+  await expect(rendered).toHaveJSProperty('naturalWidth', 1)
+  await verify(page)
+  await open(page, server, 'projects/' + id + '/queue')
+  const csv = await download(page)
+  expect(csv.split('\n')[0]).toContain('image_url')
+  expect(csv).toContain(image)
+})
+test('test_prediction_review_flow', async ({ page, server }) => {
+  const { id } = await project(page, server)
+  await seed(page, server, id, 3)
+  await api(page, server, '/' + id + '/predictions', { request_key: randomUUID(), items: [{
+    label_id: 'model-label', text: 'Model sample', source: 'release-model', model_version: 'v1', category: 'A',
+    annotator_id: 'release-reviewer', model_confidence: .7, factors: { quality: .8, difficulty: .2 } }] })
+  await open(page, server, 'projects/' + id + '/predictions')
+  await page.getByRole('row').filter({ hasText: 'Model sample' }).click()
+  await page.getByRole('button', { name: /Accept/ }).click()
+  await expect(page.getByText('Prediction accepted.')).toBeVisible()
+  expect((await api(page, server, '/' + id + '/labels/items/model-label')).verified_outcome).toBe(true)
+})
+test('test_project_settings_flow', async ({ page, server }) => {
+  const { id } = await project(page, server)
+  await open(page, server, 'projects/' + id + '/settings')
+  await page.getByLabel('Description').fill('Launch project')
+  const saved = page.waitForResponse(r => r.request().method() === 'PATCH')
+  await page.getByRole('button', { name: 'Save project settings' }).click()
+  expect((await saved).status()).toBe(200)
+  await seed(page, server, id)
+  const settings = page.waitForResponse(r => new URL(r.url()).pathname === `/v1/projects/${id}` && r.request().method() === 'GET')
+  await page.reload()
+  expect((await settings).status()).toBe(200)
+  await expect(page.getByText('Locked after first item')).toBeVisible()
+  await expect(page.getByLabel('Description')).toHaveValue('Launch project')
+  const current = await api(page, server, '/' + id)
+  const refused = await page.request.patch(server.url + '/v1/projects/' + id, {
+    headers: { 'X-Api-Key': server.key, 'If-Match': String(current.settings_version) }, data: { content_type: 'image' } })
+  expect(refused.status()).toBe(409)
+  expect((await api(page, server, '/' + id)).content_type).toBe('text')
+})

@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+python -c "from jm_service import validate_production_config; validate_production_config()"
+
 MAX_RETRIES=5
 RETRY=0
 until python -c "from db.migrate import run_migration; run_migration()"; do
@@ -13,4 +15,4 @@ until python -c "from db.migrate import run_migration; run_migration()"; do
   sleep 2
 done
 echo "Migration complete"
-exec uvicorn jm_service:app --host 0.0.0.0 --port "${PORT:-8000}"
+exec uvicorn jm_service:app --host 0.0.0.0 --port "${PORT:-8000}" --no-access-log

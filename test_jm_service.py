@@ -16,6 +16,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 
 # ─── Fixtures ────────────────────────────────────────────────────
@@ -44,9 +45,8 @@ def client(clean_db):
     import jm_service
     from pathlib import Path
 
-    labeling_engine = create_async_engine(
-        f"sqlite+aiosqlite:///{(Path(clean_db).with_name('labeling.db')).as_posix()}"
-    )
+    url = os.getenv("DLJ_DATABASE_URL") or f"sqlite+aiosqlite:///{Path(clean_db).with_name('labeling.db').as_posix()}"
+    labeling_engine = create_async_engine(url, poolclass=NullPool)
     jm_service.labeling_engine = labeling_engine
     with TestClient(jm_service.app) as test_client:
         yield test_client

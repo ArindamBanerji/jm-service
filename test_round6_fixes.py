@@ -57,6 +57,7 @@ def test_database_diagnostics_never_echo_values():
     assert 's3cret' not in result
     assert sanitize_database_error(Exception('postgresql://user:pw@[::1]:5432/db'))
     class DriverDetail(Exception):
+        statement: str
         params = {'password': 's3cret'}
         orig = Exception("postgresql://admin:pw@[::1]:5432/db; password=s3cret")
     DriverDetail.statement = statement
@@ -87,6 +88,10 @@ def test_connector_ignores_older_delivery(studio_client, monkeypatch):
     monkeypatch.setattr(repository, 'verify_and_learn', unexpected_learning)
     old = event(action='ANNOTATION_UPDATED')
     old['annotation']['updated_at'] = '2026-01-01T00:00:00Z'
+    conflict = webhook(studio_client, old)
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "Conflicting connector delivery"
+    old['annotation']['updated_at'] = '2025-12-31T00:00:00Z'
     assert webhook(studio_client, old).status_code == 200
     assert log_row(studio_client, 1) == ('reject', True, '8')
     assert webhook(studio_client, first).status_code == 200
@@ -108,7 +113,7 @@ def test_billing_stream_without_length_stops_at_limit():
         chunks_sent += 1
         return {'type': 'http.request', 'body': b'x' * 32768, 'more_body': True}
 
-    request = Request({'type': 'http', 'method': 'POST', 'path': '/v1/billing/webhook',
+    request: Request = Request({'type': 'http', 'method': 'POST', 'path': '/v1/billing/webhook',
                        'headers': []}, receive)
     with pytest.raises(HTTPException) as failure:
         asyncio.run(billing.paddle_webhook(request))

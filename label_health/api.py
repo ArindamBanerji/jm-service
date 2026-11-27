@@ -20,6 +20,7 @@ _UPLOAD_TIMEOUT = 30
 _executor = ThreadPoolExecutor(max_workers=2)
 _slots = asyncio.Semaphore(2)
 _ADMISSION_WAIT = 0.01
+_waiters = 0
 _TIMEOUT = 60
 
 
@@ -48,13 +49,17 @@ def _run_sync(data: bytes, output: str) -> Any:
 
 async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False,
                    intake_deadline: float | None = None) -> Any:
+    global _waiters
     if not slot_acquired:
-        if _slots.locked():
+        if _slots.locked() or _waiters >= 2:
             raise HTTPException(status_code=503, detail="Report workers are busy")
+        _waiters += 1
         try:
             await asyncio.wait_for(_slots.acquire(), timeout=_ADMISSION_WAIT)
         except TimeoutError:
             raise HTTPException(status_code=503, detail="Report workers are busy") from None
+        finally:
+            _waiters -= 1
     try:
         if not file.filename or not file.filename.lower().endswith(".csv"):
             raise HTTPException(status_code=422, detail=["Upload a CSV file"])
@@ -87,6 +92,7 @@ async def _analyze(file: UploadFile, output: str, *, slot_acquired: bool = False
 
 async def _analyze_request(request: Request, output: str) -> Any:
     """Reserve a worker slot before Starlette parses the multipart body."""
+    global _waiters
     content_length = request.headers.get("content-length")
     if content_length is not None:
         try:
@@ -94,12 +100,15 @@ async def _analyze_request(request: Request, output: str) -> Any:
                 raise HTTPException(status_code=413, detail="Upload exceeds 10 MiB")
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid Content-Length") from exc
-    if _slots.locked():
+    if _slots.locked() or _waiters >= 2:
         raise HTTPException(status_code=503, detail="Report workers are busy")
+    _waiters += 1
     try:
         await asyncio.wait_for(_slots.acquire(), timeout=_ADMISSION_WAIT)
     except TimeoutError:
         raise HTTPException(status_code=503, detail="Report workers are busy") from None
+    finally:
+        _waiters -= 1
     deadline = asyncio.get_running_loop().time() + _UPLOAD_TIMEOUT
     received = 0
 
@@ -120,6 +129,7 @@ async def _analyze_request(request: Request, output: str) -> Any:
             raise HTTPException(status_code=408, detail="Upload timed out") from exc
         file = form.get("file")
         if not isinstance(file, UploadFile):
+            await form.close()
             raise HTTPException(status_code=422, detail=["Upload a CSV file"])
     except BaseException:
         _slots.release()

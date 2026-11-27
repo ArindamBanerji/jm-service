@@ -29,8 +29,8 @@ def seed(client, count=3, headers=None):
     return [row["label_id"] for row in rows]
 
 
-def bulk(client, label_ids, action="approve", headers=None, reason=None):
-    body = {"label_ids": label_ids, "action": action}
+def bulk(client, label_ids, action="approve", headers=None, reason=None, outcome=True):
+    body = {"label_ids": label_ids, "action": action, "outcome": outcome}
     if reason is not None:
         body["reason"] = reason
     return client.post("/v1/labels/medical/bulk-verify", json=body, headers=headers)
@@ -63,7 +63,7 @@ def test_bulk_approve_confirms_and_learns(client):
 
 def test_bulk_reject_overrides_and_learns(client):
     ids = seed(client)
-    response = bulk(client, ids, action="reject")
+    response = bulk(client, ids, action="reject", outcome=False)
     assert response.status_code == 200, response.text
     assert response.json()["processed"] == 3
     assert all(row.verified_outcome is False and row.actual_action != row.recommended_action

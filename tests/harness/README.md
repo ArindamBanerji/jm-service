@@ -14,6 +14,13 @@ The separate SQLite CI job is advisory and uses a temporary file with foreign ke
 
 ## Post-check
 
+For the release gate, run `python -m pytest tests/ -q --timeout=120` with
+`DLJ_DATABASE_URL` set to PostgreSQL. This includes S13, whose test name
+mentions both dialects. The separate root regression job selects
+`-m "not sqlite_only"` on PostgreSQL. Root tests whose modern-store fixtures
+require SQLite run in the advisory job. To exercise the compatibility lane
+locally, run `python -m pytest tests/harness/ --harness-sqlite -q`.
+
 | Contract file | Endpoints | Writes | Audited surface |
 |---|---:|---:|---|
 | test_auth.py | 5 | 3 | Public signup, admin key, current account, domain list and resolution. The current account is the session contract. |
@@ -29,8 +36,8 @@ The separate SQLite CI job is advisory and uses a temporary file with foreign ke
 
 - **Fixtures.** pg_schema.py sets and checks search_path before table creation. It releases scoped connections, drops only the generated schema and disposes the admin engine in finally blocks. conftest.py runs the real app lifespan, points auth/request, billing, scheduler and health at the isolated store and redirects legacy SQLite and connector files into the test directory. Email and Paddle transport use local stand-ins. No client can charge a real customer through these tests.
 - **Factories.** factory.py creates a tenant key, scoped domain, versioned engine and scored source label through service persistence helpers. The write observer runs on the ASGI response-start path before forwarding success. A separate session, file reader or external-provider test ledger must already see the write. A missing observer invocation fails the test. The contracts check required field names, wire types, format-specific bodies and headers.
-- **Scenarios.** Prompt A scenarios S1–S14 are active and exercise the mounted app. S20–27 remain reserved for Prompt C and S28–32 for Prompt B; these 13 shells are skipped. S15–19 remain reserved for deferred legacy work. The Prompt A project tests additionally cover create, archive/reactivate, membership, invitation proof and the roles × payer matrix.
-- **Known failures.** Four strict expected failures remain: ambiguous connector ordering and immutable source binding belong to Prompt C; review draft protection and minimal browser history belong to Prompt B. Infrastructure faults, unexpected HTTP statuses and failed setup assertions remain errors. The diagnostic formatter and concurrent billing/report admission cases are active Prompt A checks.
+- **Scenarios.** S1–14 cover identity, access and billing. S20–27 exercise shared writes, and S28–32 exercise the browser against the mounted service. All 27 are active on PostgreSQL. S15–19 are reserved for deferred legacy work.
+- **Regression tests.** Connector ordering and immutable source binding, review draft protection and private history now run as ordinary assertions, alongside the diagnostic and concurrent intake checks. The joint S27 browser tests verify bulk review through both domain and project routes.
 - **Browser.** Eight actual screen routes and a review-components contract exercise the built SPA. Each checks browser errors. The draft-conflict test admits the specific expected HTTP 409 console entry during its intentional conflict. Its ordinary screen contract still requires a clean console.
 
 The R1 reviewer can use this checklist with the merged plan §2.1. Future product scenarios, an independent Astra review and live provider smoke tests have their own release gates.

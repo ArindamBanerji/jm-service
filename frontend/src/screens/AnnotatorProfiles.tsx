@@ -3,10 +3,11 @@ import { getAnnotators, type AnnotatorProfile } from '../api'
 import { useDomain } from '../domain'
 import ErrorBanner from '../components/ErrorBanner'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { captureOperation } from '../operationContext'
 
 type Key = keyof Pick<AnnotatorProfile, 'annotator_id' | 'total_labels' | 'accuracy' | 'strongest_category' | 'weakest_category' | 'last_active'>
 export default function AnnotatorProfiles() {
-  const { domainId } = useDomain()
+  const { domainId, projectId } = useDomain()
   const [items, setItems] = useState<AnnotatorProfile[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -14,11 +15,16 @@ export default function AnnotatorProfiles() {
   const [desc, setDesc] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   useEffect(() => {
-    if (!domainId) { setItems([]); return }
+    setItems([])
+    if (!domainId) return
     let live = true; setBusy(true); setError(null)
-    getAnnotators(domainId, 100).then(response => { if (live) setItems(response.annotators) }).catch(cause => { if (live) setError(String(cause)) }).finally(() => { if (live) setBusy(false) })
-    return () => { live = false }
-  }, [domainId])
+    const operation = captureOperation(domainId, projectId)
+    getAnnotators(domainId, 100, projectId, operation.credential ?? undefined, operation.signal)
+      .then(response => { if (live && operation.isCurrent()) setItems(response.annotators) })
+      .catch(cause => { if (live && operation.isCurrent()) setError(String(cause)) })
+      .finally(() => { if (live && operation.isCurrent()) setBusy(false); operation.finish() })
+    return () => { live = false; operation.finish() }
+  }, [domainId, projectId])
   const ordered = [...items].sort((a, b) => { const first = a[sort], second = b[sort]; const result = typeof first === 'number' && typeof second === 'number' ? first - second : String(first ?? '').localeCompare(String(second ?? '')); return desc ? -result : result })
   const header = (key: Key, label: string) => <th onClick={() => { if (sort === key) setDesc(!desc); else { setSort(key); setDesc(key === 'total_labels') } }} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); if (sort === key) setDesc(!desc); else setSort(key) } }}>{label}{sort === key ? (desc ? ' ↓' : ' ↑') : ''}</th>
   return <div className="page"><div className="eyebrow">05 / People signals</div><h1>Annotator Profiles</h1><p className="subtitle">Understand whose labels are strongest and where extra review helps.</p><ErrorBanner message={error} />{busy && <LoadingSpinner />}

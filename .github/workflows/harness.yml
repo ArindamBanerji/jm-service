@@ -34,11 +34,26 @@ jobs:
       - run: npm ci --prefix frontend
       - run: npm --prefix frontend run build
       - run: python -m playwright install --with-deps chromium
-      - name: Primary contracts, browser controls and owned gaps
+      - name: Full PostgreSQL gate
         if: matrix.database == 'postgresql'
         env:
           DLJ_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dlj_test
-        run: python -m pytest tests/harness -q --strict-markers --timeout=30
+        run: python -m pytest tests/ -q -k "not exp_dlj" --timeout=120
+      - name: Browser regression gate
+        if: matrix.database == 'postgresql'
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dlj_test
+          DLJ_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dlj_test
+        run: |
+          npm ci
+          npm --prefix frontend run typecheck:e2e
+          npx --no-install playwright install chromium
+          python -m db.migrate
+          python -m uvicorn jm_service:app --host 127.0.0.1 --port 8080 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          curl --retry 20 --retry-delay 1 --retry-connrefused --fail --silent http://127.0.0.1:8080/v1/health
+          npx --no-install playwright test
       - name: Advisory contracts and browser controls
         if: matrix.database == 'sqlite-advisory'
         run: python -m pytest tests/harness --harness-sqlite -q --strict-markers --timeout=30
@@ -48,7 +63,8 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dlj_test
           DLJ_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/dlj_test
         run: >-
-          python -m pytest -q --timeout=30 --ignore=tests/harness
+          python -m pytest -q --timeout=120 -m "not sqlite_only" --ignore=tests
+          --ignore=scripts/test_paddle.py
           --ignore=test_jm_docker_live.py --ignore=test_jm_docker_live_v2.py
           --ignore=test_jm_docker_live_v3.py --ignore=test_ops_e2e.py
       - name: Existing SQLite compatibility suite
@@ -57,6 +73,7 @@ jobs:
           DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
           DLJ_DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
         run: >-
-          python -m pytest -q --timeout=30 --ignore=tests/harness
+          python -m pytest -q --timeout=120 --ignore=tests/harness -k "not exp_dlj"
+          --ignore=scripts/test_paddle.py
           --ignore=test_jm_docker_live.py --ignore=test_jm_docker_live_v2.py
           --ignore=test_jm_docker_live_v3.py --ignore=test_ops_e2e.py

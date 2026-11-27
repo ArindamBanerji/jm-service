@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+import logging
 from collections.abc import AsyncIterator
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -25,7 +26,7 @@ def normalize_database_url(url: str) -> tuple[str, dict[str, bool]]:
     clean_url = urlunsplit(parsed._replace(query=clean_query))
     if ssl_modes:
         if ssl_modes[-1] not in {"require", "disable"}:
-            raise ValueError(f"Unsupported sslmode: {ssl_modes[-1]}")
+            raise ValueError("Unsupported database SSL mode")
         return clean_url, {"ssl": ssl_modes[-1] == "require"}
     # Railway private network: no SSL needed (self-signed cert, traffic already isolated)
     hostname = parsed.hostname or ""
@@ -79,10 +80,17 @@ async def commit_write(session: AsyncSession) -> None:
         raise HTTPException(500, detail=f"Database commit failed: {sanitize_database_error(exc)}") from None
 
 
-DATABASE_URL, CONNECT_ARGS = normalize_database_url(
-    os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/jm_labeling"))
+try:
+    DATABASE_URL, CONNECT_ARGS = normalize_database_url(
+        os.getenv("DATABASE_URL", "postgresql+asyncpg://localhost/jm_labeling"))
+except Exception:
+    raise RuntimeError("Database URL is invalid (details withheld)") from None
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+logging.getLogger("asyncpg").setLevel(logging.WARNING)
 try:
     engine = create_async_engine(DATABASE_URL, connect_args=CONNECT_ARGS,
+                                 echo=False, hide_parameters=True,
                                  **({"pool_size": 5, "max_overflow": 10} if DATABASE_URL.startswith("postgresql") else {}))
 except Exception as exc:
     raise RuntimeError(f"Database engine setup failed: {sanitize_database_error(exc)}") from None

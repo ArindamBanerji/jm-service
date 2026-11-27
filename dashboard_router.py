@@ -12,7 +12,7 @@ from sqlalchemy import Float, and_, case, cast, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import repository
-from auth import ProjectTenant, scoped_domain_id
+from auth import ProjectTenant, selected_domain_id
 from db.connection import get_db
 from db.models import Domain, LabelLog
 from jm_core import DomainConfig, JudgmentMemoryEngine
@@ -21,11 +21,12 @@ from policy_engine import TierStatus, evaluate_domain
 from rate_limit import limiter
 
 router = APIRouter(prefix="/v1/dashboard", tags=["Dashboard"])
+project_dashboard_router = APIRouter(prefix="/v1/projects/{domain_id}/dashboard", tags=["Project dashboard"])
 Session = Annotated[AsyncSession, Depends(get_db)]
 
 
 async def require_domain(domain_id: str, session: Session, tenant: ProjectTenant) -> Domain:
-    domain = await repository.get_domain(session, scoped_domain_id(tenant, domain_id))
+    domain = await repository.get_domain(session, selected_domain_id(session, tenant, domain_id))
     if domain is None:
         raise HTTPException(404, detail="Domain not found")
     session.info["public_domain_id"] = domain_id
@@ -33,8 +34,11 @@ async def require_domain(domain_id: str, session: Session, tenant: ProjectTenant
 
 
 DashboardDomain = Annotated[Domain, Depends(require_domain)]
-verified = and_(LabelLog.verified_at.is_not(None), LabelLog.verified_outcome.is_not(None),
-                repository.active_verified_evidence())
+
+
+def _verified(domain_id: str, session: AsyncSession):
+    return and_(LabelLog.verified_at.is_not(None), LabelLog.verified_outcome.is_not(None),
+                repository.active_verified_evidence(domain_id, session.info.get("tenant_id", "")))
 
 
 class Inversion(BaseModel):
@@ -150,6 +154,7 @@ def cohen_kappa(left: list[str], right: list[str]) -> float | None:
 @router.get("/{domain_id}/iaa", response_model=Agreement)
 @limiter.limit("60/minute")
 async def agreement(request: Request, domain: DashboardDomain, session: Session) -> Agreement:
+    verified = _verified(domain.domain_id, session)
     rows = (await session.execute(select(
         LabelLog.source_task_id, LabelLog.annotator_id, LabelLog.category, LabelLog.id
     ).where(LabelLog.domain_id == domain.domain_id,
@@ -190,6 +195,7 @@ def _inversion(engine: JudgmentMemoryEngine | None) -> Inversion | None:
 async def _curve(session: AsyncSession, domain_id: str, window: int,
                  category: str | None = None) -> list[CurveSample]:
     order = (LabelLog.verified_at, LabelLog.scored_at, LabelLog.id)
+    verified = _verified(domain_id, session)
     history = select(
         LabelLog.verified_at.label("timestamp"),
         func.row_number().over(order_by=order).label("n"),
@@ -234,6 +240,7 @@ async def overview(request: Request, domain: DashboardDomain, session: Session) 
 @router.get("/{domain_id}/corrections")
 @limiter.limit("60/minute")
 async def corrections(request: Request, domain: DashboardDomain, session: Session) -> Corrections:
+    verified = _verified(domain.domain_id, session)
     count = func.count()
     groups = (LabelLog.category, LabelLog.recommended_action, LabelLog.actual_action)
     query = (select(*groups, count).where(LabelLog.domain_id == domain.domain_id, LabelLog.tenant_id == session.info.get("tenant_id", ""), verified)
@@ -260,6 +267,7 @@ async def corrections(request: Request, domain: DashboardDomain, session: Sessio
 async def annotators(request: Request, domain: DashboardDomain, session: Session,
                      limit: int = Query(50, ge=1, le=100)) -> Annotators:
     annotator = LabelLog.annotator_id
+    verified = _verified(domain.domain_id, session)
     total = func.count().label("total")
     top = (select(annotator, total).where(LabelLog.domain_id == domain.domain_id, LabelLog.tenant_id == session.info.get("tenant_id", ""),
                                          LabelLog.superseded_by.is_(None), annotator.is_not(None))
@@ -297,6 +305,7 @@ async def annotators(request: Request, domain: DashboardDomain, session: Session
 @router.get("/{domain_id}/factors")
 @limiter.limit("60/minute")
 async def factors(request: Request, domain: DashboardDomain, session: Session) -> Factors:
+    verified = _verified(domain.domain_id, session)
     names = DomainConfig.from_dict(domain.config_json).factors
     engine = await repository.load_engine(session, domain.domain_id)
     # Expand JSON objects as key/value rows; custom factor names are literal keys.
@@ -330,3 +339,10 @@ async def compounding(request: Request, domain: DashboardDomain, session: Sessio
     return Compounding(domain_id=session.info.get("public_domain_id", domain.domain_id), category=category, points=points,
                        baseline_accuracy=baseline, current_accuracy=current,
                        improvement=(current - baseline) * 100 if baseline is not None and current is not None else None)
+
+
+for _path, _handler in (
+    ("/iaa", agreement), ("/overview", overview), ("/corrections", corrections),
+    ("/annotators", annotators), ("/factors", factors), ("/compounding", compounding),
+):
+    project_dashboard_router.add_api_route(_path, _handler, methods=["GET"])

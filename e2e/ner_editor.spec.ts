@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-test.use({ baseURL: process.env.NER_EDITOR_BASE_URL ?? 'http://localhost:8080' });
+if (process.env.NER_EDITOR_BASE_URL) test.use({ baseURL: process.env.NER_EDITOR_BASE_URL });
 
 const source = '😀 John Smith joined Acme <b>Ltd</b>.';
 const original = { start: 2, end: 12, label: 'PERSON', text: 'John Smith' };

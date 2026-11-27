@@ -3,6 +3,7 @@
 import pytest
 import hashlib
 import re
+from datetime import datetime, timezone
 from uuid import UUID
 from sqlalchemy import select
 
@@ -101,6 +102,39 @@ async def test_only_owner_can_archive_or_reactivate(wire: Wire):
                        headers={"X-Api-Key": admin_key}, json={
                            "settings_version": 2, "status": "active",
                        })
+    updated = await wire.request("PUT", f"/v1/projects/{project_id}/settings", json={
+        "settings_version": 2, "description": "Still archived",
+    })
+    assert updated.json()["status"] == "archived"
+
+
+@pytest.mark.prompt_a
+@pytest.mark.anyio
+async def test_archived_project_blocks_connector_learning(wire: Wire):
+    project_id = (await wire.request("POST", "/v1/projects", status=201, json={
+        "name": "Review", "public_domain_id": "review",
+        "factors": ["quality", "difficulty"], "categories": ["A"],
+    })).json()["id"]
+    await wire.request("POST", "/v1/labels/ingest", json={
+        "domain_id": "review", "label_id": "1", "category": "A",
+        "factors": {"quality": .8, "difficulty": .2},
+    })
+    connector = {"X-LS-Token": "harness-ls"}
+    await wire.request("POST", "/v1/label-studio/configure", headers=connector, json={
+        "project_id": "p", "domain_id": "review",
+        "factor_map": {"quality": "data.quality", "difficulty": "data.difficulty"},
+    })
+    await wire.request("PUT", f"/v1/projects/{project_id}/settings", json={
+        "settings_version": 1, "status": "archived",
+    })
+    await wire.request("POST", "/v1/label-studio/webhook", status=409,
+                       headers=connector, json={
+                           "project": "p", "action": "ANNOTATION_CREATED",
+                           "task": {"id": 1, "data": {"category": "A", "quality": .8,
+                                                      "difficulty": .2, "ground_truth": "approve"}},
+                           "annotation": {"id": "ann", "completed_by": 7,
+                                          "actual_action": "approve"},
+                       })
 
 
 @pytest.mark.prompt_a
@@ -118,8 +152,11 @@ async def test_project_invite_is_mailbox_bound_and_single_use(wire: Wire, monkey
         wrong = await session.scalar(select(ApiKey).where(
             ApiKey.key_hash == hashlib.sha256(wrong_key.encode()).hexdigest()))
         assert member is not None and wrong is not None
-        member.contact_email = "member@example.test"
-        wrong.contact_email = "wrong@example.test"
+        member.signup_email = "member@example.test"
+        member.contact_email = "accounts-payable@example.test"
+        wrong.signup_email = "wrong@example.test"
+        wrong.contact_email = member.signup_email
+        member.email_verified_at = wrong.email_verified_at = datetime.now(timezone.utc)
     sent: list[str] = []
 
     async def capture(address: str, subject: str, html: str) -> bool:
@@ -156,7 +193,8 @@ async def test_invite_rechecks_issuer_authority(wire: Wire, monkeypatch):
         recipient = await session.scalar(select(ApiKey).where(
             ApiKey.key_hash == hashlib.sha256(recipient_key.encode()).hexdigest()))
         assert recipient is not None
-        recipient.contact_email = "recipient@example.test"
+        recipient.signup_email = "recipient@example.test"
+        recipient.email_verified_at = datetime.now(timezone.utc)
     await wire.request("POST", f"/v1/projects/{project}/members", status=201, json={
         "member_tenant_id": "admin-tenant", "role": "admin",
     })
@@ -218,6 +256,14 @@ async def test_roles_by_payer_access_matrix(wire: Wire, role: str, payer_state: 
         "actual_action": "approve", "verified_outcome": True,
     })
     can_review = member_write and role != "annotator"
+    item = {"label_id": "batch-role-check", "category": "A",
+            "factors": {"quality": .8, "difficulty": .2}}
+    imported = await wire.client.post(f"/v1/projects/{project_id}/labels/batch", headers=headers,
+                                      json={"request_key": "role-check", "items": [item]})
+    assert imported.status_code == (200 if can_review else 403), imported.text
+    legacy = await wire.client.post("/v1/labels/ingest/batch", headers=headers, json={
+        "domain_id": "matrix", "items": [{**item, "label_id": "legacy-role-check"}]})
+    assert legacy.status_code == (200 if can_review else 403), legacy.text
     assert verify.status_code == (200 if can_review else 403), verify.text
     bulk = await wire.client.post("/v1/labels/matrix/bulk-verify", headers=headers, json={
         "label_ids": ["bulk-me"], "action": "approve", "outcome": True,

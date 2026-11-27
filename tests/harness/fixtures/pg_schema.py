@@ -14,13 +14,15 @@ from db.models import Base
 
 
 @asynccontextmanager
-async def database(directory: Path, sqlite: bool) -> AsyncIterator[AsyncEngine]:
+async def database(directory: Path, sqlite: bool, *, initialize: bool = True,
+                   pooled: bool = False) -> AsyncIterator[AsyncEngine]:
     if sqlite:
         engine = create_async_engine(f"sqlite+aiosqlite:///{(directory / 'modern.db').as_posix()}", poolclass=NullPool)
         enable_sqlite_foreign_keys(engine)
         try:
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
+            if initialize:
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
             yield engine
         finally:
             await engine.dispose()
@@ -36,12 +38,13 @@ async def database(directory: Path, sqlite: bool) -> AsyncIterator[AsyncEngine]:
         async with admin.begin() as conn:
             await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
         try:
-            engine = create_async_engine(url, poolclass=NullPool, connect_args={
+            engine = create_async_engine(url, **({} if pooled else {"poolclass": NullPool}), connect_args={
                 **options, "server_settings": {"search_path": schema}})
             try:
                 async with engine.begin() as conn:
                     assert await conn.scalar(text("SELECT current_schema()")) == schema
-                    await conn.run_sync(Base.metadata.create_all)
+                    if initialize:
+                        await conn.run_sync(Base.metadata.create_all)
                 yield engine
             finally:
                 await engine.dispose()

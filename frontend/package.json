@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "typecheck:e2e": "tsc -p ../e2e/tsconfig.json",
     "preview": "vite preview"
   },
   "devDependencies": {

@@ -18,6 +18,8 @@ from db.models import Base
 from labeling_router import router as labeling_router
 from rate_limit import limiter
 
+pytestmark = pytest.mark.sqlite_only
+
 
 @contextmanager
 def signup_client(tmp_path, monkeypatch):

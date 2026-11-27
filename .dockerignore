@@ -9,3 +9,13 @@ frontend/dist
 node_modules
 *.egg-info
 .env
+.env.*
+test_*.py
+tests/
+e2e/
+test-results/
+experiments/
+e_jm_*.py
+jm_experiment.py
+jm_api_demo.py
+pw_results.txt

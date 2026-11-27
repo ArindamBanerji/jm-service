@@ -31,26 +31,34 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from media_intake import MediaIntake
+from cryptography.fernet import Fernet
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from db.connection import engine as labeling_engine
 from pydantic import BaseModel, Field, field_validator
 from dashboard_router import router as dashboard_router
+from dashboard_router import project_dashboard_router
+from analytics_router import router as analytics_router
 from auth import router as admin_router, signup_router
 from account import router as account_router
 from label_studio import router as label_studio_router
 from label_health.api import router as label_health_router
 from labeling_router import router as labeling_router
 from labeling_router import autonomy_router
+from labeling_router import project_labels_router
+from labeling_router import project_meta_router
 from legal_pages import router as legal_router
-from billing import router as billing_router
+from billing import paddle_prices, paddle_transaction_url, router as billing_router
 from projects_router import router as projects_router
 from scheduler import scheduler_loop
+from webhook_router import router as webhook_router
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from rate_limit import limiter
+from rate_limit import RateLimitHeaders, limiter
 
 
 # ─── Database (SQLite — swap for Postgres in R2) ─────────────────
@@ -155,15 +163,14 @@ class CreateDomainRequest(BaseModel):
     def valid_factor_ranges(cls, ranges: dict[str, list[float]]) -> dict[str, list[float]]:
         for name, bounds in ranges.items():
             if len(bounds) != 2 or not all(isfinite(value) for value in bounds) or bounds[0] > bounds[1]:
-                raise ValueError(f"factor_ranges[{name}] must contain two ordered finite numbers")
+                raise ValueError("Factor ranges must contain two ordered finite numbers")
         return ranges
 
     @field_validator("factors", "categories", "actions")
     @classmethod
     def no_duplicates(cls, v: list[str]) -> list[str]:
         if len(v) != len(set(v)):
-            dupes = [x for x in v if v.count(x) > 1]
-            raise ValueError(f"Duplicate entries not allowed: {set(dupes)}")
+            raise ValueError("Duplicate entries not allowed")
         return v
 
     @field_validator("factors", "categories", "actions")
@@ -248,8 +255,32 @@ class ErrorResponse(BaseModel):
 # ─── App ─────────────────────────────────────────────────────────
 
 
+def validate_production_config() -> None:
+    environments = ("RAILWAY_ENVIRONMENT_NAME", "RAILWAY_ENVIRONMENT", "ENVIRONMENT")
+    if not any(os.getenv(name, "").strip().lower() == "production" for name in environments):
+        return
+    required = ("DATABASE_URL", "ADMIN_API_KEY", "RESEND_API_KEY", "PADDLE_API_KEY",
+                "PADDLE_PRICE_MAP", "PADDLE_WEBHOOK_SECRET", "WEBHOOK_ENCRYPTION_KEY")
+    missing = [name for name in required if not os.getenv(name, "").strip()]
+    if missing:
+        raise RuntimeError("Missing production configuration: " + ", ".join(missing))
+    if labeling_engine.dialect.name != "postgresql":
+        raise RuntimeError("Production requires PostgreSQL")
+    try:
+        paddle_transaction_url()
+        if set(("starter", "professional", "business", "scale")) - paddle_prices().keys():
+            raise ValueError("Missing checkout tiers in PADDLE_PRICE_MAP")
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from None
+    try:
+        Fernet(os.environ["WEBHOOK_ENCRYPTION_KEY"].encode())
+    except (TypeError, ValueError):
+        raise RuntimeError("Invalid WEBHOOK_ENCRYPTION_KEY") from None
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
+    validate_production_config()
     init_db()
     application.state.engine_hash_verified = (
         hashlib.sha256(Path(__file__).with_name("jm_core.py").read_bytes()).hexdigest()
@@ -268,7 +299,11 @@ async def lifespan(application: FastAPI):
 
 _sentry_dsn = os.environ.get("SENTRY_DSN")
 if _sentry_dsn:
-    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.1,
+    sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.1, max_request_body_size="never",
+                    data_collection={"http_bodies": [], "stack_frame_variables": False,
+                                     "http_headers": {"request": {"mode": "off"}},
+                                     "url_query_params": {"mode": "off"}, "cookies": {"mode": "off"},
+                                     "user_info": False, "database_query_data": False},
                     environment=os.environ.get("ENVIRONMENT", "development"))
 
 
@@ -287,19 +322,35 @@ app = FastAPI(
     responses={401: {"model": ErrorResponse, "description": "Invalid API key"}},
 )
 app.state.limiter = limiter
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Report the failing field without returning request bodies or validation context."""
+    details = [{key: error[key] for key in ("loc", "type", "msg")} for error in exc.errors()]
+    return JSONResponse({"detail": details}, status_code=422, headers={"Cache-Control": "no-store"})
+
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.include_router(label_health_router)
 app.include_router(labeling_router)
+app.include_router(project_labels_router)
+app.include_router(project_meta_router)
 app.include_router(autonomy_router)
 app.include_router(dashboard_router)
+app.include_router(project_dashboard_router)
+app.include_router(analytics_router)
 app.include_router(label_studio_router)
 app.include_router(admin_router)
 app.include_router(signup_router)
 app.include_router(account_router)
 app.include_router(billing_router)
 app.include_router(projects_router)
+app.include_router(webhook_router)
 app.include_router(legal_router)
 
+app.add_middleware(MediaIntake)  # type: ignore[arg-type, call-arg]
+app.add_middleware(RateLimitHeaders)  # type: ignore[arg-type, call-arg]
 app.add_middleware(  # type: ignore[call-arg]
     CORSMiddleware,  # type: ignore[arg-type]
     allow_origins=[
@@ -310,7 +361,8 @@ app.add_middleware(  # type: ignore[call-arg]
     ],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count"],
+    expose_headers=["X-Total-Count", "X-Next-Offset", "X-DLJ-Content-Type", "X-DLJ-Label-Schema",
+                    "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
 )
 
 
@@ -411,22 +463,28 @@ def validate_learn_input(req: LearnRequest, engine, domain_id: str, tenant: str)
 
 # ─── Endpoints ───────────────────────────────────────────────────
 
+def _check_legacy_store() -> None:
+    uri = Path(DB_PATH).resolve().as_uri() + "?mode=ro"
+    connection = sqlite3.connect(uri, uri=True, timeout=1)
+    try:
+        connection.execute("SELECT api_key FROM tenants LIMIT 0")
+    finally:
+        connection.close()
+
+
 @app.get("/v1/health", tags=["System"])
 async def health():
     """Check both stores and the frozen engine before reporting readiness."""
     checks = {"labeling_db": "connected", "legacy_db": "connected",
               "engine_hash": "verified" if getattr(app.state, "engine_hash_verified", False) else "mismatch"}
     try:
-        async with labeling_engine.connect() as connection:
-            await connection.execute(text("SELECT 1"))
+        async with asyncio.timeout(1.5):
+            async with labeling_engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
     except Exception as exc:
         checks["labeling_db"] = f"error: {type(exc).__name__}"
     try:
-        legacy_connection = sqlite3.connect(DB_PATH)
-        try:
-            legacy_connection.execute("SELECT 1")
-        finally:
-            legacy_connection.close()
+        await asyncio.to_thread(_check_legacy_store)
     except Exception as exc:
         checks["legacy_db"] = f"error: {type(exc).__name__}"
     status = ("unhealthy" if checks["labeling_db"] != "connected" or checks["engine_hash"] != "verified"
@@ -651,6 +709,24 @@ def export_state(request: Request, domain_id: str,
     """
     engine = load_engine(domain_id, tenant)
     return engine.export_state()
+
+
+# Keep the client outside the SPA mount so the download always has the Python
+# media type and attachment disposition.
+client_path = Path(__file__).resolve().parent / "backend" / "static" / "dlj_client.py"
+
+
+@app.get("/dlj_client.py", tags=["Client"], include_in_schema=True)
+async def download_python_client() -> FileResponse:
+    """Download the dependency-light, single-file DLJ Python client."""
+    if not client_path.is_file():
+        raise HTTPException(status_code=404, detail="Python client is unavailable")
+    return FileResponse(
+        client_path,
+        media_type="text/x-python",
+        filename="dlj_client.py",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 # Serve the built review UI after every API route. HashRouter keeps deep links

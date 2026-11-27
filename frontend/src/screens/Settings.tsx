@@ -4,6 +4,7 @@ import { ApiError, getAccount, getAccountDomains, getCheckoutUrl, getGuidelines,
   type AccountDomain, type AccountSummary } from '../api'
 import { useDomain } from '../domain'
 import ErrorBanner from '../components/ErrorBanner'
+import { captureOperation } from '../operationContext'
 
 const pendingKey = 'dlj-checkout-pending'
 const tiers = ['starter', 'professional', 'business', 'scale']
@@ -43,42 +44,50 @@ export default function Settings() {
   useEffect(() => {
     setGuidelines(''); setGuidelinesDomain(''); setGuidelinesMessage('')
     if (!domainId || !configured) { setGuidelinesLoading(false); return }
-    const controller = new AbortController()
+    const operation = captureOperation(domainId, null)
     setGuidelinesLoading(true)
-    getGuidelines(domainId, controller.signal).then(result => {
-      if (controller.signal.aborted || activeDomain.current !== domainId) return
+    getGuidelines(domainId, operation.signal, undefined, operation.credential ?? undefined).then(result => {
+      if (!operation.isCurrent() || activeDomain.current !== domainId) return
       setGuidelines(result.guidelines ?? ''); setGuidelinesDomain(domainId)
     }).catch(cause => {
-      if (!controller.signal.aborted && activeDomain.current === domainId) setError(String(cause))
+      if (operation.isCurrent() && activeDomain.current === domainId) setError(String(cause))
     }).finally(() => {
-      if (!controller.signal.aborted && activeDomain.current === domainId) setGuidelinesLoading(false)
+      if (operation.isCurrent() && activeDomain.current === domainId) setGuidelinesLoading(false)
+      operation.finish()
     })
-    return () => controller.abort()
+    return () => operation.finish()
   }, [domainId, configured])
   const saveGuidelines = async () => {
     if (!domainId || guidelinesDomain !== domainId || guidelinesLoading || guidelinesSaving) return
     const savedDomain = domainId
+    const operation = captureOperation(domainId, null)
     setGuidelinesSaving(true); setGuidelinesMessage(''); setError(null)
     try {
-      await putGuidelines(savedDomain, guidelines)
-      if (activeDomain.current === savedDomain) setGuidelinesMessage('Guidelines saved.')
+      await putGuidelines(savedDomain, guidelines, operation.credential ?? undefined, operation.signal)
+      if (operation.isCurrent() && activeDomain.current === savedDomain) setGuidelinesMessage('Guidelines saved.')
     } catch (cause) {
-      if (activeDomain.current === savedDomain) setError(String(cause))
-    } finally { setGuidelinesSaving(false) }
+      if (operation.isCurrent() && activeDomain.current === savedDomain) setError(String(cause))
+    } finally { operation.finish(); setGuidelinesSaving(false) }
   }
 
   const refresh = useCallback(async () => {
     if (!localStorage.getItem('rgi-api-key')) { setAccount(null); setDomains([]); return }
+    const operation = captureOperation(domainId, null)
     try {
-      const [summary, names] = await Promise.all([getAccount(), getAccountDomains()])
+      const [summary, names] = await Promise.all([
+        getAccount(operation.credential ?? undefined, operation.signal),
+        getAccountDomains(operation.credential ?? undefined, operation.signal),
+      ])
+      if (!operation.isCurrent()) return
       setAccount(summary); setDomains(names); setError(null)
       const previous = sessionStorage.getItem(pendingKey)
       if (previous && summary.tier === previous) {
         sessionStorage.removeItem(pendingKey)
         setPending(false)
       }
-    } catch (cause) { setAccount(null); setDomains([]); setError(String(cause)) }
-  }, [])
+    } catch (cause) { if (operation.isCurrent()) { setAccount(null); setDomains([]); setError(String(cause)) } }
+    finally { operation.finish() }
+  }, [domainId])
 
   useEffect(() => {
     void refresh()
@@ -105,26 +114,36 @@ export default function Settings() {
   const useDomainName = async (value: string) => {
     const next = value.trim()
     if (!next) { setError('Enter a public domain name.'); return }
+    const operation = captureOperation(domainId, null)
     setBusy(true); setError(null)
+    let usable = true
     try {
-      await resolveAccountDomain(next)
-      setDomains(await getAccountDomains())
+      await resolveAccountDomain(next, operation.credential ?? undefined, operation.signal)
+      if (!operation.isCurrent()) return
+      const names = await getAccountDomains(operation.credential ?? undefined, operation.signal)
+      if (operation.isCurrent()) setDomains(names)
     } catch (cause) {
       if (!(cause instanceof ApiError && cause.status === 404)) {
-        setError(String(cause)); setBusy(false); return
+        usable = false
+        if (operation.isCurrent()) setError(String(cause))
       }
+    } finally {
+      if (usable && operation.isCurrent()) { setDomainId(next); setDomainName(next) }
+      operation.finish(); setBusy(false)
     }
-    setDomainId(next); setDomainName(next); setBusy(false)
   }
   const checkout = async () => {
+    const operation = captureOperation(domainId, null)
     setBusy(true); setError(null)
     try {
-      const result = await getCheckoutUrl(tier)
+      const result = await getCheckoutUrl(tier, operation.credential ?? undefined, operation.signal)
+      if (!operation.isCurrent()) return
       if (!result.checkout_url?.startsWith('https://')) throw new Error('Checkout URL is unavailable. Please try again later.')
       sessionStorage.setItem(pendingKey, tier)
       setPending(true)
       window.location.assign(result.checkout_url)
-    } catch (cause) { setError(String(cause)); setBusy(false) }
+    } catch (cause) { if (operation.isCurrent()) setError(String(cause)); setBusy(false) }
+    finally { operation.finish() }
   }
   const usage = account?.usage && typeof account.usage === 'object' ? account.usage : emptyUsage
   const labelsToday = usage.labels_today ?? 0

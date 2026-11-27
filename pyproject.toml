@@ -1,3 +1,15 @@
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
+
+[tool.pytest.ini_options]
+markers = [
+    "sqlite_only: regression fixture requires the advisory modern SQLite store",
+    "sqlite_advisory: selected SQLite compatibility run",
+    "sqlite_divergence(reason): documented dialect-specific assertion",
+    "prompt_a: owned by Prompt A",
+    "prompt_b: owned by Prompt B",
+    "prompt_c: owned by Prompt C",
+    "prompt_d: owned by Prompt D",
+    "prompt_e: owned by Prompt E",
+]

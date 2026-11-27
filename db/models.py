@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, BigInteger, JSON, String, Text, UniqueConstraint, Uuid, func, text
+from sqlalchemy import Boolean, CHAR, CheckConstraint, DateTime, Enum, Float, ForeignKey, ForeignKeyConstraint, Index, Integer, BigInteger, JSON, LargeBinary, SmallInteger, String, Text, UniqueConstraint, Uuid, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -18,6 +18,10 @@ class Domain(Base):
         CheckConstraint("status IN ('active','archived','completed')", name="ck_domain_status"),
         CheckConstraint("confidence_floor BETWEEN 0.80 AND 0.99", name="ck_domain_confidence_floor"),
         CheckConstraint("settings_version >= 1", name="ck_domain_settings_version"),
+        CheckConstraint(
+            "(content_type='text' AND label_schema IN ('single','multi','ner')) OR "
+            "(content_type='image' AND label_schema IN ('single','multi'))",
+            name="ck_domains_modality_pair"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
@@ -27,11 +31,18 @@ class Domain(Base):
     domain_name: Mapped[str] = mapped_column(String(200))
     config_json: Mapped[dict] = mapped_column(JSON)
     guidelines: Mapped[str | None] = mapped_column(Text, nullable=True)
+    guidelines_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     automation_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     confidence_floor: Mapped[float] = mapped_column(Float, nullable=False, server_default=text("0.95"))
     settings_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    content_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="text", server_default="text")
+    label_schema: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="single", server_default="single")
+    modality_enforced: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -58,7 +69,14 @@ class LabelLog(Base):
     __tablename__ = "label_log"
     __table_args__ = (
         Index("ix_label_log_domain_category_verified", "domain_id", "category", "verified_at"),
+        Index("uq_revision_predecessor", "domain_id", "prior_revision_id", unique=True,
+              postgresql_where=text("prior_revision_id IS NOT NULL"),
+              sqlite_where=text("prior_revision_id IS NOT NULL")),
         UniqueConstraint("domain_id", "label_id", name="uq_label_log_domain_label"),
+        CheckConstraint("recommended_action IS NULL OR length(recommended_action) <= 200",
+                        name="ck_label_log_recommended_action_length"),
+        CheckConstraint("actual_action IS NULL OR length(actual_action) <= 200",
+                        name="ck_label_log_actual_action_length"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4, server_default=text("gen_random_uuid()"))
@@ -73,15 +91,21 @@ class LabelLog(Base):
     category: Mapped[str | None] = mapped_column(String(200), index=True, nullable=True)
     factors_json: Mapped[dict] = mapped_column(JSON)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommended_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
     actual_action: Mapped[str | None] = mapped_column(String(200), nullable=True)
     verified_outcome: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, server_default=func.now())
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_by_key_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("api_keys.id"), nullable=True)
     verification_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     prior_revision_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     revision_actor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    revision_by_key_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("api_keys.id"), nullable=True)
     revision_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_token: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
@@ -97,7 +121,153 @@ class LabelContent(Base):
     content_type: Mapped[str] = mapped_column(String(32), nullable=False)
     spans_json: Mapped[list[dict]] = mapped_column(JSON, nullable=False, default=list)
     tags_json: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    image_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ConnectorConfigRow(Base):
+    __tablename__ = "connector_config"
+
+    tenant_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    project_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    config_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=text("1"))
+
+
+class ProjectRequest(Base):
+    __tablename__ = "project_request"
+
+    project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("domains.id"), primary_key=True)
+    actor_key_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("api_keys.id"), primary_key=True)
+    operation: Mapped[str] = mapped_column(String(40), primary_key=True)
+    request_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    payload_digest: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    result_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProjectExportSlot(Base):
+    __tablename__ = "project_export_slot"
+    __table_args__ = (CheckConstraint("slot IN (1,2)", name="ck_project_export_slot_number"),)
+
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("domains.id", ondelete="CASCADE"), primary_key=True)
+    slot: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    lease_token: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Prediction(Base):
+    __tablename__ = "prediction"
+    __table_args__ = (
+        CheckConstraint("model_confidence BETWEEN 0 AND 1", name="ck_prediction_model_confidence"),
+        CheckConstraint("state IN ('pending','auto_approved','human_reviewed')", name="ck_prediction_state"),
+        CheckConstraint("assessment IS NULL OR assessment IN ('correct','incorrect','unknown')",
+                        name="ck_prediction_assessment"),
+        Index("ix_prediction_scope", "project_id", "source", "imported_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True,
+                                     default=uuid4, server_default=text("gen_random_uuid()"))
+    project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("domains.id"), nullable=False)
+    original_label_log_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("label_log.id"), nullable=False, unique=True)
+    current_label_log_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("label_log.id"), nullable=False, unique=True)
+    source: Mapped[str] = mapped_column(String(200), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(200), nullable=False)
+    original_content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    original_category: Mapped[str] = mapped_column(String(200), nullable=False)
+    model_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    dlj_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    tier: Mapped[str] = mapped_column(String(32), nullable=False)
+    recommendation: Mapped[str] = mapped_column(String(200), nullable=False)
+    gate_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    decision_reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    decision_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    machine_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    human_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer_key_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("api_keys.id"), nullable=True)
+    assessment: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    human_spans_reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
+
+class WebhookEvent(Base):
+    __tablename__ = "webhook_event"
+    __table_args__ = (UniqueConstraint("project_id", "event_type", "transition_key",
+                                       name="uq_webhook_event_transition"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True,
+                                     default=uuid4, server_default=text("gen_random_uuid()"))
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("domains.id", ondelete="CASCADE"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    transition_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    canonical_body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WebhookEndpoint(Base):
+    __tablename__ = "webhook_endpoint"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True,
+                                     default=uuid4, server_default=text("gen_random_uuid()"))
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("domains.id", ondelete="CASCADE"), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    subscribed_events: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    destination_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    lease_token: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_delivery"
+    __table_args__ = (
+        UniqueConstraint("endpoint_id", "event_id", name="uq_webhook_delivery_endpoint_event"),
+        CheckConstraint(
+            "state IN ('pending','leased','delivered','dead','cancelled')",
+            name="ck_webhook_delivery_state"),
+        Index("ix_delivery_due", "state", "next_attempt_at"),
+        Index("ix_delivery_lease", "state", "lease_until"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True,
+                                     default=uuid4, server_default=text("gen_random_uuid()"))
+    endpoint_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("webhook_endpoint.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("webhook_event.id", ondelete="CASCADE"), nullable=False)
+    destination_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(16), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    lease_token: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    terminal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_class: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+
+class WebhookAttempt(Base):
+    __tablename__ = "webhook_attempt"
+
+    delivery_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("webhook_delivery.id", ondelete="CASCADE"), primary_key=True)
+    attempt_no: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Annotator(Base):
@@ -129,6 +299,10 @@ class ApiKey(Base):
     paddle_event_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     paddle_event_occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    signup_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    signup_reconciliation_reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reproof_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     trial_expiring_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     trial_expired_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -141,6 +315,9 @@ class ApiKey(Base):
 Index("uq_api_keys_contact_email", func.lower(ApiKey.contact_email), unique=True,
       postgresql_where=ApiKey.contact_email.is_not(None),
       sqlite_where=ApiKey.contact_email.is_not(None))
+Index("uq_api_keys_signup_email", func.lower(ApiKey.signup_email), unique=True,
+      postgresql_where=ApiKey.signup_email.is_not(None),
+      sqlite_where=ApiKey.signup_email.is_not(None))
 Index("uq_api_keys_paddle_customer_id", ApiKey.paddle_customer_id, unique=True,
       postgresql_where=ApiKey.paddle_customer_id.is_not(None),
       sqlite_where=ApiKey.paddle_customer_id.is_not(None))

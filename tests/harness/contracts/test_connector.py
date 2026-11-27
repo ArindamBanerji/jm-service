@@ -1,6 +1,7 @@
-import json
-
 import pytest
+from sqlalchemy import select
+
+from db.models import ConnectorConfigRow
 
 from ..fixtures.factory import NULL, NUMBER, Wire, shape
 
@@ -19,8 +20,9 @@ def annotation(action="approve", task_id=1, kind="ANNOTATION_CREATED", stamp=Non
 
 async def test_configure(wire: Wire):
     async def saved():
-        data = json.loads((wire.directory / "connector.json").read_text(encoding="utf8"))
-        assert data["contract-tenant\0p"]["domain_id"] == "studio"
+        async with wire.factory.sessions() as fresh:
+            row = await fresh.get(ConnectorConfigRow, ("contract-tenant", "p"))
+            assert row is not None and row.config_json["domain_id"] == "studio"
 
     response = await wire.request("POST", "/v1/label-studio/configure", headers=HEADERS, before_send=saved,
                                   json={"project_id": "p", "domain_id": "studio",
@@ -56,3 +58,20 @@ async def test_webhook(wire: Wire):
 
 async def test_health(wire: Wire):
     shape((await wire.request("GET", "/v1/label-studio/health")).json(), {"status": str, "model_version": str})
+
+
+async def test_pending_binding_and_watermark_survive_project_name_separators(wire: Wire):
+    stamp = "2026-11-25T10:00:00Z"
+    for project, annotation_id, task_id in (("team:one", "review", 1), ("team", "one:review", 2)):
+        body = annotation(task_id=task_id, stamp=stamp)
+        body["project"] = project
+        body["annotation"]["id"] = annotation_id
+        body["task"]["data"] = dict(body["task"]["data"], ground_truth=None)
+        pending = await wire.request("POST", "/v1/label-studio/webhook", headers=HEADERS, json=body)
+        assert pending.json()["status"] == "pending_ground_truth"
+        body["task"]["data"]["ground_truth"] = True
+        del body["annotation"]["updated_at"]
+        await wire.request("POST", "/v1/label-studio/webhook", headers=HEADERS, status=409, json=body)
+        body["annotation"]["updated_at"] = "2026-11-25T11:00:00Z"
+        processed = await wire.request("POST", "/v1/label-studio/webhook", headers=HEADERS, json=body)
+        assert processed.json()["status"] == "processed"

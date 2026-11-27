@@ -43,6 +43,34 @@ test('whole-store clear invalidates account and deferred receipt', async ({ page
   expect(await page.evaluate(() => sessionStorage.getItem('dlj-deferred-registration'))).toBeNull()
 })
 
+test('rotating the account cancels a pending report download', async ({ page }) => {
+  await account(page)
+  await page.route('**/v1/label-health/report', route => route.fulfill({ contentType: 'text/html', body: '<p>Report ready</p>' }))
+  let resume!: () => void
+  const hold = new Promise<void>(resolve => { resume = resolve })
+  await page.route('**/v1/label-health/report/pdf', async route => {
+    await hold
+    await route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.4' })
+  })
+  const downloads: string[] = []
+  page.on('download', download => downloads.push(download.suggestedFilename()))
+  await page.goto('/#/health')
+  await page.locator('input[type=file]').setInputFiles({ name: 'old.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\n1,2') })
+  const sent = page.waitForRequest(req => req.url().endsWith('/report/pdf'))
+  await page.getByRole('button', { name: 'Download PDF' }).click()
+  await sent
+  const cancelled = page.waitForEvent('requestfailed', req => req.url().endsWith('/report/pdf'))
+  try {
+    await page.evaluate(() => {
+      localStorage.setItem('rgi-api-key', 'key-B')
+      window.dispatchEvent(new StorageEvent('storage', { key: 'rgi-api-key', newValue: 'key-B' }))
+    })
+  } finally { resume() }
+  await cancelled
+  await expect(page.getByRole('button', { name: 'Download PDF' })).toHaveCount(0)
+  expect(downloads).toEqual([])
+})
+
 test('report navigation does not retain a File in browser history', async ({ page }) => {
   await account(page)
   let reportRequests = 0

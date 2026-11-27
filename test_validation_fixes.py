@@ -49,7 +49,7 @@ def test_unknown_relabel_category(client):
     assert ingest(client).status_code == 200
     response = relabel(client, revision(client), "UNKNOWN")
     assert response.status_code == 422
-    assert response.json()["detail"] == "Category not in domain schema: UNKNOWN"
+    assert response.json()["detail"] == "Category not in domain schema"
 
 
 def test_valid_relabel_category(client):

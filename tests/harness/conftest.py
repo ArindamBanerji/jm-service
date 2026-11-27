@@ -23,20 +23,13 @@ def pytest_runtest_setup(item):
     if sys.platform == "win32":
         # asyncpg's teardown can raise a late Proactor socket reset; Playwright
         # subprocesses require Proactor. Choose per test before async fixtures.
-        policy = (asyncio.WindowsProactorEventLoopPolicy if "browser" in item.path.parts
+        policy = (asyncio.WindowsProactorEventLoopPolicy if "browser" in item.path.parts or item.path.name == "test_s28_s32.py"
                   else asyncio.WindowsSelectorEventLoopPolicy)
         asyncio.set_event_loop_policy(policy())
 
 
 def pytest_addoption(parser):
     parser.addoption("--harness-sqlite", action="store_true", help="Run advisory SQLite compatibility lane")
-
-
-def pytest_configure(config):
-    for owner in "abc":
-        config.addinivalue_line("markers", f"prompt_{owner}: owned by Prompt {owner.upper()}")
-    config.addinivalue_line("markers", "sqlite_advisory: selected SQLite compatibility run")
-    config.addinivalue_line("markers", "sqlite_divergence(reason): documented dialect-specific assertion")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -77,9 +70,13 @@ async def wire(factory, db_engine, tmp_path, monkeypatch) -> AsyncIterator[Wire]
         "ADMIN_API_KEY": "harness-admin", "LABEL_STUDIO_TOKEN": "harness-ls",
         "LABEL_STUDIO_TENANT_ID": factory.tenant, "LABEL_STUDIO_DOMAIN_ID": "studio",
         "LS_CONFIG_PATH": str(tmp_path / "connector.json"), "PADDLE_SANDBOX": "true",
-        "PADDLE_WEBHOOK_SECRET": "", "LS_FACTOR_MAP": '{"quality":"data.quality","difficulty":"data.difficulty"}',
+        "PADDLE_WEBHOOK_SECRET": "harness-secret", "LS_FACTOR_MAP": '{"quality":"data.quality","difficulty":"data.difficulty"}',
+        "WEBHOOK_ENCRYPTION_KEY": "v3OuRMPdfFgUyo7ymalbyeksLJG-wHiStLvtp0oSrLI=",
     }.items():
         monkeypatch.setenv(name, value)
+    async def idle_scheduler() -> None:
+        await asyncio.Event().wait()
+    monkeypatch.setattr(jm_service, "scheduler_loop", idle_scheduler)
     key = await factory.user()
     app = jm_service.app
 

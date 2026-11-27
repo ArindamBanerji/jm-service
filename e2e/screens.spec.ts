@@ -42,8 +42,7 @@ test.describe('Health & API', () => {
 test.describe('Navigation', () => {
   test('root redirects to upload', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/upload');
+    await expect(page).toHaveURL(/#\/upload$/);
   });
 
   test('sidebar has all nav links', async ({ page }) => {
@@ -54,14 +53,29 @@ test.describe('Navigation', () => {
   });
 
   test('all hash routes are reachable', async ({ page }) => {
-    const routes = ['/#/upload', '/#/queue', '/#/dashboard', '/#/annotators', '/#/health'];
-    for (const route of routes) {
-      await page.goto(route);
-      await page.waitForTimeout(300);
-      // Page should not show a blank body
-      const text = await page.locator('body').innerText();
-      expect(text.trim().length).toBeGreaterThan(0);
+    let sdkRequests = 0;
+    await page.route('https://cdn.paddle.com/paddle/v2/paddle.js', async route => {
+      sdkRequests += 1;
+      await route.fulfill({ contentType: 'text/javascript', body: `
+        window.Paddle = {
+          Environment: { set(value) { document.documentElement.dataset.paddleEnvironment = value; } },
+          Initialize(options) { document.documentElement.dataset.paddleSeller = String(options.seller); }
+        };
+      ` });
+    });
+    const headings = {
+      upload: 'Start with your labels.', queue: 'Scored Queue', dashboard: 'Dashboard',
+      annotators: 'Annotator Profiles', health: 'Label Health Report',
+    };
+    for (const [route, name] of Object.entries(headings)) {
+      await page.goto('/#/' + route);
+      await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
     }
+    expect(sdkRequests).toBe(0);
+    await page.goto('/?_ptxn=txn_test123#/settings');
+    await expect(page.locator('html')).toHaveAttribute('data-paddle-environment', 'sandbox');
+    await expect(page.locator('html')).toHaveAttribute('data-paddle-seller', '161556');
+    expect(sdkRequests).toBe(1);
   });
 });
 

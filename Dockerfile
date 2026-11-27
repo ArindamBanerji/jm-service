@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py ./
 COPY label_health/ label_health/
 COPY db/ db/
+COPY backend/static/dlj_client.py backend/static/dlj_client.py
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 COPY docker-entrypoint.sh ./
 RUN mkdir -p /data && chmod +x docker-entrypoint.sh
@@ -36,4 +37,3 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.getenv('PORT', '8000') + '/v1/health')" || exit 1
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
-# cache-bust

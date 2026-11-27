@@ -18,6 +18,7 @@ def detail(client, domain="demo", label="L1", headers=None):
 
 
 @pytest.mark.asyncio
+@pytest.mark.sqlite_only
 async def test_old_schema_migration_repeats(tmp_path, monkeypatch):
     db_path = Path(tmp_path) / "old.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path.as_posix()}")

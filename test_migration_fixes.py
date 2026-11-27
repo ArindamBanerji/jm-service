@@ -19,7 +19,7 @@ pytestmark = pytest.mark.asyncio
 TIMESTAMPS = {
     "label_log": ("revision_at",),
     "api_keys": ("cancelled_at", "trial_expiring_email_sent_at", "trial_expired_email_sent_at",
-                 "paddle_event_occurred_at"),
+                 "paddle_event_occurred_at", "email_verified_at"),
 }
 
 
@@ -219,3 +219,32 @@ async def test_rebuilt_parent_enforces_foreign_key_and_cascade(db):
             await conn.execute(insert_child.values(label_log_id=parent))
         await conn.execute(delete(LabelLog).where(LabelLog.id == labels[0]))
         assert (await conn.scalars(select(LabelContent.label_log_id))).all() == [labels[1]]
+
+
+async def test_historical_unproved_email_key_is_revoked_once(db):
+    await migration.migrate()
+    async with db.begin() as conn:
+        await conn.exec_driver_sql("ALTER TABLE api_keys DROP COLUMN email_verified_at")
+        await conn.exec_driver_sql("ALTER TABLE api_keys DROP COLUMN reproof_required")
+    key_id = uuid4()
+    async with db.begin() as conn:
+        await conn.execute(ApiKey.__table__.insert().values(
+            id=key_id, key_hash="a" * 64, tenant_id="legacy-signup",
+            tenant_name="Legacy", contact_email="legacy@example.test",
+            is_active=True, subscription_state="trial"))
+    await migration.migrate()
+    await migration.migrate()
+    async with db.connect() as conn:
+        active, digest, reproof = (await conn.execute(select(
+            ApiKey.is_active, ApiKey.key_hash, ApiKey.reproof_required).where(
+            ApiKey.id == key_id))).one()
+        assert active is False
+        assert digest == "a" * 64
+        assert reproof is True
+    async with db.begin() as conn:
+        await conn.execute(update(ApiKey).where(ApiKey.id == key_id).values(
+            is_active=True, email_verified_at=datetime.now(timezone.utc)))
+    await migration.migrate()
+    async with db.connect() as conn:
+        active = await conn.scalar(select(ApiKey.is_active).where(ApiKey.id == key_id))
+        assert active is True

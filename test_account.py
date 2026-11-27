@@ -8,6 +8,7 @@ import json
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
@@ -20,6 +21,8 @@ from auth import scoped_domain_id
 from db.connection import get_db
 from db.models import ApiKey, Base, Domain
 from labeling_router import router as labeling_router
+
+pytestmark = pytest.mark.sqlite_only
 
 
 @contextmanager
@@ -152,7 +155,7 @@ def test_checkout_webhook_refreshes_tier(tmp_path, monkeypatch):
                 calls.append((url, kwargs))
                 class Reply:
                     def raise_for_status(self): pass
-                    def json(self): return {"data": {"id": "txn_account_test", "checkout": {"url": "https://checkout.paddle.com/test"}}}
+                    def json(self): return {"data": {"id": "txn_accounttest", "checkout": {"url": "https://checkout.paddle.com/test"}}}
                 return Reply()
         monkeypatch.setattr(billing.httpx, "AsyncClient", lambda **_kwargs: FakeClient())
         monkeypatch.setenv("PADDLE_API_KEY", "test")
@@ -165,7 +168,7 @@ def test_checkout_webhook_refreshes_tier(tmp_path, monkeypatch):
         assert custom["tenant_id"] == "tenant-a" and custom["key_id"]
         payload = {"event_type": "subscription.created", "event_id": "evt-account",
                    "occurred_at": "2026-01-01T00:00:00Z", "data": {
-            "id": "sub-1", "customer_id": "customer-1", "custom_data": custom,
+            "id": "sub-1", "customer_id": "customer-1", "transaction_id": "txn_accounttest", "custom_data": custom,
             "items": [{"product": {"name": "DLJ Starter"}}]}}
         body = json.dumps(payload).encode()
         ts = "1234567890"

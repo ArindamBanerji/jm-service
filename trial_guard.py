@@ -1,17 +1,16 @@
 """Trial expiry and transactional label-volume enforcement."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ApiKey
+from db.entitlement import UPGRADE_URL, entitlement_decision, expired_trial_error, require_payer_eligibility, resolve_entitlement
 
 TRIAL_DAYS = 14
 DAILY_TRIAL_CAP = 50
-UPGRADE_URL = "https://dlj.dakshineshwari.net/#/settings"
 
 TIER_MONTHLY_CAPS: dict[str, int | None] = {
     "trial": None,
@@ -23,29 +22,9 @@ TIER_MONTHLY_CAPS: dict[str, int | None] = {
 }
 
 
-def _utc_timestamp(value: datetime) -> datetime:
-    """SQLite loads naive UTC timestamps; PostgreSQL preserves their zone."""
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
-
-
 def check_trial_expiry(api_key_record: ApiKey) -> None:
-    if api_key_record.subscription_state == "trial_expired":
-        raise HTTPException(402, detail={"error": "trial_expired",
-                                         "message": "Your 14-day free trial has ended. Upgrade to continue scoring.",
-                                         "upgrade_url": UPGRADE_URL})
-    if (api_key_record.tier or "trial") != "trial":
-        return
-    created = api_key_record.created_at
-    if created is None:
-        return
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) > created + timedelta(days=TRIAL_DAYS):
-        raise HTTPException(402, detail={
-            "error": "trial_expired",
-            "message": "Your 14-day free trial has ended. Upgrade to continue scoring.",
-            "upgrade_url": UPGRADE_URL,
-        })
+    if entitlement_decision(api_key_record).state == "trial_expired":
+        raise expired_trial_error()
 
 
 def check_volume_cap(api_key_record: ApiKey) -> dict[str, str] | None:
@@ -68,23 +47,21 @@ def check_volume_cap(api_key_record: ApiKey) -> dict[str, str] | None:
     return None
 
 
-async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None:
+async def reserve_label_capacity(session: AsyncSession, locked_payer: ApiKey | None = None) -> dict[str, str] | None:
     """Reserve one scored label in the caller's transaction, locking the API key row."""
-    key_hash = session.info.get("api_key_hash")
-    payer_key_id = session.info.get("payer_key_id")
-    if not key_hash and payer_key_id is None:
+    tenant_id = session.info.get("tenant_id")
+    if not isinstance(tenant_id, str):
         raise HTTPException(401, detail="Invalid API key")
-    payer_filter = ApiKey.id == payer_key_id if payer_key_id is not None else ApiKey.key_hash == key_hash
-    record = await session.scalar(select(ApiKey).where(
-        payer_filter, ApiKey.is_active.is_(True)).with_for_update()
-        .execution_options(populate_existing=True))
-    if record is None:
-        raise HTTPException(401, detail="Invalid API key")
-    state = record.subscription_state
-    if state in {"past_due", "paused"}:
-        raise HTTPException(402, detail={"error": state, "message": "Subscription is not active"})
-    if state == "cleaned_up":
-        raise HTTPException(403, detail="Subscription was cleaned up")
+    if locked_payer is None:
+        record = await resolve_entitlement(tenant_id, session, for_update=True, purpose="write")
+        state = entitlement_decision(record).state
+    else:
+        record = locked_payer
+        if record.tenant_id != tenant_id or record.id != session.info.get("payer_key_id"):
+            raise HTTPException(403, "Project payer is unavailable")
+        state = require_payer_eligibility(
+            record, "write" if session.info.get("project_role") == "owner" else "member_write"
+        ).state
 
     now = datetime.now(timezone.utc)
     day_key = now.strftime("%Y-%m-%d")
@@ -96,9 +73,7 @@ async def reserve_label_capacity(session: AsyncSession) -> dict[str, str] | None
         record.labels_month_key = month_key
         record.labels_this_month = 0
 
-    cancelled = record.cancelled_at
-    cancellation_effective = state == "cancelled" or (cancelled is not None and _utc_timestamp(cancelled) <= now)
-    check_trial_expiry(record)
+    cancellation_effective = state == "cancelled"
     if (record.tier or "trial") == "trial" or cancellation_effective:
         if record.labels_today >= DAILY_TRIAL_CAP:
             raise HTTPException(429, detail={

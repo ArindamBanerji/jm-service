@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
 
-test.use({ baseURL: 'http://localhost:8080' })
 
 const categories = ['PERSON', 'ORG'].map(category => ({
   category, tier: 'amber', verified_count: 0, accuracy: null,

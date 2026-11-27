@@ -70,6 +70,8 @@ test('ImageViewer renders a provided image and category', async ({ page }) => {
   const state = await mock(page, { content: image('https://images.example.test/source.png') })
   await page.route('https://images.example.test/source.png', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="blue"/></svg>' }))
   await page.goto('/#/review/L001')
+  await expect(page.getByRole('region', { name: 'Image classification' }).locator('img')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Load external image' }).click()
   await expect(page.getByRole('region', { name: 'Image classification' }).getByRole('img', { name: 'Source image for classification' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Image classification' })).toContainText('Category: PERSON')
   expect(state.errors).toEqual([])
@@ -79,6 +81,7 @@ test('ImageViewer reports a broken image without edit controls', async ({ page }
   const state = await mock(page, { content: image('https://images.example.test/missing.png') })
   await page.route('https://images.example.test/missing.png', route => route.fulfill({ status: 404, body: '' }))
   await page.goto('/#/review/L001')
+  await page.getByRole('button', { name: 'Load external image' }).click()
   await expect(page.getByRole('alert').filter({ hasText: 'Image not available' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Image classification' }).getByRole('button')).toHaveCount(0)
   expect(state.errors).toEqual([])
@@ -141,7 +144,7 @@ test('Settings guidelines editor saves text through PUT', async ({ page }) => {
 test('GuidelinesPanel explains when no guidance is configured', async ({ page }) => {
   const state = await mock(page, { guidelines: '' }); await page.goto('/#/review/L001')
   await page.getByRole('button', { name: 'Guidelines' }).click()
-  await expect(page.getByRole('region', { name: 'Annotation guidelines' })).toContainText('No guidelines configured')
+  await expect(page.getByRole('region', { name: 'Annotation guidelines' })).toContainText('No guidelines yet')
   expect(state.errors).toEqual([])
 })
 
@@ -296,8 +299,12 @@ test('pagination loads a second page and disables Next at the end', async ({ pag
 test('pagination Previous returns to the first page', async ({ page }) => {
   const state = await mock(page, { rows: 55 }); await page.goto('/#/queue')
   await expect(page.locator('tbody tr')).toHaveCount(50)
-  await page.getByRole('button', { name: 'Next' }).click(); await expect(page.locator('tbody tr')).toHaveCount(5)
-  await page.getByRole('button', { name: 'Previous' }).click(); await expect(page.locator('tbody tr')).toHaveCount(50)
+  const nextPage = page.waitForResponse(r => new URL(r.url()).searchParams.get('offset') === '50')
+  await page.getByRole('button', { name: 'Next' }).click(); await nextPage
+  await expect(page.locator('tbody tr')).toHaveCount(5)
+  const firstPage = page.waitForResponse(r => new URL(r.url()).searchParams.get('offset') === '0')
+  await page.getByRole('button', { name: 'Previous' }).click(); await firstPage
+  await expect(page.locator('tbody tr')).toHaveCount(50)
   await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled()
   expect(state.errors).toEqual([])
 })

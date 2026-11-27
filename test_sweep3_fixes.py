@@ -2,11 +2,13 @@
 import asyncio
 import hashlib
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
+from starlette.datastructures import UploadFile
 
 import label_health.api as health_api
 import label_studio
@@ -66,18 +68,20 @@ def test_cancel_without_items_still_sets_cancelled_at(client, kind, extra):
     assert read_key(client).cancelled_at is not None
 
 
-def test_implicit_bulk_approve_sets_true(client):
+def test_implicit_bulk_approve_preserves_unknown_outcome(client):
     assert ingest(client).status_code == 200
     response = client.post("/v1/labels/medical/bulk-verify", json={"label_ids": ["L1"], "action": "approve"})
     assert response.status_code == 200, response.text
-    assert detail(client)["verified_outcome"] is True
+    assert response.json()["errors"] == [{"label_id": "L1", "error": "outcome_required"}]
+    assert detail(client)["verified_outcome"] is None
 
 
-def test_implicit_bulk_reject_sets_false(client):
+def test_implicit_bulk_reject_preserves_unknown_outcome(client):
     assert ingest(client).status_code == 200
     response = client.post("/v1/labels/medical/bulk-verify", json={"label_ids": ["L1"], "action": "reject"})
     assert response.status_code == 200, response.text
-    assert detail(client)["verified_outcome"] is False
+    assert response.json()["errors"] == [{"label_id": "L1", "error": "outcome_required"}]
+    assert detail(client)["verified_outcome"] is None
 
 
 def attach_spans(client):
@@ -192,12 +196,11 @@ def test_connector_revision_copies_tags(client, monkeypatch):
 
 def test_busy_report_worker_rejects_before_read(monkeypatch):
     monkeypatch.setattr(health_api, "_slots", asyncio.Semaphore(0))
-    class UnreadFile:
-        filename = "labels.csv"
-        async def read(self, limit):
+    class UnreadFile(UploadFile):
+        async def read(self, size: int = -1) -> bytes:
             raise AssertionError("upload body was read")
     with pytest.raises(HTTPException) as error:
-        asyncio.run(health_api._analyze(UnreadFile(), "json"))
+        asyncio.run(health_api._analyze(UnreadFile(BytesIO(), filename="labels.csv"), "json"))
     assert error.value.status_code == 503
     app = FastAPI()
     app.include_router(health_api.router)
@@ -208,13 +211,12 @@ def test_busy_report_worker_rejects_before_read(monkeypatch):
 
 def test_oversized_report_upload_is_rejected(monkeypatch):
     monkeypatch.setattr(health_api, "_slots", asyncio.Semaphore(1))
-    class OversizedFile:
-        filename = "labels.csv"
-        async def read(self, limit):
-            assert limit == health_api._MAX_BYTES + 1
-            return b"a" * limit
+    class OversizedFile(UploadFile):
+        async def read(self, size: int = -1) -> bytes:
+            assert size == health_api._MAX_BYTES + 1
+            return b"a" * size
     with pytest.raises(HTTPException) as error:
-        asyncio.run(health_api._analyze(OversizedFile(), "json"))
+        asyncio.run(health_api._analyze(OversizedFile(BytesIO(), filename="labels.csv"), "json"))
     assert error.value.status_code == 413
     assert health_api._slots._value == 1
     app = FastAPI()

@@ -58,7 +58,6 @@ async def test_known_failure_billing_intake_deadline(monkeypatch):
 
 @pytest.mark.anyio
 @pytest.mark.prompt_c
-@pytest.mark.xfail(strict=True, raises=KnownGap, reason="B6-02: ambiguous updates need reconciliation")
 async def test_known_failure_connector_order(wire: Wire):
     path = "/v1/label-studio/webhook"
     await wire.request("POST", path, headers=HEADERS, json=annotation(stamp="2026-01-01T12:00:00Z"))
@@ -77,7 +76,6 @@ async def test_known_failure_connector_order(wire: Wire):
 
 @pytest.mark.anyio
 @pytest.mark.prompt_c
-@pytest.mark.xfail(strict=True, raises=KnownGap, reason="B7-01: an established source task is immutable")
 async def test_known_failure_task_binding(wire: Wire):
     path = "/v1/label-studio/webhook"
     await wire.request("POST", path, headers=HEADERS, json=annotation())
