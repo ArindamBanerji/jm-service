@@ -73,7 +73,7 @@ test.describe('Navigation', () => {
     }
     expect(sdkRequests).toBe(0);
     await page.goto('/?_ptxn=txn_test123#/settings');
-    await expect(page.locator('html')).toHaveAttribute('data-paddle-environment', 'sandbox');
+    await expect(page.locator('html')).not.toHaveAttribute('data-paddle-environment', /.+/);
     await expect(page.locator('html')).toHaveAttribute('data-paddle-seller', '161556');
     expect(sdkRequests).toBe(1);
   });

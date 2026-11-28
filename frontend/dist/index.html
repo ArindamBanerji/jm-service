@@ -18,7 +18,6 @@
         const sdk = document.createElement('script');
         sdk.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
         sdk.onload = () => {
-          Paddle.Environment.set('sandbox');
           Paddle.Initialize({ seller: 161556 });
         };
         document.head.appendChild(sdk);

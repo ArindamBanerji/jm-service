@@ -1911,3 +1911,12 @@ Three P1s, six P2s and one P3 were fixed. Reviewed registration through scoring 
 - Backend and design — `auth.py`, `email_service.py`, `db/models.py`, `db/migrate.py`, `projects_router.py`, `labeling_router.py`, `docs/design/dlj_product_design_v1.md`, `docs/session_state.md`.
 - Frontend — `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/copyKey.ts`, `frontend/src/components/SidebarKey.tsx`, `frontend/src/pages/GuidePage.tsx`, `frontend/src/screens/Signup.tsx`, `Projects.tsx`, `ReviewCard.tsx`, `Settings.tsx`, `Upload.tsx` in the same screens directory, and the built `frontend/dist/index.html`.
 - Tests — `tests/harness/test_key_recovery.py`, `tests/harness/browser/test_key_recovery_flow.py`, `tests/e2e/key_recovery.spec.ts`, `tests/harness/test_prompt_a_projects.py`, `tests/harness/test_prompt_e_webhooks.py`, `tests/harness/test_r2_fixes.py`, `tests/test_modality_schema.py`.
+
+## Prompt 15 — Remove Paddle Sandbox Mode
+
+**Date:** 2026-11-28
+- Removed `Paddle.Environment.set('sandbox')` from frontend/index.html
+- Rebuilt frontend/dist/
+- Paddle checkout now hits production
+- PW: 202 passed
+- Engine hash: unchanged

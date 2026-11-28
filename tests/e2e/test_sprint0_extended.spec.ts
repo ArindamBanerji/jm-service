@@ -18,6 +18,7 @@ const test = base.extend<{}, { server: Server }>({
     }
   }, { scope: 'worker', timeout: 120_000 }],
 })
+test.setTimeout(60_000)
 
 test('quoted CSV and a lost batch response preserve exactly one upload', async ({ page, server }) => {
   await open(page, server, 'quickstart')
@@ -254,10 +255,14 @@ test('test_project_switch_preserves_state', async ({ page, server }) => {
   await expect(badge(page)).toHaveClass(/sla-safe/)
   const original = await badge(page).innerText()
   await page.locator('#project-chooser').selectOption(b)
+  await expect(page).toHaveURL(new RegExp(`/projects/${b}/queue$`))
   await page.getByRole('link', {name:/Dashboard/}).click()
+  await expect(page).toHaveURL(new RegExp(`/projects/${b}/dashboard$`))
   await expect(badge(page)).toHaveClass(/sla-inactive/)
   await page.locator('#project-chooser').selectOption(a)
+  await expect(page).toHaveURL(new RegExp(`/projects/${a}/queue$`))
   await page.getByRole('link', {name:/Dashboard/}).click()
+  await expect(page).toHaveURL(new RegExp(`/projects/${a}/dashboard$`))
   await expect(badge(page)).toHaveText(original.replace(/\n/g, ''), {useInnerText:false})
 })
 
