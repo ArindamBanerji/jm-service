@@ -449,6 +449,7 @@ async def migrate() -> None:
                         "paddle_event_id": "VARCHAR(200)",
                         "contact_email": "VARCHAR(200)",
                         "signup_email": "VARCHAR(200)",
+                        "recovery_token_hash": "VARCHAR(64)",
                         "signup_reconciliation_reference": "VARCHAR(200)",
                         "labels_this_month": "INTEGER NOT NULL DEFAULT 0",
                         "labels_month_key": "VARCHAR(7) NOT NULL DEFAULT ''",
@@ -457,11 +458,14 @@ async def migrate() -> None:
                     }
                     _upgrade_timestamps(sync_connection, "api_keys", (
                         "trial_expiring_email_sent_at", "trial_expired_email_sent_at",
-                        "cancelled_at", "paddle_event_occurred_at", "email_verified_at"))
+                        "cancelled_at", "paddle_event_occurred_at", "email_verified_at", "recovery_token_expires"))
                     for column, definition in additions.items():
                         if column not in names:
                             sync_connection.execute(text(
                                 f"ALTER TABLE api_keys ADD COLUMN {column} {definition}"))
+                    sync_connection.execute(text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_recovery_token "
+                        "ON api_keys (recovery_token_hash) WHERE recovery_token_hash IS NOT NULL"))
                     # Before challenge-based issuance, signup sent the same live key to
                     # an unverified requester and mailbox. Neither holder can be trusted.
                     # Require a mailbox proof and rotate the digest before reuse.

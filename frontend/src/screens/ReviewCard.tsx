@@ -92,9 +92,7 @@ export default function ReviewCard() {
     if (!domainId || !labelId) { setBusy(false); operation.finish(); return }
     setBusy(true); setError(null)
     try {
-      const [detail, rows, autonomy] = await Promise.all([
-        getLabelDetail(domainId, labelId, controller.signal, projectId, operation.credential ?? undefined), getPending(domainId, { limit: 200 }, controller.signal, projectId, operation.credential ?? undefined), getAutonomy(domainId, controller.signal, projectId, operation.credential ?? undefined),
-      ])
+      const detail = await getLabelDetail(domainId, labelId, controller.signal, projectId, operation.credential ?? undefined)
       if (controller.signal.aborted || !operation.isCurrent() || currentRoute.current.domainId !== domainId || currentRoute.current.labelId !== labelId) return
       if (detail.label_id !== currentRoute.current.labelId) {
         if (preserveDraft.current && draftToPreserve.current?.domainId === domainId &&
@@ -103,7 +101,6 @@ export default function ReviewCard() {
         navigate(path(`review/${encodeURIComponent(detail.label_id)}`), { replace: true })
         return
       }
-      setPending(rows)
       setItem(detail)
       setNote(detail.review_notes ?? '')
       const savedDraft = preserveDraft.current && draftToPreserve.current?.domainId === domainId &&
@@ -118,13 +115,35 @@ export default function ReviewCard() {
         preserveDraft.current = false
         draftToPreserve.current = null
       }
-      setEntityTypes(autonomy.categories.map(status => status.category))
       setLoadedDomain(domainId)
-      setTier(autonomy.categories.find(status => status.category === detail.category) ?? null)
     } catch (cause) { if (!controller.signal.aborted && currentRoute.current.labelId === labelId && currentRoute.current.domainId === domainId) setError(String(cause)) }
     finally { if (!controller.signal.aborted && currentRoute.current.labelId === labelId && currentRoute.current.domainId === domainId) setBusy(false); operation.finish() }
   }, [domainId, projectId, labelId, navigate])
   useEffect(() => { void load(); return () => loadController.current?.abort() }, [load])
+  useEffect(() => {
+    setEntityTypes([])
+    setTier(null)
+    if (!item || item.label_id !== labelId || loadedDomain !== domainId) return
+    const owner = captureOperation(domainId, projectId)
+    getAutonomy(domainId, owner.signal, projectId, owner.credential ?? undefined)
+      .then(({ categories }) => {
+        if (!owner.isCurrent()) return
+        setEntityTypes(categories.map(status => status.category))
+        setTier(categories.find(status => status.category === item.category) ?? null)
+      })
+      .catch(() => { /* The label can still be reviewed without tier information. */ })
+      .finally(owner.finish)
+    return owner.finish
+  }, [domainId, projectId, item, labelId, loadedDomain])
+  useEffect(() => {
+    if (!domainId || smartReview) return
+    const owner = captureOperation(domainId, projectId)
+    getPending(domainId, { limit: 2 }, owner.signal, projectId, owner.credential ?? undefined)
+      .then(rows => { if (owner.isCurrent()) setPending(rows) })
+      .catch(() => { /* After verification the queue remains available. */ })
+      .finally(owner.finish)
+    return owner.finish
+  }, [domainId, projectId, labelId, smartReview])
   const spansDirty = item !== null && JSON.stringify(editedSpans) !==
     JSON.stringify(item.content?.content_type === 'text_ner' ? item.content.spans : [])
   const tagsDirty = item !== null && JSON.stringify(editedTags) !==

@@ -359,8 +359,8 @@ function decode(path: string, value: unknown, method = 'GET'): void {
     if (!Array.isArray(value)) throw new ApiError('The server returned incompatible domain data. Refresh and retry.', 502)
     value.forEach(row => requireFields(row, { id: 'string' }))
   } else if (path === '/account/domains/resolve') requireFields(value, { public_domain_id: 'string' })
-  else if (path === '/auth/confirm') requireFields(value, { api_key: 'string', tenant_id: 'string' })
-  else if (path === '/auth/register') requireFields(value, { message: 'string' })
+  else if (path === '/auth/confirm' || path === '/auth/recover/confirm') requireFields(value, { api_key: 'string', tenant_id: 'string' })
+  else if (path === '/auth/register' || path === '/auth/recover') requireFields(value, { message: 'string' })
   else if (path === '/label-health/analyze') {
     requireFields(value, { metadata: 'object', warnings: 'array' })
     requireFields((value as { metadata: unknown }).metadata, { row_count: 'number', verified_count: 'number', factor_count: 'number' })
@@ -397,7 +397,7 @@ function decode(path: string, value: unknown, method = 'GET'): void {
 
 async function request<T>(path: string, init?: RequestInit, onResponse?: (response: Response) => void,
   credential?: string, expectedFormat: 'json' | 'html' | 'pdf' | 'csv' = 'json'): Promise<T> {
-  const authenticated = !path.startsWith('/label-health/') && path !== '/auth/register' && path !== '/auth/confirm'
+  const authenticated = !path.startsWith('/label-health/') && !['/auth/register', '/auth/confirm', '/auth/recover', '/auth/recover/confirm'].includes(path)
   const apiKey = credential ?? (localStorage.getItem('rgi-api-key') || (import.meta.env.DEV ? import.meta.env.VITE_API_KEY : ''))
   const headers = new Headers(init?.headers)
   if (authenticated && apiKey) headers.set('X-Api-Key', apiKey)
@@ -448,10 +448,13 @@ export const ingestBatch = (body: IngestBatchRequest, credential?: string, signa
     request<IngestBatchResponse>('/labels/ingest/batch', { ...json(body), signal }, undefined, credential)
 export const seedSample = (domainId: string, credential?: string, signal?: AbortSignal) => request<SampleSeedResponse>(`/labels/${id(domainId)}/sample`, { method: 'POST', signal }, undefined, credential)
 export const hasApiKey = () => Boolean(localStorage.getItem('rgi-api-key') || (import.meta.env.DEV && import.meta.env.VITE_API_KEY))
-  export interface RegistrationResponse { api_key: string; tenant_id: string; tier: string; message: string }
+export interface KeyReceipt { api_key: string; tenant_id: string; message: string }
+export interface RegistrationResponse extends KeyReceipt { tier: string }
 export interface RegistrationStart { message: string }
 export const registerAccount = (email: string, name?: string) => request<RegistrationStart>('/auth/register', json({ email, name: name || undefined }))
 export const confirmAccount = (token: string) => request<RegistrationResponse>('/auth/confirm', json({ token }))
+export const recoverKey = (email: string) => request<RegistrationStart>('/auth/recover', json({ email }))
+export const confirmRecovery = (token: string) => request<KeyReceipt>('/auth/recover/confirm', json({ token }))
 export const verifyLabel = (body: VerifyRequest, credential?: string, signal?: AbortSignal, projectId?: string | null) =>
   request<VerifyResponse>(projectId ? `${labelsRoot(body.domain_id, projectId)}/verify` : '/labels/verify',
     { ...json(projectId ? { label_id: body.label_id, actual_action: body.actual_action,

@@ -70,22 +70,28 @@ export default function Settings() {
     } finally { operation.finish(); setGuidelinesSaving(false) }
   }
 
+  const refreshId = useRef(0)
   const refresh = useCallback(async () => {
+    const attempt = ++refreshId.current
     if (!localStorage.getItem('rgi-api-key')) { setAccount(null); setDomains([]); return }
     const operation = captureOperation(domainId, null)
+    const current = () => attempt === refreshId.current && operation.isCurrent()
     try {
-      const [summary, names] = await Promise.all([
-        getAccount(operation.credential ?? undefined, operation.signal),
-        getAccountDomains(operation.credential ?? undefined, operation.signal),
-      ])
-      if (!operation.isCurrent()) return
-      setAccount(summary); setDomains(names); setError(null)
+      const summary = await getAccount(operation.credential ?? undefined, operation.signal)
+      if (!current()) return
+      setAccount(summary); setError(null)
       const previous = sessionStorage.getItem(pendingKey)
       if (previous && summary.tier === previous) {
         sessionStorage.removeItem(pendingKey)
         setPending(false)
       }
-    } catch (cause) { if (operation.isCurrent()) { setAccount(null); setDomains([]); setError(String(cause)) } }
+      try {
+        const names = await getAccountDomains(operation.credential ?? undefined, operation.signal)
+        if (current()) setDomains(names)
+      } catch {
+        if (current()) { setDomains([]); setError('The domain list could not be loaded. Use Refresh account to retry.') }
+      }
+    } catch (cause) { if (current()) { setAccount(null); setDomains([]); setError(String(cause)) } }
     finally { operation.finish() }
   }, [domainId])
 
@@ -153,7 +159,7 @@ export default function Settings() {
   const dayKey = usage.day_key ?? '—'
   const monthKey = usage.month_key ?? '—'
   return <div className="page"><div className="eyebrow">Account</div><h1>Settings</h1><p className="subtitle">Manage your local key, current domain, and subscription.</p>
-    <div className="grid-2"><section className="card card-pad"><h2 className="section-title">API key</h2><p>{configured ? 'Key configured on this browser' : 'No key configured'}</p><p className="muted">Your key is stored locally in this browser. The service cannot show it again.</p><label className="field">{configured ? 'Replace local key' : 'Enter API key'}<input type="password" autoComplete="off" value={keyInput} onChange={event => setKeyInput(event.target.value)} /></label><div className="button-row" style={{ marginTop: 12 }}><button className="button" onClick={storeKey}>Save key</button>{configured && <button className="button secondary" onClick={clearKey}>Clear local key</button>}</div>{!configured && <p><Link to="/signup">Start a free trial →</Link></p>}</section>
+    <div className="grid-2"><section className="card card-pad"><h2 className="section-title">API key</h2><p>{configured ? 'Key configured on this browser' : 'No key configured'}</p><p className="muted">Copy or reveal this browser’s saved key in the sidebar. Lost access? <Link to="/signup?recover=1">Recover your API key</Link> using your verified email.</p><label className="field">{configured ? 'Replace local key' : 'Enter API key'}<input type="password" autoComplete="off" value={keyInput} onChange={event => setKeyInput(event.target.value)} /></label><div className="button-row" style={{ marginTop: 12 }}><button className="button" onClick={storeKey}>Save key</button>{configured && <button className="button secondary" onClick={clearKey}>Clear local key</button>}</div>{!configured && <p><Link to="/signup">Start a free trial →</Link></p>}</section>
       <section className="card card-pad"><h2 className="section-title">Account</h2>{account ? <><p><strong>{account.tenant_name}</strong> · {account.tier}</p><p className="muted">Key status: {account.is_active ? 'Active' : 'Inactive'}<br />Tenant ID: {account.tenant_id}<br />Created: {date(account.created_at)}</p>{account.cancelled_at && <div className="notice">Subscription cancelled on {date(account.cancelled_at)}. Your data is retained for 30 days.</div>}{account.tier === 'trial' && <div className="notice">{account.trial_expired ? 'Trial expired' : 'Free trial active'} · ends {account.trial_expires_at ? date(account.trial_expires_at) : '—'}. Trial scoring is limited to 50 labels per day.</div>}</> : <p className="muted">Add a valid key to see account details.</p>}<button className="button secondary" onClick={() => void refresh()} disabled={!configured}>Refresh account</button></section></div>
     {account && <div className="grid-2" style={{ marginTop: 18 }}><UsageBoundary key={account.tenant_id}><section className="card card-pad"><h2 className="section-title">Key usage</h2><p>Today ({dayKey} UTC): <strong>{labelsToday.toLocaleString()}</strong>{dailyCap !== null && ` / ${dailyCap.toLocaleString()}`}</p><p>This month ({monthKey} UTC): <strong>{labelsMonth.toLocaleString()}</strong> / {account.tier === 'trial' ? '50/day trial limit' : monthlyCap === null ? 'Unlimited' : monthlyCap.toLocaleString()}</p><p className="muted">These are counters for this API key. Domain totals are on the Dashboard.</p></section></UsageBoundary>
       <section className="card card-pad"><h2 className="section-title">Subscription</h2>{pending && <div className="notice">Awaiting checkout confirmation. Your tier will update when Paddle confirms the subscription.</div>}<p className="muted">Choose a plan to open Paddle checkout. Your current tier remains in effect until confirmed.</p><div className="button-row"><label className="field">Plan<select value={tier} onChange={event => setTier(event.target.value)}>{tiers.map(value => <option key={value} value={value}>{value}</option>)}</select></label><button className="button" onClick={() => void checkout()} disabled={busy}>Upgrade with Paddle</button></div></section></div>}

@@ -85,7 +85,7 @@ async def test_project_member_cannot_edit_settings(wire: Wire):
 async def test_only_owner_can_archive_or_reactivate(wire: Wire):
     project_id = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Review", "public_domain_id": "review",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     admin_key = await wire.factory.user("admin-tenant")
     await wire.request("POST", f"/v1/projects/{project_id}/members", status=201, json={
@@ -142,7 +142,7 @@ async def test_archived_project_blocks_connector_learning(wire: Wire):
 async def test_project_invite_is_mailbox_bound_and_single_use(wire: Wire, monkeypatch):
     project = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Review", "public_domain_id": "review",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     member_key = await wire.factory.user("member-tenant")
     wrong_key = await wire.factory.user("wrong-tenant")
@@ -185,7 +185,7 @@ async def test_project_invite_is_mailbox_bound_and_single_use(wire: Wire, monkey
 async def test_invite_rechecks_issuer_authority(wire: Wire, monkeypatch):
     project = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Review", "public_domain_id": "review",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     admin_key = await wire.factory.user("admin-tenant")
     recipient_key = await wire.factory.user("recipient-tenant")

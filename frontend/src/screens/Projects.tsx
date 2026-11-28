@@ -10,7 +10,7 @@ export default function Projects() {
   const { domainId, projects, projectsLoaded, projectError } = useDomain()
   const [name, setName] = useState('')
   const [alias, setAlias] = useState('')
-  const [factors, setFactors] = useState('factor_quality, factor_difficulty')
+  const [factors, setFactors] = useState('quality, difficulty')
   const [categories, setCategories] = useState('default')
   const [contentType, setContentType] = useState<ContentType>('text')
   const [capabilities, setCapabilities] = useState<ProjectCapabilities | null>(null)
@@ -30,11 +30,16 @@ export default function Projects() {
   const create = async () => {
     const key = localStorage.getItem('rgi-api-key')
     if (!key || busy) return
+    const factorNames = factors.split(',').map(value => value.trim()).filter(Boolean)
+    if (factorNames.length < 2 || factorNames.length > 20 || new Set(factorNames).size !== factorNames.length) {
+      setError('Enter 2–20 distinct factor names, separated by commas.')
+      return
+    }
     const operation = captureOperation(domainId, null)
     setBusy(true); setError(null)
     try {
       const project = await createProject({ name: name.trim(), public_domain_id: alias.trim(),
-        factors: factors.split(',').map(value => value.trim()).filter(Boolean),
+        factors: factorNames,
         categories: categories.split(',').map(value => value.trim()).filter(Boolean),
         content_type: contentType, label_schema: 'single' }, operation.credential ?? undefined, operation.signal)
       if (!operation.isCurrent()) return
@@ -54,11 +59,13 @@ export default function Projects() {
       <label className="field">Project name<input value={name} maxLength={200} onChange={event => setName(event.target.value)} /></label>
       <label className="field">Public ID<input value={alias} maxLength={200} onChange={event => setAlias(event.target.value)} /></label>
       <label className="field">Factors, comma separated<input value={factors} onChange={event => setFactors(event.target.value)} /></label>
+      <small className="muted">Enter 2–20 distinct factor names, such as quality and difficulty. In a CSV, use factor_quality and factor_difficulty as column headers.</small>
       <label className="field">Categories, comma separated<input value={categories} onChange={event => setCategories(event.target.value)} /></label>
       {capabilities?.combinations.some(pair => pair.content_type === 'image' && pair.label_schema === 'single') && <label className="field">Content type<select value={contentType} onChange={event => setContentType(event.target.value as ContentType)}><option value="text">Text</option><option value="image">Image</option></select></label>}
       <label className="field">Label schema<select value="single" disabled><option value="single">Single</option><option disabled>Multi — Coming soon</option><option disabled>NER — Coming soon</option></select></label>
       <p className="muted">Choose what reviewers will label. This locks after the first item.</p>
       {contentType === 'image' && <div className="notice">Upload items with image URLs. DLJ scores the annotator&apos;s category decisions, not the image content.</div>}
-      <button className="button" disabled={busy || !name.trim() || !alias.trim()} onClick={() => void create()}>Create project</button>
+      <button className="button" disabled={busy || !localStorage.getItem('rgi-api-key') || !name.trim() || !alias.trim()} onClick={() => void create()}>Create project</button>
+      {!localStorage.getItem('rgi-api-key') && <p><Link to="/signup">Create an account</Link> or <Link to="/signup?recover=1">recover your API key</Link> to create a project.</p>}
     </section></div>
 }

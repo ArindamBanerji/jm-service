@@ -302,6 +302,8 @@ class ApiKey(Base):
     signup_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     signup_reconciliation_reference: Mapped[str | None] = mapped_column(String(200), nullable=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    recovery_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    recovery_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reproof_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     trial_expiring_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     trial_expired_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -315,6 +317,9 @@ class ApiKey(Base):
 Index("uq_api_keys_contact_email", func.lower(ApiKey.contact_email), unique=True,
       postgresql_where=ApiKey.contact_email.is_not(None),
       sqlite_where=ApiKey.contact_email.is_not(None))
+Index("uq_api_keys_recovery_token", ApiKey.recovery_token_hash, unique=True,
+      postgresql_where=ApiKey.recovery_token_hash.is_not(None),
+      sqlite_where=ApiKey.recovery_token_hash.is_not(None))
 Index("uq_api_keys_signup_email", func.lower(ApiKey.signup_email), unique=True,
       postgresql_where=ApiKey.signup_email.is_not(None),
       sqlite_where=ApiKey.signup_email.is_not(None))

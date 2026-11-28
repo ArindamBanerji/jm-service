@@ -10,7 +10,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from limits import RateLimitItemPerHour
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -20,7 +21,7 @@ from db.connection import commit_write, get_db
 from db.models import ApiKey, Domain, ProjectBillingOwner, ProjectMember, SignupChallenge, TenantGuard
 from db.entitlement import entitlement_decision, resolve_entitlement
 from db.tenant_lock import lock_tenant
-from email_service import send_signup_challenge_email
+from email_service import send_recovery_email, send_signup_challenge_email
 from rate_limit import limiter
 
 Session = Annotated[AsyncSession, Depends(get_db)]
@@ -75,6 +76,84 @@ async def register(request: Request, payload: RegisterRequest, session: Session)
 
 class ConfirmRequest(BaseModel):
     token: str = Field(min_length=64, max_length=64)
+
+
+class RecoveryRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_mailbox(cls, value: str) -> str:
+        return RegisterRequest.valid_email(value)
+
+
+_recovery_rate = RateLimitItemPerHour(3)
+_recovery_eligible = (
+    ApiKey.is_active.is_(True), ApiKey.reproof_required.is_(False),
+    ApiKey.email_verified_at.is_not(None), ApiKey.signup_email.is_not(None),
+    ApiKey.subscription_state.is_distinct_from("cleaned_up"),
+)
+
+
+class RecoveryNotice(BaseModel):
+    message: str
+
+
+class RecoveredKey(RecoveryNotice):
+    api_key: str
+    tenant_id: str
+
+
+@signup_router.post("/recover", response_model=RecoveryNotice)
+@limiter.limit("30/hour")
+async def recover(request: Request, payload: RecoveryRequest, background: BackgroundTasks,
+                  session: Session) -> dict[str, str]:
+    """Send a one-time code to the verified signup mailbox. Existing keys stay active."""
+    mailbox = hashlib.sha256(payload.email.encode()).hexdigest()
+    if not limiter.limiter.hit(_recovery_rate, "recover-mailbox", mailbox):
+        raise HTTPException(429, "Recovery request limit reached. Try again in one hour.")
+    token = secrets.token_hex(32)
+    recipient = await session.scalar(update(ApiKey).where(
+        *_recovery_eligible, func.lower(ApiKey.signup_email) == payload.email,
+    ).values(recovery_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+             recovery_token_expires=datetime.now(timezone.utc) + timedelta(minutes=15))
+      .returning(ApiKey.signup_email))
+    await commit_write(session)
+    if recipient is not None:
+        background.add_task(send_recovery_email, recipient, token)
+    return {"message": "Check your email for a recovery code."}
+
+
+class RecoveryConfirmRequest(BaseModel):
+    token: str
+
+    @field_validator("token")
+    @classmethod
+    def valid_code(cls, value: str) -> str:
+        if len(value) != 64 or not re.fullmatch("[0-9a-f]{64}", value):
+            raise HTTPException(401, "Invalid or expired recovery code")
+        return value
+
+
+@signup_router.post("/recover/confirm", response_model=RecoveredKey)
+@limiter.limit("10/minute")
+async def confirm_recovery(request: Request, payload: RecoveryConfirmRequest, session: Session) -> dict[str, str]:
+    """Consume mailbox proof and replace the existing credential in the same transaction."""
+    digest = hashlib.sha256(payload.token.encode()).hexdigest()
+    tenant = await session.scalar(select(ApiKey.tenant_id).where(ApiKey.recovery_token_hash == digest))
+    if tenant is None:
+        raise HTTPException(401, "Invalid or expired recovery code")
+    await lock_tenant(session, tenant)
+    plain = secrets.token_hex(32)
+    rotated = await session.scalar(update(ApiKey).where(
+        *_recovery_eligible, ApiKey.tenant_id == tenant, ApiKey.recovery_token_hash == digest,
+        ApiKey.recovery_token_expires > datetime.now(timezone.utc),
+    ).values(key_hash=hashlib.sha256(plain.encode()).hexdigest(),
+             recovery_token_hash=None, recovery_token_expires=None).returning(ApiKey.tenant_id))
+    if rotated is None:
+        raise HTTPException(401, "Invalid or expired recovery code")
+    await commit_write(session)
+    return {"api_key": plain, "tenant_id": rotated, "message": "Save this key — it cannot be recovered."}
 
 
 @signup_router.post("/confirm", status_code=201)
@@ -384,6 +463,8 @@ async def rotate_key(key_id: UUID, session: Session,
         raise HTTPException(409, "Key is unavailable for rotation")
     plain = secrets.token_hex(32)
     key.key_hash = hashlib.sha256(plain.encode()).hexdigest()
+    key.recovery_token_hash = None
+    key.recovery_token_expires = None
     await commit_write(session)
     return {"api_key": plain, "tenant_id": key.tenant_id}
 

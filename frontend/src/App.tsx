@@ -14,6 +14,7 @@ import Pricing from './screens/Pricing'
 import KeyboardShortcuts from './components/KeyboardShortcuts'
 import Projects from './screens/Projects'
 import ProjectSettings from './screens/ProjectSettings'
+import SidebarKey from './components/SidebarKey'
 
 const Dashboard = lazy(() => import('./screens/Dashboard'))
 const GuidePage = lazy(() => import('./pages/GuidePage'))
@@ -87,6 +88,7 @@ export default function App() {
   useEffect(() => {
     const applyKeyChange = (next: string) => {
       const importWasActive = sessionStorage.getItem('dlj-import-active') === '1'
+      const firstSignIn = !activeKey.current && Boolean(next)
       activeKey.current = next
       window.dispatchEvent(new Event('dlj-account-changing'))
       setProjects([]); setProjectsLoaded(false); setKeyGeneration(value => value + 1)
@@ -98,7 +100,7 @@ export default function App() {
         return
       }
       localStorage.removeItem('rgi-domain')
-      if (location.pathname === '/upload' && importWasActive) {
+      if (location.pathname === '/upload' && (firstSignIn || importWasActive)) {
         setApiKey(next); updateDomain('')
         return
       }
@@ -123,8 +125,10 @@ export default function App() {
     updateDomain(value); localStorage.setItem('rgi-domain', value)
   }
   const commitKey = () => {
-    if (apiKey === activeKey.current) return
-    if (apiKey) localStorage.setItem('rgi-api-key', apiKey)
+    const trimmed = apiKey.trim()
+    if (trimmed !== apiKey) setApiKey(trimmed)
+    if (trimmed === activeKey.current) return
+    if (trimmed) localStorage.setItem('rgi-api-key', trimmed)
     else localStorage.removeItem('rgi-api-key')
     window.dispatchEvent(new Event('dlj-key-updated'))
   }
@@ -144,8 +148,8 @@ export default function App() {
         </select>
         {projectId && projectError && <p role="alert">Projects could not be loaded. <button onClick={() => setKeyGeneration(value => value + 1)}>Retry</button></p>}
         <NavLink to="/projects" className="nav-link">Manage projects</NavLink>
-        <label className="sidebar-label" htmlFor="api-key">API KEY</label>
-        <input id="api-key" className="domain-input" type="password" autoComplete="off" value={apiKey} onChange={event => setApiKey(event.target.value)} onBlur={commitKey} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }} placeholder="Enter your API key" />
+        <SidebarKey key={`${keyGeneration}:${location.pathname}:${mobileOpen}`} value={apiKey}
+          saved={activeKey.current} onChange={setApiKey} onCommit={commitKey} />
         <datalist id="recent-domains">{domainId && <option value={domainId} />}</datalist>
         <nav aria-label="Main navigation">{links.map(([path, label, icon]) => <NavLink key={path} to={path === 'health' || path === 'settings' ? `/${path}` : `${root}/${path}`} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}><span aria-hidden>{icon}</span>{label}</NavLink>)}
           {projectId && <><NavLink to={`${root}/analytics`} className="nav-link">Analytics</NavLink><NavLink to={`${root}/predictions`} className="nav-link">Prediction review</NavLink><NavLink to={`${root}/settings`} className="nav-link">Project settings</NavLink><NavLink to={`${root}/integrations`} className="nav-link">Integrations</NavLink></>}
@@ -170,7 +174,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/annotators" element={<AnnotatorProfiles />} />
         <Route path="/health" element={<HealthReport />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/signup" element={<Signup key={location.search} />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/docs" element={<GuidePage />} />

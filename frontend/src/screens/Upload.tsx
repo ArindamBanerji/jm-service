@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
-import { createTextTask, hasApiKey, ingestBatch, seedSample, uploadForAnalysis, type HealthReport, type IngestItem } from '../api'
+import { ApiError, createTextTask, hasApiKey, ingestBatch, seedSample, uploadForAnalysis, type HealthReport, type IngestItem } from '../api'
 import { parseIngestFile } from '../csv'
 import { useDomain } from '../domain'
 import CsvDropzone from '../components/CsvDropzone'
@@ -66,9 +66,25 @@ export default function Upload() {
   const analyze = async (next: File, isSample = false) => {
     const run = ++analysisRun.current
     const operation = captureOperation(domainId, projectId)
-    setSample(isSample); setFile(next); setReport(null); setError(null); setBusy(true); setProgress(0)
+    setSample(isSample); setFile(next); setReport(null); setPreparedRows(null); setError(null); setBusy(true); setProgress(0)
     try { const result = await uploadForAnalysis(next, operation.signal); if (operation.isCurrent() && run === analysisRun.current) setReport(result) }
-    catch (cause) { if (run === analysisRun.current) setError(String(cause)) }
+    catch (cause) {
+      if (!operation.isCurrent() || run !== analysisRun.current) return
+      if (projectId && operation.credential && !isSample && next.size <= 10 * 1024 * 1024 &&
+          cause instanceof ApiError && cause.status === 422) {
+        try {
+          const rows = await parseIngestFile(next, 'text')
+          if (rows.length && operation.isCurrent() && run === analysisRun.current) {
+            setPreparedRows(rows)
+            return
+          }
+        } catch (parseError) {
+          if (operation.isCurrent() && run === analysisRun.current) setError(String(parseError))
+          return
+        }
+      }
+      if (operation.isCurrent() && run === analysisRun.current) setError(String(cause))
+    }
     finally { if (run === analysisRun.current) setBusy(false); operation.finish() }
   }
   const chooseFile = async (next: File) => {
@@ -198,6 +214,10 @@ export default function Upload() {
       {file && <p><strong>{file.name}</strong> <span className="muted">· {(file.size / 1024).toFixed(0)} KB</span></p>}
       {busy && <LoadingSpinner />}{progress > 0 && <p className="muted">Scored {progress} rows</p>}<ErrorBanner message={error} />
       {imageProject && preparedRows && <div className="image-import-preview" aria-label="Image import preview"><div className="success">{preparedRows.length} image items ready to import</div>{preparedRows.slice(0, 5).map(row => <div key={row.label_id} className="image-import-row"><strong>{row.text || row.label_id}</strong><span className="pill">Image URL</span></div>)}{preparedRows.length > 5 && <p className="muted">+ {preparedRows.length - 5} more rows</p>}<button className="button" onClick={startScoring} disabled={busy || !domainId}>Import image labels</button></div>}
+      {!imageProject && preparedRows && <div className="stack">
+        <p>{preparedRows.length} labels ready to score. This CSV qualifies for project import. Health reports require 200 rows with a verified outcome column.</p>
+        <button className="button" onClick={startScoring} disabled={busy || !domainId}>Start scoring these labels</button>
+      </div>}
       {report && <div className="stack"><div className="success">Analysis ready · {report.metadata.row_count} labels · {report.metadata.verified_count} verified · {report.metadata.factor_count} factors</div>
         {report.warnings?.map((warning, index) => <div className="notice" key={index}>{warning}</div>)}
         <div className="button-row">{sample ? (hasApiKey() && <button className="button" onClick={scoreSample} disabled={busy}>Score 12 sample labels</button>) : <button className="button" onClick={startScoring} disabled={busy || !domainId}>Start scoring these labels</button>}<button className="button secondary" onClick={() => { if (file) navigate('/health', { state: { reportRef: storeReportFile(file) } }) }}>View full report</button></div>

@@ -7,8 +7,9 @@ from urllib.parse import quote
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import and_, case, exists, func, or_, select, update
+from sqlalchemy import and_, bindparam, case, exists, func, insert, or_, select, update
 from sqlalchemy.orm import aliased
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -340,11 +341,51 @@ async def get_annotator(session: AsyncSession, domain_id: str, annotator_id: str
                                                        Annotator.annotator_id == annotator_id))
 
 
+# In PostgreSQL a scored label and its existing engine snapshot can be written
+# together. The dependency on the insert retains label-before-engine ordering.
+_scored_label = insert(LabelLog).values(
+    domain_id=bindparam("p_domain"), tenant_id=bindparam("p_tenant"),
+    label_id=bindparam("p_label"), annotator_id=bindparam("p_annotator"),
+    category=bindparam("p_category"), factors_json=bindparam("p_factors"),
+    recommended_action=bindparam("p_action"), confidence=bindparam("p_confidence"),
+    text=bindparam("p_text"), notes=bindparam("p_notes"),
+).returning(LabelLog.id).cte("scored_label")
+
+_advanced_engine = update(Engine).where(
+    Engine.domain_id == bindparam("p_domain"), Engine.tenant_id == bindparam("p_tenant"),
+    Engine.annotator_id.is_not_distinct_from(bindparam("p_annotator")),
+    Engine.version == bindparam("p_version"), exists(select(_scored_label.c.id)),
+).values(state_json=bindparam("p_state"), version=Engine.version + 1,
+         updated_at=bindparam("p_time")).returning(Engine.id, Engine.version).cte("advanced_engine")
+_persist_existing_score = select(_advanced_engine.c.id, _advanced_engine.c.version)
+
+
 async def score_and_persist(session: AsyncSession, engine: JudgmentMemoryEngine, domain_id: str,
                             label_id: str, annotator_id: str | None, category: str,
                             factors: dict[str, float], text: str | None = None,
                             notes: str | None = None) -> ScoreResult:
     result = engine.score(factors, category)
+    expected = getattr(engine, "_db_version", 0)
+    if expected and session.get_bind().dialect.name == "postgresql":
+        await session.flush()
+        state = engine.export_state()
+        updated_at = datetime.now(timezone.utc)
+        updated = (await session.execute(_persist_existing_score, {
+            "p_domain": domain_id, "p_tenant": _tenant(session), "p_label": label_id,
+            "p_annotator": annotator_id, "p_category": category, "p_factors": factors,
+            "p_action": result.recommended_action, "p_confidence": result.confidence,
+            "p_text": text, "p_notes": notes, "p_version": expected,
+            "p_state": state, "p_time": updated_at,
+        })).one_or_none()
+        if updated is None:
+            raise StaleDataError("Engine version changed during update")
+        cached = session.identity_map.get(session.identity_key(Engine, updated.id))
+        if cached is not None:
+            set_committed_value(cached, "state_json", state)
+            set_committed_value(cached, "version", updated.version)
+            set_committed_value(cached, "updated_at", updated_at)
+        setattr(engine, "_db_version", updated.version)
+        return result
     await record_score(session, domain_id, label_id, annotator_id, category,
                        factors, result.recommended_action, result.confidence, text, notes)
     await save_engine_state(session, domain_id, annotator_id, engine)

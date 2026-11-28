@@ -1805,3 +1805,109 @@ The measured bottleneck is elapsed time outside SQL execution, including interva
 - Both changed Python modules passed mypy. The unchanged evidence/payer-lock test and signup-to-score test passed individually. The complete suite covered authorization, quota, replay, revision evidence and commit-before-response.
 - Frozen engine SHA-256: `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
 - Files changed for 12d: `auth.py`, `db/entitlement.py`, `docs/session_state.md`.
+
+## Prompt 12e — Scoring Latency Diagnostic + Fix
+
+**Date:** 27 November 2026
+**Baseline latency:** 150.85 ms median / 276.58 ms p95 (30 committed HTTP writes)
+**Post-fix latency:** 140.29 ms median / 291.25 ms p95 (final run after all suites)
+**Budget:** <50 ms median / <100 ms p95
+**Verdict:** FAIL. Both limits were exceeded. The first post-change release run measured 143.89 / 298.36 ms. The final run again exceeded both limits. The pre-change run overlapped a type check. The two post-change signoff runs were isolated from type checks and suites, so the wall-time differences are descriptive rather than a controlled estimate of the code change.
+
+### Layer breakdown (median, 30 writes)
+
+The table compares instrumented loopback HTTP runs against an isolated PostgreSQL schema. Both runs exclude one cold write. The release numbers above come from the separate, uninstrumented `python -m tests.release_server --measure` entry point. Independent medians need not sum to the median total.
+
+| Layer | Before fix (ms) | After fix (ms) |
+|---|---:|---:|
+| Rate limit and outer middleware, T0 → T2 | 0.20 | 0.23 |
+| Media intake, including waiting for the body, T2 → T1 | 19.91 | 15.78 |
+| Body parse, T1 → T4 | 0.89 | 1.03 |
+| Validation, dependency setup and checkout through first SQL dispatch, T4 → T5 | 3.56 | 4.12 |
+| Actor lookup through completion of require_tenant, T5 → T3 | 4.67 | 4.77 |
+| Project authorization, scoring, persistence, evidence and receipt flush, T3 → T6 | 57.19 | 49.14 |
+| Database commit through return of AsyncSession.commit, T6 → T7 | 3.41 | 2.89 |
+| Response encoding, headers and final ASGI send, T7 → T8 | 1.28 | 1.37 |
+| **Total inside ASGI, T0 → T8** | **88.25** | **82.83** |
+
+### Root cause and limits of the measurement
+
+- The largest application interval was project authorization through the final receipt flush. Within this interval, project authorization after actor lookup took 17.74 ms after the change. Driver work across the entire request, including network and client scheduling, measured 29.95 → 24.72 ms. The earlier PostgreSQL execution measurement of about 3 ms covers only time executing on the database server.
+- The final diagnostic measured 13.13 ms median from the HTTP client to ASGI entry and 28.96 ms from final ASGI send to client completion. The latter interval reached 142.52 ms at p95. Timing the actual route in process before the change measured only 0.27 ms of media intake. The TCP measurement also includes the wait for body bytes. Across all layers, the post-change in-process diagnostic measured 59.32 ms median / 83.78 ms p95, compared with 63.44 / 77.67 ms before.
+- A transport control sent the same request body on the existing loopback connection and returned the same response bytes. Without FastAPI routing, scoring, authorization or SQL, it took 52.66 ms median / 58.58 ms p95. HTTPX selected a direct connection pool. This isolates a transport/runtime contribution large enough to consume the median budget on this host. The measurements do not identify an individual OS component or security product, or establish the cause of the historical pre-12a difference.
+- Warm SQL count fell from 11 to 10. The new diagnostic records T0–T8 for each write and checks that PostgreSQL commit completes before response headers. Rate limiting runs before media intake, JSON parsing precedes dependency resolution, and actor authentication itself executes the first SQL statement. The table uses that observed order.
+
+### Warm owner write path and await boundaries
+
+1. Uvicorn dispatches through CORS and `RateLimitHeaders` to `MediaIntake`. The small JSON body takes the bounded ASGI receive loop. Larger or undeclared bodies can also await a permit. FastAPI awaits body/JSON parsing using the replayed bytes.
+2. `get_db` yields one async session. `require_tenant` awaits cached request JSON for pre-access validation and a scalar API-key lookup. `require_project_tenant` awaits the UUID/tenant-guard query, sorted actor/payer locking through `resolve_entitlement`, and a fresh project row lock. It rechecks status and records the locked project and payer in the request.
+3. `project_import_batch` verifies its transaction and scope, computes the digest, awaits the receipt lookup, and validates all items. A matching receipt returns the committed result. A new request awaits `_ingest`. `_prepare_engine` awaits `load_or_create_engine` → `load_engine` → scoped engine SELECT. The measured workload already has its engine and category.
+4. `reserve_label_capacity` checks the locked payer and updates counters. `score_and_persist` scores synchronously, flushes pending changes, and awaits the parameterized label/engine write. `_category_stats` awaits the scoped evidence stream and iterates its results before policy evaluation. The measured input has no typed attachment or annotator. Those branches retain their content and annotator writes and eligibility checks.
+5. The handler stages the receipt, awaits `commit_write` → `AsyncSession.commit` (including ORM flush and database COMMIT), then returns the result. ASGI awaits headers/body sends and the session context handles cleanup. Validation, stale versions, duplicate keys and failed commits retain their rollback/error paths.
+
+### Fixes applied
+
+- `db/repository.py` combines the scored label insert and existing engine snapshot update in one PostgreSQL statement. The update depends on the label insert, checks tenant, domain, annotator and expected version, and returns only the engine ID and version. A retained ORM row is refreshed from the values just written. First-time engines retain their creation and conflict checks. The warm SQL sequence is actor lookup → UUID/tenant guard → payer and actor locks → domain lock → receipt lookup → engine lookup → payer counter update → scored label and versioned engine write → verified evidence → receipt insert. BEGIN and COMMIT are separate transaction operations.
+- `tests/test_latency_diagnostic.py` adds request-owned ASGI, session and driver timing. It issues a real admin and project request, runs the release scoring payload 31 times, checks 31 durable pending items, and reports the 30 warm writes. Set `DLJ_LATENCY_TRANSPORT=tcp` to include Uvicorn, loopback HTTP and the byte-matched transport control.
+
+### Functional verification
+
+- PostgreSQL suite: **361 passed**, 16 experiment tests deselected.
+- Playwright: **196 passed**. PostgreSQL, Playwright and the scenario selection ran in sequence.
+- Scenarios: **27/27 IDs green** in the full suite (29 cases in the scenario files). The separate filter first returned 35 passed and one S28 failure with a teardown error. S28 timed out waiting for the intercepted signup confirmation. Repeating the complete filter in a fresh process returned **36 passed** without changes to code or timeouts.
+- The focused signup-to-score test and both diagnostic transports passed. Authorization, quota, replay, evidence and commit-before-response regressions passed in the full suite.
+- Mypy passed for both changed Python files. Frozen engine SHA-256: `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+- The unchanged TCP gate ran with `python -m tests.release_server --measure`. It returned exit 1 for latency after verifying the 31 committed labels.
+
+### Files changed
+
+- `db/repository.py`
+- `tests/test_latency_diagnostic.py`
+- `docs/session_state.md`
+
+## Prompt 13 — Key Recovery + Find All Fix All
+
+**Date** 27–28 November 2026
+**Baseline** The preserved pre-change checkout recorded 360 PostgreSQL-suite cases passed, 1 failed and 16 experiments deselected. The failing export test exposed incorrect UTF-8 byte counting on Windows PostgreSQL. Playwright recorded 195 passed and 1 failed while advancing to the next label in the text lifecycle.
+**Post** 369 PostgreSQL-suite cases passed, 16 experiments deselected. All 202 Playwright tests passed. The PostgreSQL and browser suites ran sequentially on Windows.
+
+### Part A — Key Recovery Flow
+
+Both public endpoints shipped. `POST /v1/auth/recover` returns the same acknowledgement for verified and unknown addresses and limits both to three requests per normalized mailbox per hour. The existing IP limiter also applies. A code is eligible only for the verified signup mailbox. The billing contact alone grants no access. Inactive, cleaned-up and reconciliation-pending credentials cannot be recovered through this route.
+
+`POST /v1/auth/recover/confirm` locks the tenant and conditionally rotates the existing credential in one committed transaction. Only the SHA-256 digest and a 15-minute expiry are persisted in `api_keys.recovery_token_hash` and `api_keys.recovery_token_expires`. Requesting another code supersedes the previous one. Confirmation preserves the credential ID, project ownership, paid tier and subscription. The former key then receives 401. Admin rotation also invalidates an outstanding code.
+
+A returning customer can recover from the signup conflict, Settings or the public guide. A Chromium test exercised signup, mailbox confirmation, recovery, replacement, refresh, project access and former-key rejection against the real API and PostgreSQL. The email provider was mocked at the send boundary and the test consumed the code from the rendered email. Live inbox delivery and live Paddle purchases were outside this verification.
+
+### Part B — Sidebar Key Copy
+
+Clicking the masked value or the keyboard-accessible Copy button copies the saved key. Successful copy shows a short confirmation. A denied clipboard leaves the input selected and offers Show for manual copying. The display conceals on window blur and navigation. Account changes invalidate stale feedback.
+
+### Part C — Find All Fix All
+
+| Severity | Location | First-hour failure and correction |
+|---|---|---|
+| P1 | `auth.py:109`, `frontend/src/screens/Signup.tsx:23` | Returning signup previously directed customers to support without a recovery flow. Added mailbox-proven rotation and self-service UI. |
+| P1 | `frontend/src/components/SidebarKey.tsx:11` | A saved credential became inaccessible behind the sidebar mask. Added copy, reveal, feedback and manual fallback. |
+| P1 | `projects_router.py:90`, `frontend/src/screens/Projects.tsx:13` | One-factor projects could be created but could not score. The form’s default factor names also disagreed with CSV parsing. Enforced the documented 2–20 factors and aligned form defaults with CSV headers. |
+| P2 | `frontend/src/screens/Projects.tsx` | The create action silently returned for visitors without a key. Disabled that action and provided signup and recovery links. |
+| P2 | `frontend/src/screens/Upload.tsx:66` | A report’s 200-row requirement blocked a valid small text CSV. A signed-in project can preview and explicitly import locally validated scoring rows when the report rejects the file. |
+| P2 | `frontend/src/screens/ReviewCard.tsx:95` | The current label waited for unrelated queue and autonomy reads. Load the detail independently, fetch just two candidate IDs for normal next-item navigation, and keep the queue available after a verification. |
+| P2 | `frontend/src/screens/Settings.tsx` | A failed domain list removed account usage and the upgrade controls. Retain the independently loaded account summary and provide a retry message. |
+| P2 | `frontend/src/App.tsx:91` | Entering the first key reloaded the page during project discovery, and surrounding whitespace could invalidate a pasted key. Apply a first sign-in on Upload in place and trim on commit. |
+| P2 | `labeling_router.py:1623` | Export measured database-encoded bytes. A Windows PostgreSQL database using WIN1252 undercounted non-ASCII UTF-8 output. Count the bytes in the export encoding. |
+| P3 | `frontend/src/pages/GuidePage.tsx`, `frontend/src/screens/Settings.tsx` | Getting-started and account help omitted the available key-management paths. Added recovery, copy and first-project guidance and documented the public API and schema. |
+
+Three P1s, six P2s and one P3 were fixed. Reviewed registration through scoring and verification, local key retention, project validation, CSV admission and row errors, trial/upgrade handling, browser interaction, recovery authorization, the public guide and downloadable client. Billing integration checks used the existing provider harness.
+
+### Tests and verification
+
+- Eight new PostgreSQL-suite cases (including one real Chromium recovery journey) and six new Playwright cases. Coverage includes single-use races, replacement/expiry, per-email limits, billing-contact isolation, copy failure, first CSV scoring and isolated account/tier failures.
+- TypeScript and the frontend production build passed. mypy passed on the changed Python modules and fixtures. The backend modules in this checkout are at the repository root and under `db/`.
+- Frozen engine SHA-256 verified as `1922316f0998df0d071318c8a82192c880890ff9dddfa62bf399f02f04469e09`.
+
+### Files changed
+
+- Backend and design — `auth.py`, `email_service.py`, `db/models.py`, `db/migrate.py`, `projects_router.py`, `labeling_router.py`, `docs/design/dlj_product_design_v1.md`, `docs/session_state.md`.
+- Frontend — `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/copyKey.ts`, `frontend/src/components/SidebarKey.tsx`, `frontend/src/pages/GuidePage.tsx`, `frontend/src/screens/Signup.tsx`, `Projects.tsx`, `ReviewCard.tsx`, `Settings.tsx`, `Upload.tsx` in the same screens directory, and the built `frontend/dist/index.html`.
+- Tests — `tests/harness/test_key_recovery.py`, `tests/harness/browser/test_key_recovery_flow.py`, `tests/e2e/key_recovery.spec.ts`, `tests/harness/test_prompt_a_projects.py`, `tests/harness/test_prompt_e_webhooks.py`, `tests/harness/test_r2_fixes.py`, `tests/test_modality_schema.py`.

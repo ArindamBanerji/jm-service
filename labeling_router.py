@@ -18,13 +18,13 @@ from math import isfinite
 from pathlib import Path
 from time import monotonic
 from typing import Annotated, Any, ClassVar, Literal, Self, Sequence
-from sqlalchemy.orm import defer
+from sqlalchemy.orm import InstrumentedAttribute, defer
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ModelWrapValidatorHandler, PrivateAttr, field_validator, model_validator
-from sqlalchemy import String, bindparam, case, func, null, or_, select, text, update
+from sqlalchemy import LargeBinary, String, bindparam, case, func, null, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
@@ -1618,7 +1618,13 @@ async def _export_rows(tenant: str, domain: Domain, *, actor: UUID, review_statu
                 domain.content_type, domain.label_schema, domain.modality_enforced):
             raise HTTPException(409, "Project modality changed before export")
         image_project = policy.content_type == "image"
-        byte_length = func.octet_length if session.get_bind().dialect.name == "postgresql" else func.length
+        postgres = session.get_bind().dialect.name == "postgresql"
+
+        def byte_length(column: InstrumentedAttribute[str | None]):
+            # The wire format is UTF-8 even when a local PostgreSQL database uses a different encoding.
+            if postgres:
+                return func.octet_length(func.convert_to(column, "UTF8"))
+            return func.length(column.cast(LargeBinary))
         last_id: UUID | None = None
         while True:
             if monotonic() - started > EXPORT_TIMEOUT_SECONDS:

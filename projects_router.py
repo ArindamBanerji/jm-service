@@ -90,7 +90,7 @@ async def _project(session: AsyncSession, project_id: UUID, tenant: str,
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     public_domain_id: str = Field(min_length=1, max_length=200)
-    factors: list[str] = Field(min_length=1, max_length=20)
+    factors: list[str] = Field(min_length=2, max_length=20)
     categories: list[str] = Field(min_length=1, max_length=20)
     actions: list[str] = Field(default_factory=lambda: ["approve", "reject"])
     content_type: str | None = None

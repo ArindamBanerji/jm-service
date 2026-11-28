@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from html import escape
 
 import httpx
@@ -54,6 +55,16 @@ async def send_signup_challenge_email(to: str, token: str) -> bool:
     html = ("<p>Enter this one-time code in the DLJ signup form within 30 minutes:</p>"
             f"<pre>{escape(token)}</pre>")
     return await send_email(to, "Confirm your DLJ email", html)
+
+
+async def send_recovery_email(to: str, token: str) -> None:
+    html = ("<p>To replace your DLJ API key, enter this one-time code on the "
+            "<a href='https://dlj.dakshineshwari.net/#/signup?recover=1'>key recovery page</a> "
+            f"within 15 minutes:</p><pre>{escape(token)}</pre>"
+            "<p>Confirming replaces the key used by your apps. If you did not request this, "
+            "ignore this email. Your existing key still works.</p>")
+    if not await send_email(to, "Recover your DLJ API key", html):
+        logging.getLogger(__name__).warning("Recovery code email delivery failed")
 
 
 def trial_expiring_email() -> tuple[str, str]:

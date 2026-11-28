@@ -124,7 +124,9 @@ CREATE TABLE api_keys (
   paddle_event_id VARCHAR(200), 
   paddle_event_occurred_at TIMESTAMP WITH TIME ZONE, 
   contact_email VARCHAR(200), 
-  signup_email VARCHAR(200), 
+  signup_email VARCHAR(200),
+  recovery_token_hash VARCHAR(64),
+  recovery_token_expires TIMESTAMP WITH TIME ZONE,
   signup_reconciliation_reference VARCHAR(200), 
   email_verified_at TIMESTAMP WITH TIME ZONE, 
   reproof_required BOOLEAN DEFAULT false NOT NULL, 
@@ -143,6 +145,7 @@ CREATE INDEX ix_api_keys_tenant_id ON api_keys (tenant_id);
 CREATE UNIQUE INDEX uq_api_keys_contact_email ON api_keys (lower(contact_email)) WHERE contact_email IS NOT NULL;
 CREATE UNIQUE INDEX uq_api_keys_paddle_customer_id ON api_keys (paddle_customer_id) WHERE paddle_customer_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_api_keys_signup_email ON api_keys (lower(signup_email)) WHERE signup_email IS NOT NULL;
+CREATE UNIQUE INDEX uq_api_keys_recovery_token ON api_keys (recovery_token_hash) WHERE recovery_token_hash IS NOT NULL;
 ```
 
 ORM insert defaults: `id=uuid4`, `is_active=True`, `tier=trial`, `labels_this_month=0`, `labels_month_key=`, `labels_today=0`, `labels_day_key=`.
@@ -1373,6 +1376,8 @@ Project DTOs use snake_case, UUID strings and RFC 3339 UTC timestamps. JSON exam
 
 | Method and route | Input | Success |
 |---|---|---|
+| POST /v1/auth/recover | Public. Submit `{email}` for the verified signup mailbox. Three requests per normalized email per hour. A newer code supersedes the previous one. | 200 `{message}` for both known and unknown mailboxes, 429 on rate limit |
+| POST /v1/auth/recover/confirm | Public. Submit `{token}` within 15 minutes. One successful confirmation rotates the credential on the existing account and retains its projects and billing. | 200 `{api_key, tenant_id, message}`, 401 for invalid, expired or used code |
 | POST /v1/projects | CreateProject below; name and public_domain_id 1–200 characters, description up to 4 KiB. Require unique nonempty factor/category names, 2–20 factors, 1–20 categories. Launch projects use approve/reject actions. Retain existing domains' own actions on read | 201 Project |
 | GET /v1/projects; GET P | List supports limit 1–100 (default 50), offset ≥0, optional status. Sort by created_at then id | 200 list {items,total} or one Project |
 | PATCH P; DELETE P | PATCH accepts name, description, status, automation_enabled, confidence_floor and append-only categories. Supply If-Match with the project settings version. DELETE archives | 200 updated Project; 204 on archive including repeat |

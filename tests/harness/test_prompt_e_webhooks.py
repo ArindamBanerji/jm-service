@@ -24,7 +24,7 @@ from .fixtures.factory import Wire
 async def _project(wire: Wire, name: str = "Hooks") -> str:
     response = await wire.request("POST", "/v1/projects", status=201, json={
         "name": name, "public_domain_id": name.lower(),
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })
     return response.json()["id"]
 

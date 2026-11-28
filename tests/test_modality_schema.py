@@ -4,7 +4,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import inspect, select, text
+from sqlalchemy import insert, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
 from db import migrate as migration
@@ -45,10 +45,10 @@ async def test_fresh_migration(tmp_path, monkeypatch):
                 lambda sync: inspect(sync).get_columns("label_content"))
                               if row["name"] == "image_url")
             assert str(image_type).upper() == "TEXT"
-            await connection.execute(Domain.__table__.insert().values(
+            await connection.execute(insert(Domain).values(
                 domain_id="fresh-default", tenant_id="fresh", domain_name="Fresh",
                 config_json={"domain_id": "fresh-default", "domain_name": "Fresh",
-                             "factors": ["quality"], "categories": ["A"],
+                             "factors": ["quality", "difficulty"], "categories": ["A"],
                              "actions": ["approve", "reject"]}))
             defaults = (await connection.execute(select(
                 Domain.content_type, Domain.label_schema, Domain.modality_enforced).where(
@@ -56,10 +56,10 @@ async def test_fresh_migration(tmp_path, monkeypatch):
             assert defaults == ("text", "single", False)
             with pytest.raises(IntegrityError):
                 async with connection.begin_nested():
-                    await connection.execute(Domain.__table__.insert().values(
+                    await connection.execute(insert(Domain).values(
                         domain_id="invalid-pair", tenant_id="fresh", domain_name="Invalid",
                         config_json={"domain_id": "invalid-pair", "domain_name": "Invalid",
-                                     "factors": ["quality"], "categories": ["A"],
+                                     "factors": ["quality", "difficulty"], "categories": ["A"],
                                      "actions": ["approve", "reject"]},
                         content_type="image", label_schema="ner"))
 

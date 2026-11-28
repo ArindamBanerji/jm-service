@@ -415,7 +415,7 @@ async def test_invitation_claim_is_single_use_with_concurrent_acceptances(wire: 
         pytest.skip("PostgreSQL row locking is the concurrency oracle")
     project = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Shared", "public_domain_id": "claim-once",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     member_key = await wire.factory.user("invite-recipient")
     async with wire.factory.sessions.begin() as session:
@@ -452,7 +452,7 @@ async def test_invitation_revoked_while_acceptance_waits_is_refused(wire: Wire, 
         pytest.skip("PostgreSQL row locking is the concurrency oracle")
     project = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Replace invite", "public_domain_id": "replace-invite",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     member_key = await wire.factory.user("replacement-recipient")
     async with wire.factory.sessions.begin() as session:
@@ -504,7 +504,7 @@ async def test_invitation_revoked_while_acceptance_waits_is_refused(wire: Wire, 
 async def test_null_project_patch_is_validation_error_without_mutation(wire: Wire):
     project = (await wire.request("POST", "/v1/projects", status=201, json={
         "name": "Patch", "public_domain_id": "patch-null",
-        "factors": ["quality"], "categories": ["A"],
+        "factors": ["quality", "difficulty"], "categories": ["A"],
     })).json()["id"]
     original = (await wire.request("GET", f"/v1/projects/{project}")).json()
     for field in ("automation_enabled", "confidence_floor"):
